@@ -6,6 +6,13 @@ Entities are introduced through tickets as they're needed (§12 of the source br
 
 `users`, `tenants`, `tenant_memberships`, `brands`, `locations`, `invitations`.
 
+> **Implemented (ticket #4):** `tenants`, `tenant_memberships`, `brands`, `locations` and their RLS policies ship in
+> `supabase/migrations/20260801040000_tenant_membership_brand_location_model.sql`. `tenant_memberships` currently
+> carries a minimal fixed `role` column (`owner` | `manager` | `staff`) rather than the full RBAC tables below — those
+> land with ticket #9. A tenant is guaranteed at least one Owner membership at all times via a deferred
+> database constraint trigger (see the migration's header comment). `users` and `invitations` are not yet
+> implemented (tickets #7/#8).
+
 ## Authorization
 
 `roles`, `permissions`, `role_permissions`, `membership_roles`. Permission keys follow `area.resource.action`, e.g. `menu.publish`, `payments.refund`, `orders.cancel` — full list in `.claude/rules/auth.md`.

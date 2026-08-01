@@ -24,6 +24,12 @@ name: Migration Check
 # migration set grows, the fallback is a lighter `supabase db lint`-only step
 # without `supabase start` -- not implemented now because the full start is
 # currently fast (single example migration) and gives strictly more coverage.
+#
+# Ticket #4 adds a "Run integration tests" step after `supabase start`: the
+# required cross-tenant RLS test (packages/database/src/tenants.integration.test.ts)
+# needs a real local Supabase Postgres instance, which only this runner
+# reliably provides (see that test file's header comment for why it can't be
+# verified on the current dev machine).
 
 on:
   pull_request:
@@ -48,6 +54,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
@@ -58,6 +76,11 @@ jobs:
 
       - name: Lint migrations
         run: supabase db lint
+
+      - name: Run integration tests (RLS / tenant isolation)
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: pnpm --filter @gastro-saas/database test:integration
 
       - name: Stop local Supabase stack
         if: always()
