@@ -1,0 +1,39 @@
+# Threat Model
+
+Scope: multi-tenant gastronomy SaaS handling menu data, orders, payments (via Stripe, never storing card data), and staff/customer PII.
+
+## Threats and mitigations
+
+| Threat | Mitigation |
+|---|---|
+| Cross-tenant data access | RLS + server-side membership checks on every request; cross-tenant test harness (`docs/security/tenant-isolation.md`) |
+| Insecure direct object references | Every lookup joins through tenant membership, never a bare ID lookup |
+| Privilege escalation | Server-side permission checks per action; permission changes audited; last-owner protection (cannot remove the final Owner) |
+| Stolen sessions | Secure, httpOnly, short-lived session cookies; session invalidation on password change |
+| Invitation abuse | Invitations are single-use, expiring, scoped to one tenant + role |
+| Owner lockout | At least one Owner membership required per tenant at all times; enforced at the DB constraint level, not just UI |
+| Payment manipulation / price tampering | Server always recalculates order totals from current menu data; client-submitted totals are never trusted (`.claude/rules/payments.md`) |
+| Webhook spoofing / replay | Stripe webhook signature verification on every event; `payment_webhook_events` table enforces idempotency by event ID |
+| Order tampering | Orders are immutable once paid; state machine rejects invalid transitions |
+| Malicious file upload | Allow-listed file types/sizes for dish images, re-encoded on upload, stored under tenant-scoped storage paths |
+| Stored/reflected XSS | Output encoding by default (React), strict CSP, no `dangerouslySetInnerHTML` for tenant-authored free text without sanitization |
+| CSRF | Same-site cookies + framework CSRF protection on state-changing routes |
+| SQL injection | Parameterized queries only via the Supabase client / typed query layer, no string-built SQL |
+| SSRF | No server-side fetch of tenant-supplied URLs without an allow-list (e.g. image import from URL is out of MVP scope specifically to avoid this) |
+| Secret leakage | Stripe secret keys and Supabase service-role key live server-side only, never shipped to the browser; `.env*` blocked from commits by a Claude Code hook |
+| Log leakage | Structured logs redact payment data, tokens, and free-text customer notes beyond what's operationally necessary |
+| Rate-limit abuse / credential stuffing | Rate limiting on auth and checkout endpoints |
+| Review spam | Ratings require a verified completed-order token; moderation queue before public display |
+| Order spam | Rate limiting + basic bot protection (Cloudflare Turnstile) on guest checkout |
+| Enumeration | Generic error messages for auth failures; no "email already exists" style leaks beyond what's necessary for UX |
+| Insecure external integrations | Provider-neutral interface, official APIs only, no scraping, mock provider for dev |
+| Prompt injection via untrusted content during development | Content fetched from external sources (web pages, tool results) is treated as data, never as instructions, per the agent's own operating rules |
+
+## Explicit residual responsibility split
+
+- **Enforced by software**: tenant isolation, payment integrity, webhook verification, auth/authorization, input validation, rate limiting, secret handling.
+- **Tenant's legal responsibility, not automatable**: accuracy of allergen/additive declarations, correctness of legal/imprint content, compliance with local food-safety and consumer-protection law. The platform's rule-based quality checks (§11 of the source brief) catch *missing* or *structurally inconsistent* data — they are not legal compliance certification, and the product must never claim otherwise.
+
+## Not yet assessed (flag for `/security-gate` before each relevant ticket)
+
+Dispute/chargeback handling, formal penetration testing, GDPR Article 30 records of processing, data processing agreements with each vendor in the service register.
