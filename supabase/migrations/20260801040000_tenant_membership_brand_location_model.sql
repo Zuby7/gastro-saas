@@ -183,6 +183,16 @@ grant execute on function is_tenant_owner(uuid) to authenticated, service_role;
 -- ----------------------------------------------------------------------------
 alter table tenants enable row level security;
 
+-- Postgres checks table-level GRANTs *before* RLS -- RLS alone does not
+-- expose a table to a role, it only filters rows once access is otherwise
+-- permitted. New tables are not auto-exposed to the Data API roles by
+-- default (see supabase/config.toml `[api] auto_expose_new_tables` note), so
+-- every RLS-protected table below needs an explicit GRANT matching the verbs
+-- its policies allow. `service_role` bypasses RLS entirely but still needs
+-- the same underlying GRANTs to read/write at all.
+grant select, update on tenants to authenticated;
+grant select, insert, update, delete on tenants to service_role;
+
 create policy tenants_select_member
   on tenants
   for select
@@ -204,6 +214,9 @@ create policy tenants_update_owner
 -- tenant_memberships RLS
 -- ----------------------------------------------------------------------------
 alter table tenant_memberships enable row level security;
+
+grant select, update, delete on tenant_memberships to authenticated;
+grant select, insert, update, delete on tenant_memberships to service_role;
 
 create policy tenant_memberships_select_member
   on tenant_memberships
@@ -248,6 +261,14 @@ begin
 
   if (tg_op = 'DELETE' and old.role = 'owner')
      or (tg_op = 'UPDATE' and old.role = 'owner' and new.role <> 'owner') then
+    -- If the tenant itself no longer exists (e.g. `delete from tenants ...`
+    -- cascaded into deleting all of its memberships in the same
+    -- transaction), there is nothing to protect -- skip the check so
+    -- deleting a whole tenant is never blocked by its own Owner cleanup.
+    if not exists (select 1 from tenants where id = v_tenant_id) then
+      return null;
+    end if;
+
     select count(*) into v_remaining_owners
     from tenant_memberships
     where tenant_id = v_tenant_id
@@ -298,6 +319,9 @@ create trigger brands_set_updated_at
 create index brands_tenant_id_idx on brands (tenant_id);
 
 alter table brands enable row level security;
+
+grant select, insert, update, delete on brands to authenticated;
+grant select, insert, update, delete on brands to service_role;
 
 create policy brands_select_member
   on brands
@@ -382,6 +406,9 @@ create trigger locations_brand_same_tenant
   execute function enforce_location_brand_same_tenant();
 
 alter table locations enable row level security;
+
+grant select, insert, update, delete on locations to authenticated;
+grant select, insert, update, delete on locations to service_role;
 
 create policy locations_select_member
   on locations
