@@ -25,6 +25,7 @@ Decisions made autonomously because they were low-risk, reversible, and didn't r
 - **Repository name/visibility**: `gastro-saas`, private — confirmed with the user directly.
 - **GitHub tickets language**: German titles/descriptions, per explicit instruction.
 - **MFA for Owner/Manager**: not built in this foundation pass (accepted risk, tracked in `docs/security/threat-model.md`) — flagged by the Opus architecture review as a gap for accounts that control Stripe payouts/refunds. Should become a real ticket before a pilot tenant's Stripe account goes live with real payouts, not indefinitely deferred.
+- **Elevated security scrutiny near payments/customer data** (2026-08-01, explicit user instruction): given the platform integrates payment providers, anything touching payment logic, webhooks, customer PII, or auth must be triple-checked before shipping — no shortcuts, no "good enough" code that could leak customer data or create liability. This reinforces (doesn't replace) the existing per-ticket Opus validation cadence and `.claude/rules/security.md`/`payments.md` — for `risk:security`/`risk:payment`/`risk:privacy`-labelled tickets specifically, the opus-validator should be pushed to verify claims empirically (real DB/API probes, not just code reading) rather than accepting a report at face value, the same rigor already applied to tickets #4 and #7.
 
 ## Opus architecture review (2026-08-01) — what was fixed vs. deferred
 
