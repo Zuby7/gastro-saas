@@ -1,0 +1,67 @@
+{
+  "ticket": "2",
+  "cycle": 1,
+  "note": "Backfilled per-ticket review after cadence reverted to per-ticket-always (2026-08-01); originally only covered by the retired end-of-epic batch mode.",
+  "verdict": "APPROVED",
+  "acceptance_criteria": [
+    { "criterion": "Workflow läuft bei jedem PR automatisch", "status": "PASS" },
+    { "criterion": "Ein fehlgeschlagener Check blockiert den Merge", "status": "PASS" },
+    { "criterion": "Cache wird sinnvoll genutzt, ohne Secrets zu cachen", "status": "PASS" }
+  ],
+  "deterministic_checks": {
+    "format": "PASS",
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "unit_tests": "PASS",
+    "integration_tests": "NOT_RUN",
+    "e2e_tests": "NOT_RUN",
+    "build": "PASS",
+    "security": "PASS"
+  },
+  "tenant_isolation": "NOT_APPLICABLE",
+  "authorization": "NOT_APPLICABLE",
+  "payment_safety": "NOT_APPLICABLE",
+  "accessibility": "NOT_APPLICABLE",
+  "data_integrity": "NOT_APPLICABLE",
+  "maintainability": "PASS",
+  "review_findings": [
+    {
+      "severity": "medium",
+      "area": "CI hardening",
+      "summary": "No top-level `permissions: contents: read`; only secret-scan job restricts its token."
+    },
+    {
+      "severity": "medium",
+      "area": "Secret scanning coverage",
+      "summary": ".gitleaks.toml allowlists all of .env.example by path, not just the known demo values — a real secret pasted there later would be silently ignored."
+    },
+    {
+      "severity": "low",
+      "area": "Secret scanning depth",
+      "summary": "Only incremental commit ranges are scanned; no scheduled full-history scan."
+    },
+    {
+      "severity": "low",
+      "area": "Test gate strength",
+      "summary": "`pnpm -r --if-present test` silently skips packages without a test script."
+    },
+    {
+      "severity": "low",
+      "area": "Supply chain",
+      "summary": "Actions pinned to mutable major tags, not commit SHAs."
+    },
+    {
+      "severity": "low",
+      "area": "Runtime currency",
+      "summary": "Node 20 deprecation warnings in every CI job."
+    }
+  ],
+  "residual_risks": [
+    "No required_pull_request_reviews on branch protection — a PR can be merged as soon as checks are green, Opus verdict is not itself a required status check.",
+    "Migration Check workflow is not in the required-checks list on main.",
+    "gitleaks SARIF is uploaded as an artifact but not fed into GitHub code scanning."
+  ],
+  "required_actions": [
+    "None blocking. Recommended non-blocking follow-up chore: top-level permissions:contents:read, narrow .gitleaks.toml allowlist, add Migration Check to required status checks, pin actions to SHAs, scheduled full-history secret scan."
+  ]
+}
