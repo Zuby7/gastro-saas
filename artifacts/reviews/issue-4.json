@@ -5,12 +5,21 @@
   "acceptance_criteria": [
     { "criterion": "Migrationen laufen fehlerfrei", "status": "PASS" },
     { "criterion": "Jede Tabelle hat eine RLS-Policy im selben Migrationsfile", "status": "PASS" },
-    { "criterion": "Ein Tenant hat zu jedem Zeitpunkt mindestens einen Owner (DB-Constraint)", "status": "PASS" },
+    {
+      "criterion": "Ein Tenant hat zu jedem Zeitpunkt mindestens einen Owner (DB-Constraint)",
+      "status": "PASS"
+    },
     { "criterion": "Integrationstest: RLS verweigert Zugriff auf fremden Tenant", "status": "PASS" }
   ],
   "deterministic_checks": {
-    "format": "PASS", "lint": "PASS", "typecheck": "PASS", "unit_tests": "PASS",
-    "integration_tests": "PASS", "e2e_tests": "NOT_RUN", "build": "PASS", "security": "PASS"
+    "format": "PASS",
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "unit_tests": "PASS",
+    "integration_tests": "PASS",
+    "e2e_tests": "NOT_RUN",
+    "build": "PASS",
+    "security": "PASS"
   },
   "tenant_isolation": "PASS",
   "authorization": "PASS",
