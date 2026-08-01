@@ -5,9 +5,11 @@ name: CI
 #   format -> lint -> typecheck -> unit -> integration -> build ->
 #   migration validation -> secret scan -> dependency/security scan -> E2E smoke
 #
-# This ticket (#2) implements: format, lint, typecheck, unit, build, secret scan.
+# This workflow implements: format, lint, typecheck, unit, build, secret scan.
+# Integration tests + migration validation (incl. the cross-tenant RLS test)
+# live in the separate .github/workflows/migration-check.yml job "Migration
+# Validation", which is also a required status check on `main`.
 # Not yet implemented (tracked in later tickets, do not add here without an ADR):
-#   - integration tests + migration validation: no database/migrations yet (ticket #3)
 #   - dependency/security scan (e.g. npm audit / Dependabot alerts gate): follow-up ticket
 #   - E2E smoke: no Playwright suite yet
 # Each check below is its own job so a failure is attributable to a single named

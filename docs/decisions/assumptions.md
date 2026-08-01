@@ -32,6 +32,15 @@ The pre-implementation Opus review (`artifacts/reviews/architecture-review-pass-
 
 Deferred to ticket-level fixes (tracked as follow-up, not yet done): correcting ticket #4's "exactly one Owner" wording to "at least one Owner", adding a transactional-email ticket (order confirmation via Resend — currently only invitations are covered), adding an MVP-phase imprint/privacy/consent ticket (currently only a post-MVP retention/export ticket exists), re-sequencing the cross-tenant-harness ticket (#5) to not depend on auth (#7), moving `analytics_events` table creation earlier than ticket #31, seeding `packages/ui` design tokens in ticket #1, and marking ticket #39 (integration reconciliation) as blocked on a real integration partner rather than freely schedulable. These should be applied to the GitHub Issues before Epic 3/4/6/7/12 work starts, respectively.
 
+## Tracked follow-up: `.env.example` key reconciliation (from ticket #3's PR, not yet done)
+
+`.env.example`'s Supabase demo values were filled in from the well-known local-dev defaults documented by Supabase (not a real `supabase status -o env` run), because local Docker/Supabase could not be smoke-verified on this dev machine (disk space / Docker availability — see the CI-only reliance noted in `docs/operations/deployment-strategy.md` and `.github/workflows/migration-check.yml`). Outstanding, not yet done:
+
+- Once local Docker/Supabase works on a dev machine, run `supabase start` + `supabase status -o env` and diff the real output against `.env.example` to confirm no drift.
+- Current Supabase CLI versions (2.x) emit a newer publishable/secret key format (`sb_publishable_...` / `sb_secret_...`) alongside/instead of the older JWT-style anon/service-role keys. `.env.example` and any onboarding docs should document both formats and which one a given CLI version produces, so a developer isn't confused when their locally generated keys don't look like the checked-in example.
+
+This was previously only recorded in the (merged) PR #44 description; it is tracked here so it isn't lost.
+
 ## Explicitly not decided yet (needs the user or a later ticket)
 
 - Real Stripe/Supabase/Resend/Sentry/PostHog/Better Stack account creation — these need the user's own email/identity and, for Stripe, banking details for payouts.
