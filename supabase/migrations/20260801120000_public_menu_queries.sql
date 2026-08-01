@@ -35,8 +35,15 @@ begin
     return null;
   end if;
 
-  insert into public.analytics_events (tenant_id, event_type)
-  values (v_tenant_id, 'menu_viewed');
+  -- Opus batch review (epic-3-5-batch, medium, fake-metric inflation):
+  -- this function is granted to anon and was writing an analytics_events
+  -- row on every call, unbounded and ungated -- anyone could inflate
+  -- "menu viewed" counts arbitrarily by hitting the public endpoint in a
+  -- loop. Removed outright rather than adding throttling/dedup here, which
+  -- would be disproportionate scope for this fix cycle. Real view analytics
+  -- need a proper throttled/deduplicated mechanism (e.g. rate-limited per
+  -- IP/session, or deduplicated within a time window) -- tracked as a
+  -- follow-up, see the GitHub issue referenced in this migration's PR.
 
   select jsonb_build_object(
     'tenant', jsonb_build_object(

@@ -107,6 +107,43 @@ describe.skipIf(!dbAvailable)("invitations", () => {
     ).rejects.toThrow(/already been used/i);
   });
 
+  // Regression test for the Opus batch review (epic-3-5-batch, high,
+  // privilege escalation): create_invitation() previously only checked
+  // users.invite and left p_role_id unvalidated -- a Manager (users.invite +
+  // users.manage, but no roles.manage) could invite someone directly as
+  // Owner. This is now rejected unless the inviter holds roles.manage.
+  it("rejects inviting as Owner without roles.manage", async () => {
+    const managerUserId = randomUUID();
+    fixture = await seedTwoTenantFixture(admin, {
+      tenantA: {
+        additionalMembers: [
+          { userId: managerUserId, email: "manager-inviter@example.test", role: "manager" },
+        ],
+      },
+    });
+    const { tenantA } = fixture;
+    const tokenHash = "c".repeat(64);
+
+    await expect(
+      queryAsUser(
+        admin,
+        managerUserId,
+        `select create_invitation($1, $2, $3, $4, now() + interval '7 days')`,
+        [
+          tenantA.tenantId,
+          `owner-invitee-${randomUUID()}@example.test`,
+          await roleId(tenantA.tenantId, "owner"),
+          tokenHash,
+        ],
+      ),
+    ).rejects.toThrow(/roles\.manage/i);
+
+    const created = await admin.query(`select 1 from invitations where token_hash = $1`, [
+      tokenHash,
+    ]);
+    expect(created.rows).toHaveLength(0);
+  });
+
   it("rejects expired invitations without creating a membership", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA } = fixture;

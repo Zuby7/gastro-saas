@@ -449,6 +449,13 @@ create policy membership_roles_select_member
     )
   );
 
+-- Opus batch review (epic-3-5-batch, high, privilege escalation): a
+-- users.manage holder could previously assign the system 'owner' role to
+-- any membership (including their own), self-escalating to Owner (gaining
+-- roles.manage, payments.refund, etc). Assigning (or revoking, see the
+-- delete policy below) the 'owner' role now additionally requires
+-- roles.manage -- users.manage alone is no longer sufficient for that one
+-- role key.
 create policy membership_roles_insert_users_manage
   on membership_roles
   for insert
@@ -460,9 +467,12 @@ create policy membership_roles_insert_users_manage
         join public.roles r on r.id = role_id and r.tenant_id = tm.tenant_id
        where tm.id = membership_id
          and has_tenant_permission(tm.tenant_id, 'users.manage')
+         and (r.key <> 'owner' or has_tenant_permission(tm.tenant_id, 'roles.manage'))
     )
   );
 
+-- Same rule as the insert policy above: revoking an 'owner' role assignment
+-- also requires roles.manage, not just users.manage.
 create policy membership_roles_delete_users_manage
   on membership_roles
   for delete
@@ -474,6 +484,7 @@ create policy membership_roles_delete_users_manage
         join public.roles r on r.id = role_id and r.tenant_id = tm.tenant_id
        where tm.id = membership_id
          and has_tenant_permission(tm.tenant_id, 'users.manage')
+         and (r.key <> 'owner' or has_tenant_permission(tm.tenant_id, 'roles.manage'))
     )
   );
 

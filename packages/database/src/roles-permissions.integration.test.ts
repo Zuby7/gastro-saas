@@ -252,6 +252,62 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
     expect(stillOwner.rows).toHaveLength(1);
   });
 
+  // Regression test for the Opus batch review (epic-3-5-batch, high,
+  // privilege escalation): a users.manage holder (Manager) used to be able
+  // to assign the system 'owner' role to their own membership, gaining
+  // roles.manage/payments.refund etc. Assigning 'owner' now additionally
+  // requires roles.manage.
+  it("blocks a users.manage-only Manager from self-assigning the Owner role", async () => {
+    const managerUserId = randomUUID();
+    fixture = await seedTwoTenantFixture(admin, {
+      tenantA: {
+        additionalMembers: [
+          { userId: managerUserId, email: "manager@example.test", role: "manager" },
+        ],
+      },
+    });
+    const { tenantA } = fixture;
+
+    const canManageUsers = await queryAsUser<{ has_tenant_permission: boolean }>(
+      admin,
+      managerUserId,
+      `select has_tenant_permission($1, 'users.manage')`,
+      [tenantA.tenantId],
+    );
+    expect(canManageUsers.rows[0]?.has_tenant_permission).toBe(true);
+    const canManageRoles = await queryAsUser<{ has_tenant_permission: boolean }>(
+      admin,
+      managerUserId,
+      `select has_tenant_permission($1, 'roles.manage')`,
+      [tenantA.tenantId],
+    );
+    expect(canManageRoles.rows[0]?.has_tenant_permission).toBe(false);
+
+    const membership = await admin.query<{ id: string }>(
+      `select id from tenant_memberships where tenant_id = $1 and user_id = $2`,
+      [tenantA.tenantId, managerUserId],
+    );
+    const ownerRole = await admin.query<{ id: string }>(
+      `select id from roles where tenant_id = $1 and key = 'owner'`,
+      [tenantA.tenantId],
+    );
+
+    await expect(
+      queryAsUser(
+        admin,
+        managerUserId,
+        `insert into membership_roles (membership_id, role_id) values ($1, $2)`,
+        [membership.rows[0]?.id, ownerRole.rows[0]?.id],
+      ),
+    ).rejects.toThrow(/row-level security|permission denied/i);
+
+    const escalated = await admin.query(
+      `select 1 from membership_roles where membership_id = $1 and role_id = $2`,
+      [membership.rows[0]?.id, ownerRole.rows[0]?.id],
+    );
+    expect(escalated.rows).toHaveLength(0);
+  });
+
   it("blocks assigning a role across tenants", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA, tenantB } = fixture;

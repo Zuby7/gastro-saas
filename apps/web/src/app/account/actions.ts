@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { CreateTenantSchema, InviteMemberSchema } from "@/lib/auth/schemas";
 import { sendInvitationEmail } from "@/lib/invitations/email";
 import { createInvitationToken, hashInvitationToken } from "@/lib/invitations/tokens";
+import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 
 export async function logoutAction(): Promise<void> {
   const supabase = await createSupabaseServerClient();
@@ -135,6 +136,22 @@ export async function inviteMemberAction(
     return { error: "Sie sind noch keinem Restaurant zugeordnet." };
   }
 
+  // Opus batch review (epic-3-5-batch, high, regression): the reordering
+  // below (send email before persisting) moved the send in front of the
+  // users.invite authorization check, which used to live only inside the
+  // create_invitation() RPC that ran *after* the email send -- any tenant
+  // member (even one with no invite permission) could trigger an arbitrary
+  // invitation email. This RLS-scoped permission check must happen before
+  // the send, not just before the persist.
+  try {
+    await requireTenantPermission(supabase, membership.tenant_id, "users.invite");
+  } catch (error) {
+    if (error instanceof PermissionDeniedError) {
+      return { error: "Sie haben nicht die erforderliche Berechtigung, Mitglieder einzuladen." };
+    }
+    throw error;
+  }
+
   const token = createInvitationToken();
   const tokenHash = hashInvitationToken(token);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -147,7 +164,9 @@ export async function inviteMemberAction(
   // single-use-token best practice) -- persisting first and emailing second
   // meant a failed send left a permanently unusable invite row with no way
   // to recover or resend the token. Sending first means a failure leaves
-  // nothing behind to clean up; the admin just retries the action.
+  // nothing behind to clean up; the admin just retries the action. The
+  // users.invite permission check above now runs before this send too, so
+  // an unauthorized caller can no longer trigger the email at all.
   try {
     await sendInvitationEmail({
       to: parsed.data.email,

@@ -238,6 +238,82 @@ describe.skipIf(!dbAvailable)("restaurant profile and menu management", () => {
     );
   });
 
+  // Regression test for the Opus batch review (epic-3-5-batch, critical):
+  // menu_versions' basic RLS UPDATE policy only checked menu.write, so a
+  // menu.write-only role could directly set status = 'published' (or flip a
+  // published version back to 'draft'), completely bypassing
+  // publish_menu_version()'s menu.publish check, blocker validation, and
+  // audit log. Fixed by guard_menu_versions_status_change().
+  it("rejects direct menu_versions.status writes outside publish_menu_version()", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const draftId = randomUUID();
+
+    await queryAsUser(
+      admin,
+      tenantA.ownerId,
+      `insert into menu_versions (id, tenant_id, status) values ($1, $2, 'draft')`,
+      [draftId, tenantA.tenantId],
+    );
+
+    await expect(
+      queryAsUser(
+        admin,
+        tenantA.ownerId,
+        `update menu_versions set status = 'published' where id = $1`,
+        [draftId],
+      ),
+    ).rejects.toThrow(/can only be changed by publish_menu_version/i);
+
+    const stillDraft = await admin.query<{ status: string }>(
+      `select status from menu_versions where id = $1`,
+      [draftId],
+    );
+    expect(stillDraft.rows[0]?.status).toBe("draft");
+
+    // Publishing legitimately, then trying to flip it back to 'draft'
+    // directly (which used to let an admin re-edit a "published" version)
+    // must also be rejected.
+    await admin.query(
+      `insert into categories (tenant_id, menu_version_id, name, sort_order) values ($1, $2, 'Pizza', 1)`,
+      [tenantA.tenantId, draftId],
+    );
+    await admin.query(
+      `insert into dishes (tenant_id, menu_version_id, category_id, name, price_cents, allergen_reviewed)
+       select $1, $2, c.id, 'Margherita', 900, true from categories c
+        where c.menu_version_id = $2`,
+      [tenantA.tenantId, draftId],
+    );
+    await queryAsUser(admin, tenantA.ownerId, `select publish_menu_version($1)`, [draftId]);
+
+    await expect(
+      queryAsUser(admin, tenantA.ownerId, `update menu_versions set status = 'draft' where id = $1`, [
+        draftId,
+      ]),
+    ).rejects.toThrow(/can only be changed by publish_menu_version/i);
+  });
+
+  // Regression test for the Opus batch review (epic-3-5-batch, high):
+  // run_menu_publish_checks() is SECURITY DEFINER with no tenant-membership
+  // check, so any authenticated user (of any tenant) could read another
+  // tenant's unpublished dish names via this RPC.
+  it("rejects cross-tenant calls to run_menu_publish_checks", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA, tenantB } = fixture;
+    const draftId = randomUUID();
+
+    await queryAsUser(
+      admin,
+      tenantA.ownerId,
+      `insert into menu_versions (id, tenant_id, status) values ($1, $2, 'draft')`,
+      [draftId, tenantA.tenantId],
+    );
+
+    await expect(
+      queryAsUser(admin, tenantB.ownerId, `select run_menu_publish_checks($1)`, [draftId]),
+    ).rejects.toThrow(/Missing permission menu\.write|permission denied|insufficient_privilege/i);
+  });
+
   it("public menu query returns only one tenant's published menu and hides drafts", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA, tenantB } = fixture;

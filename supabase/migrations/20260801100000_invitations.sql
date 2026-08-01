@@ -61,6 +61,7 @@ as $$
 declare
   v_inviter_user_id uuid := auth.uid();
   v_invitation_id uuid;
+  v_role_key text;
 begin
   if v_inviter_user_id is null then
     raise exception 'Authentication required'
@@ -74,13 +75,24 @@ begin
       using errcode = 'check_violation';
   end if;
 
-  if not exists (
-    select 1 from public.roles r
-     where r.id = p_role_id
-       and r.tenant_id = p_tenant_id
-  ) then
+  select r.key into v_role_key
+    from public.roles r
+   where r.id = p_role_id
+     and r.tenant_id = p_tenant_id;
+
+  if v_role_key is null then
     raise exception 'Invitation role must belong to the invitation tenant'
       using errcode = 'check_violation';
+  end if;
+
+  -- Opus batch review (epic-3-5-batch, high, privilege escalation): the
+  -- same rule membership_roles' RLS policies now enforce (see
+  -- 20260801080000_roles_and_permissions_rbac.sql) applies to invitations --
+  -- inviting someone directly into the 'owner' role requires roles.manage,
+  -- not just users.invite/users.manage.
+  if v_role_key = 'owner' and not public.has_tenant_permission(p_tenant_id, 'roles.manage') then
+    raise exception 'Inviting as Owner requires the roles.manage permission'
+      using errcode = 'insufficient_privilege';
   end if;
 
   insert into public.invitations (

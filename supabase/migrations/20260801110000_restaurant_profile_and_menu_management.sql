@@ -92,6 +92,68 @@ create trigger menu_versions_set_updated_at
   for each row
   execute function set_updated_at();
 
+-- ----------------------------------------------------------------------------
+-- menu_versions status change guard (Opus batch review, epic-3-5-batch,
+-- critical finding): the basic RLS UPDATE policy applied further down
+-- (apply_basic_tenant_policies('menu_versions', 'menu.write')) only checks
+-- menu.write, so any menu.write holder could previously UPDATE
+-- menu_versions SET status = 'published' directly -- completely bypassing
+-- publish_menu_version()'s menu.publish permission check, blocker
+-- validation, and audit log (and flipping a published version back to
+-- 'draft' to edit it, then forward again, defeats the whole draft/publish
+-- workflow).
+--
+-- current_setting('role') is NOT sufficient here (verified empirically
+-- against the real local DB): it reads 'authenticated' identically whether
+-- the UPDATE comes from a direct client call or from inside
+-- publish_menu_version()'s SECURITY DEFINER body, because SECURITY DEFINER
+-- changes the *privileges* a function runs with, not the `SET ROLE` the
+-- session is running under. So this guard instead uses a transaction-local
+-- config flag that only publish_menu_version() sets, and only for the
+-- narrow moment it performs the two sanctioned status-changing UPDATEs --
+-- see publish_menu_version() below, which turns the flag on immediately
+-- before those UPDATEs and off immediately after (not just relying on
+-- set_config's `is_local = true` transaction-scoped reset, since a client
+-- could otherwise chain further statements inside the same transaction as
+-- the RPC call).
+--
+-- A non-app-facing (privileged/migration/ops) connection -- current_setting
+-- ('role', true) = 'none', same detection already used by
+-- reject_audit_log_mutation() in
+-- 20260801050000_audit_log_and_analytics_events_skeleton.sql -- is not
+-- restricted by this guard, matching that migration's precedent for
+-- privileged maintenance paths.
+create or replace function guard_menu_versions_status_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_caller_role text := current_setting('role', true);
+  v_is_app_facing_role boolean := v_caller_role in ('authenticated', 'anon', 'service_role');
+  v_allow_flag text := current_setting('gastro_saas.allow_menu_version_status_change', true);
+begin
+  if new.status is distinct from old.status
+     and v_is_app_facing_role
+     and coalesce(v_allow_flag, 'off') <> 'on'
+  then
+    raise exception 'menu_versions.status can only be changed by publish_menu_version()'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  return new;
+end;
+$$;
+
+comment on function guard_menu_versions_status_change() is
+  'Rejects direct menu_versions.status transitions from app-facing roles unless the transaction-local gastro_saas.allow_menu_version_status_change flag is set to on (only publish_menu_version() sets it, and only around its own sanctioned status UPDATEs). A non-app-facing caller (current_setting(''role'') = ''none'') is not restricted, matching the audit_logs immutability guard''s precedent for privileged maintenance connections.';
+
+create trigger menu_versions_guard_status_change
+  before update on menu_versions
+  for each row
+  execute function guard_menu_versions_status_change();
+
 create table categories (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants (id) on delete cascade,
@@ -486,6 +548,13 @@ begin
     raise exception 'Menu version not found' using errcode = 'invalid_parameter_value';
   end if;
 
+  -- Opus batch review (epic-3-5-batch, high): this SECURITY DEFINER function
+  -- had no tenant-membership/permission check on p_menu_version_id, so any
+  -- authenticated user could read another tenant's unpublished dish/option
+  -- names by calling it directly. Same gate publish_menu_version() already
+  -- uses.
+  perform public.require_tenant_permission(v_tenant_id, 'menu.write');
+
   delete from public.menu_publish_checks where menu_version_id = p_menu_version_id;
 
   insert into public.menu_publish_checks (menu_version_id, tenant_id, severity, code, message)
@@ -643,6 +712,13 @@ begin
       using errcode = 'check_violation';
   end if;
 
+  -- Momentarily authorize the two sanctioned status UPDATEs below via the
+  -- guard trigger's transaction-local flag (see
+  -- guard_menu_versions_status_change() above) -- turned back off
+  -- immediately afterwards so the flag can never be exploited by a further
+  -- statement chained into the same client transaction as this RPC call.
+  perform set_config('gastro_saas.allow_menu_version_status_change', 'on', true);
+
   update public.menu_versions
      set status = 'archived'
    where tenant_id = v_tenant_id
@@ -653,6 +729,8 @@ begin
          published_at = now(),
          published_by_user_id = v_actor_user_id
    where id = p_menu_version_id;
+
+  perform set_config('gastro_saas.allow_menu_version_status_change', 'off', true);
 
   insert into public.audit_logs (tenant_id, actor_user_id, action, target_type, target_id)
   values (v_tenant_id, v_actor_user_id, 'menu.published', 'menu_version', p_menu_version_id::text);

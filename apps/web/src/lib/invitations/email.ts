@@ -9,9 +9,11 @@ export async function sendInvitationEmail(input: SendInvitationEmailInput): Prom
   const from = process.env.RESEND_FROM_EMAIL ?? "Gastro SaaS <onboarding@resend.dev>";
 
   if (!apiKey) {
-    console.info("[invitations] RESEND_API_KEY missing; invite link generated", {
+    // Opus batch review (epic-3-5-batch, medium): never log the raw
+    // single-use invite token/URL -- logging it here would let anyone with
+    // log access accept the invitation without ever receiving the email.
+    console.info("[invitations] RESEND_API_KEY missing; invite generated (not sent)", {
       to: input.to,
-      inviteUrl: input.inviteUrl,
     });
     return;
   }
