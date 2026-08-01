@@ -4,6 +4,8 @@ export type PermissionKey =
   | "users.invite"
   | "users.manage"
   | "roles.manage"
+  | "tenant.settings.write"
+  | "menu.write"
   | "menu.publish"
   | "orders.cancel"
   | "payments.refund"

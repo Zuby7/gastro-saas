@@ -28,6 +28,7 @@ Ticket #9 introduces tenant-scoped standard roles (Owner, Manager, Kitchen, Serv
 ## Restaurant profile
 
 `restaurant_profiles`, `opening_hours`, `fulfillment_settings`, `payment_accounts` (Stripe Connect account reference, onboarding status).
+Ticket #11 introduces `restaurant_profiles` and `opening_hours` with tenant-scoped RLS and timezone-aware profile storage.
 
 ## Tax
 
@@ -36,6 +37,7 @@ Ticket #9 introduces tenant-scoped standard roles (Owner, Manager, Kitchen, Serv
 ## Menu
 
 `menu_versions`, `menus`, `categories`, `dishes`, `dish_variants`, `option_groups`, `options`, `dish_option_group_assignments`, `ingredients`, `removable_ingredients`, `allergens`, `additives`, `dietary_labels`, `dish_allergen_assignments`, `dish_additive_assignments`, `media_assets`, `availability_schedules`, `channel_availability`.
+Tickets #12-#15 introduce the draft/published menu foundation, tenant-scoped image metadata, variants/options/extras, restaurant-provided allergen/additive/dietary-label assignments, and server-side publish checks. Allergen/additive data is "provided by the restaurant"; the platform does not certify legal correctness.
 
 ## Ordering
 

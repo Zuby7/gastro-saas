@@ -98,9 +98,11 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
       "analytics.read",
       "audit.read",
       "menu.publish",
+      "menu.write",
       "orders.cancel",
       "payments.refund",
       "roles.manage",
+      "tenant.settings.write",
       "users.invite",
       "users.manage",
     ]);
