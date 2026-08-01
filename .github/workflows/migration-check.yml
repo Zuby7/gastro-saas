@@ -1,0 +1,64 @@
+name: Migration Check
+
+# Validates supabase/migrations/**. Implements the "migration validation" gate
+# that ticket #2 (CI pipeline) explicitly deferred pending this ticket (#3).
+#
+# NOTE for whoever merges ticket #2's feat/2-ci-pipeline branch: that branch
+# adds .github/workflows/ci.yml with format/lint/typecheck/unit/build/secret-scan
+# jobs and already reserves "migration validation" as a follow-up slot in its
+# header comment. This job is intentionally its own workflow file (not folded
+# into ci.yml) so the two tickets don't collide in the same file; consider
+# merging this job into ci.yml as its own step once both branches land, so
+# there is a single CI entrypoint. Until then, this workflow runs independently
+# on the same triggers.
+#
+# Design choice: GitHub-hosted ubuntu-latest runners have Docker available
+# natively (not nested virtualization), so a real `supabase start` -- which
+# pulls the local Postgres/Auth/Studio images and applies every migration in
+# supabase/migrations/ against a fresh database -- is realistic here and is
+# the strongest signal that migrations are both syntactically valid AND
+# actually apply cleanly (catches things a pure SQL lint would miss, e.g. a
+# migration that depends on an extension or an earlier migration's schema).
+# `supabase db lint` runs afterwards for additional static diagnostics
+# (unindexed foreign keys, etc.). If this job becomes flaky/slow as the
+# migration set grows, the fallback is a lighter `supabase db lint`-only step
+# without `supabase start` -- not implemented now because the full start is
+# currently fast (single example migration) and gives strictly more coverage.
+
+on:
+  pull_request:
+    paths:
+      - "supabase/**"
+      - ".github/workflows/migration-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - ".github/workflows/migration-check.yml"
+
+concurrency:
+  group: migration-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migration-check:
+    name: Migration Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase stack (applies all migrations)
+        run: supabase start
+
+      - name: Lint migrations
+        run: supabase db lint
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop
