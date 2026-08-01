@@ -21,7 +21,7 @@ gastro-saas needs to ship an MVP fast, stay free-tier-friendly per the user's ex
 
 ## Alternatives considered
 
-- **Vercel** for hosting — rejected as the *default* only because of the commercial-use ToS restriction on the free tier; documented as a fallback for non-commercial previews.
+- **Vercel** for hosting — rejected as the _default_ only because of the commercial-use ToS restriction on the free tier; documented as a fallback for non-commercial previews.
 - **Microservices from day one** — rejected: adds operational overhead (service discovery, distributed transactions, multiple deploy pipelines) the MVP doesn't need. Module boundaries are enforced in code now so extraction later is possible without a rewrite.
 - **Firebase** instead of Supabase — rejected: weaker relational/RLS story for the tenant-isolation and reporting-heavy analytics requirements; Postgres is a better fit for the join-heavy analytics queries (topsellers, extras, trends).
 - **Prisma-style full ORM** vs. typed SQL/Supabase client — left open, to be decided at the first database-touching ticket rather than upfront.

@@ -2,20 +2,20 @@
 
 Modules, in the modular monolith. Each owns its own tables and exposes a typed interface; other modules call the interface, never the underlying tables directly.
 
-| Module | Owns | Depends on |
-|---|---|---|
-| **identity** | users, sessions, invitations | — |
-| **tenants** | tenants, brands, locations, memberships | identity |
-| **authorization** | roles, permissions, role_permissions | identity, tenants |
-| **restaurant-profile** | restaurant profile, opening hours, branding | tenants |
-| **menu** | menus, categories, dishes, variants, option groups, options, allergens, additives, dietary labels, media, availability, publication/quality checks | tenants, restaurant-profile |
-| **ordering** | carts, cart items, orders, order items, order state machine | menu, tenants |
-| **payments** | payment accounts, payments, refunds, webhook events | ordering, tenants |
-| **analytics** | analytics events, daily aggregates, metric definitions | ordering, payments, menu |
-| **reviews** | ratings, moderation | ordering, tenants |
-| **integrations** | integration accounts, sync jobs, errors, mock provider | menu, ordering, tenants |
-| **notifications** | email sends, templates | identity, ordering, payments |
-| **audit** | audit log | all (write-only append interface) |
+| Module                 | Owns                                                                                                                                               | Depends on                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| **identity**           | users, sessions, invitations                                                                                                                       | —                                 |
+| **tenants**            | tenants, brands, locations, memberships                                                                                                            | identity                          |
+| **authorization**      | roles, permissions, role_permissions                                                                                                               | identity, tenants                 |
+| **restaurant-profile** | restaurant profile, opening hours, branding                                                                                                        | tenants                           |
+| **menu**               | menus, categories, dishes, variants, option groups, options, allergens, additives, dietary labels, media, availability, publication/quality checks | tenants, restaurant-profile       |
+| **ordering**           | carts, cart items, orders, order items, order state machine                                                                                        | menu, tenants                     |
+| **payments**           | payment accounts, payments, refunds, webhook events                                                                                                | ordering, tenants                 |
+| **analytics**          | analytics events, daily aggregates, metric definitions                                                                                             | ordering, payments, menu          |
+| **reviews**            | ratings, moderation                                                                                                                                | ordering, tenants                 |
+| **integrations**       | integration accounts, sync jobs, errors, mock provider                                                                                             | menu, ordering, tenants           |
+| **notifications**      | email sends, templates                                                                                                                             | identity, ordering, payments      |
+| **audit**              | audit log                                                                                                                                          | all (write-only append interface) |
 
 ## Rules
 

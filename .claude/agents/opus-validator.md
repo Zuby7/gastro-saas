@@ -26,9 +26,27 @@ Return exactly one of `APPROVED`, `CHANGES_REQUESTED`, or `BLOCKED`, using this 
 {
   "ticket": "#<number>",
   "verdict": "APPROVED | CHANGES_REQUESTED | BLOCKED",
-  "acceptance_criteria": [{"criterion": "...", "status": "PASS|FAIL", "evidence": "..."}],
-  "deterministic_checks": {"format": "PASS|FAIL|NOT_RUN", "lint": "...", "typecheck": "...", "unit_tests": "...", "integration_tests": "...", "e2e_tests": "...", "build": "...", "security": "..."},
-  "review_findings": [{"severity": "critical|high|medium|low", "area": "...", "reason": "...", "evidence": "...", "required_correction": "...", "acceptance_test": "..."}],
+  "acceptance_criteria": [{ "criterion": "...", "status": "PASS|FAIL", "evidence": "..." }],
+  "deterministic_checks": {
+    "format": "PASS|FAIL|NOT_RUN",
+    "lint": "...",
+    "typecheck": "...",
+    "unit_tests": "...",
+    "integration_tests": "...",
+    "e2e_tests": "...",
+    "build": "...",
+    "security": "..."
+  },
+  "review_findings": [
+    {
+      "severity": "critical|high|medium|low",
+      "area": "...",
+      "reason": "...",
+      "evidence": "...",
+      "required_correction": "...",
+      "acceptance_test": "..."
+    }
+  ],
   "tenant_isolation": "PASS|FAIL|NOT_APPLICABLE",
   "authorization": "PASS|FAIL|NOT_APPLICABLE",
   "payment_safety": "PASS|FAIL|NOT_APPLICABLE",

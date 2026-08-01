@@ -2,12 +2,12 @@
 
 ## Environments
 
-| Environment | Trigger | Approval |
-|---|---|---|
-| Local | `pnpm dev` | none |
-| Preview | every PR | automatic |
-| Staging | manual promotion from a merged PR | automatic, run `/release-check` first |
-| Production | explicit request | **always requires explicit human approval** — both the deploy itself and any migration run against it |
+| Environment | Trigger                           | Approval                                                                                              |
+| ----------- | --------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Local       | `pnpm dev`                        | none                                                                                                  |
+| Preview     | every PR                          | automatic                                                                                             |
+| Staging     | manual promotion from a merged PR | automatic, run `/release-check` first                                                                 |
+| Production  | explicit request                  | **always requires explicit human approval** — both the deploy itself and any migration run against it |
 
 ## Hosting
 

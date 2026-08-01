@@ -2,14 +2,46 @@
   "ticket": "architecture-review-pass-1",
   "verdict": "CHANGES_REQUESTED",
   "acceptance_criteria": [
-    {"criterion": "Documentation reflects a multi-tenant gastronomy SaaS with menu mgmt, ordering, secure payments, analytics, ratings, RBAC", "status": "PASS", "evidence": "product-vision.md items 1-12 map 1:1 onto epics 1-12 in mvp-scope.md; domain-boundaries.md defines a module per capability"},
-    {"criterion": "Every step of the MVP acceptance scenario (mvp-scope.md) has backing tickets", "status": "FAIL", "evidence": "No ticket covers transactional order-confirmation email or a VAT/tax model, though both are required by the scenario and referenced elsewhere in the docs"},
-    {"criterion": "Stack choice is coherent and ADR-0001 reasoning is sound", "status": "PASS", "evidence": "ADR-0001 records real alternatives with concrete rejection reasons; Cloudflare-over-Vercel is justified by the commercial-use ToS restriction"},
-    {"criterion": "Two-layer tenant isolation is sufficient and consistent across rules and tickets", "status": "FAIL", "evidence": "Guest checkout (cart/order/rating) has no membership; neither documented layer defined that path before this review"},
-    {"criterion": "Payment design never trusts client totals, gates on verified webhooks, stays test-mode-only", "status": "PASS", "evidence": "payments.md + ticket 24/25 acceptance criteria close the client-total and client-redirect holes explicitly"},
-    {"criterion": "Threat model has no material gaps for this domain", "status": "FAIL", "evidence": "No MFA path for Owner/Manager accounts controlling Stripe payouts/refunds"},
-    {"criterion": "39 tickets are logically sequenced with sensible dependencies", "status": "FAIL", "evidence": "Cross-tenant harness (ticket 5) sequenced before auth (ticket 7) it would need; analytics_events referenced before its creating ticket"},
-    {"criterion": "Nothing materially over-engineered for an MVP", "status": "PASS", "evidence": "Epic 12 correctly phase:post-mvp; non-goals.md and domain-boundaries.md both forbid pre-building unneeded tables"}
+    {
+      "criterion": "Documentation reflects a multi-tenant gastronomy SaaS with menu mgmt, ordering, secure payments, analytics, ratings, RBAC",
+      "status": "PASS",
+      "evidence": "product-vision.md items 1-12 map 1:1 onto epics 1-12 in mvp-scope.md; domain-boundaries.md defines a module per capability"
+    },
+    {
+      "criterion": "Every step of the MVP acceptance scenario (mvp-scope.md) has backing tickets",
+      "status": "FAIL",
+      "evidence": "No ticket covers transactional order-confirmation email or a VAT/tax model, though both are required by the scenario and referenced elsewhere in the docs"
+    },
+    {
+      "criterion": "Stack choice is coherent and ADR-0001 reasoning is sound",
+      "status": "PASS",
+      "evidence": "ADR-0001 records real alternatives with concrete rejection reasons; Cloudflare-over-Vercel is justified by the commercial-use ToS restriction"
+    },
+    {
+      "criterion": "Two-layer tenant isolation is sufficient and consistent across rules and tickets",
+      "status": "FAIL",
+      "evidence": "Guest checkout (cart/order/rating) has no membership; neither documented layer defined that path before this review"
+    },
+    {
+      "criterion": "Payment design never trusts client totals, gates on verified webhooks, stays test-mode-only",
+      "status": "PASS",
+      "evidence": "payments.md + ticket 24/25 acceptance criteria close the client-total and client-redirect holes explicitly"
+    },
+    {
+      "criterion": "Threat model has no material gaps for this domain",
+      "status": "FAIL",
+      "evidence": "No MFA path for Owner/Manager accounts controlling Stripe payouts/refunds"
+    },
+    {
+      "criterion": "39 tickets are logically sequenced with sensible dependencies",
+      "status": "FAIL",
+      "evidence": "Cross-tenant harness (ticket 5) sequenced before auth (ticket 7) it would need; analytics_events referenced before its creating ticket"
+    },
+    {
+      "criterion": "Nothing materially over-engineered for an MVP",
+      "status": "PASS",
+      "evidence": "Epic 12 correctly phase:post-mvp; non-goals.md and domain-boundaries.md both forbid pre-building unneeded tables"
+    }
   ],
   "review_findings_summary": "12 findings (1 critical, 4 high, 5 medium, 2 low). Critical: guest-path tenant isolation undefined. High: missing transactional-email ticket, missing tax/VAT model, undefined Stripe Connect account/charge topology, no MVP-phase imprint/privacy ticket. See docs/decisions/assumptions.md for what was fixed immediately vs. deferred as ticket-level follow-up.",
   "tenant_isolation": "FAIL_THEN_FIXED",
