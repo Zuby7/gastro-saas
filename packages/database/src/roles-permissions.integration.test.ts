@@ -218,6 +218,37 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
     ]);
   });
 
+  it("keeps at least one RBAC Owner role assignment per tenant", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+
+    const ownerAssignment = await admin.query<{ membership_id: string; role_id: string }>(
+      `select mr.membership_id, mr.role_id
+         from membership_roles mr
+         join roles r on r.id = mr.role_id
+        where r.tenant_id = $1
+          and r.key = 'owner'`,
+      [tenantA.tenantId],
+    );
+
+    await admin.query("begin");
+    await admin.query(`delete from membership_roles where membership_id = $1 and role_id = $2`, [
+      ownerAssignment.rows[0]?.membership_id,
+      ownerAssignment.rows[0]?.role_id,
+    ]);
+    await expect(admin.query("commit")).rejects.toThrow(/at least one Owner role assignment/i);
+
+    const stillOwner = await admin.query(
+      `select 1
+         from membership_roles mr
+         join roles r on r.id = mr.role_id
+        where r.tenant_id = $1
+          and r.key = 'owner'`,
+      [tenantA.tenantId],
+    );
+    expect(stillOwner.rows).toHaveLength(1);
+  });
+
   it("blocks assigning a role across tenants", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA, tenantB } = fixture;
