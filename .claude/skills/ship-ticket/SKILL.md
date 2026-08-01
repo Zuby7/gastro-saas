@@ -7,7 +7,7 @@ Processes exactly one ticket per invocation. Never starts a second ticket in the
 
 ## Opus cadence (see `CLAUDE.md`)
 
-Opus validates once per epic, at the end, against the full accumulated diff (revised a third time 2026-08-01 — back to batching, for development speed). Risk-labelled tickets (`risk:security`/`risk:payment`/`risk:migration`/`risk:privacy`, or anything touching payments/auth/tenant-migrations) get an immediate same-model Sonnet self-check at ticket completion instead of an immediate Opus review — a weaker but fast independent-invocation pass that still catches obvious issues before the epic-end Opus review sees the same diff. `opus-validator` is always Opus 5 (`model: opus`).
+Opus validates once per epic, at the end, against the full accumulated diff (revised a fourth time 2026-08-01 — back to batching, for development speed). Risk-labelled tickets (`risk:security`/`risk:payment`/`risk:migration`/`risk:privacy`, or anything touching payments/auth/tenant-migrations) get an immediate same-model Sonnet self-check at ticket completion instead of an immediate Opus review — a weaker but fast independent-invocation pass that still catches obvious issues before the epic-end Opus review sees the same diff. `opus-validator` is always Opus 5 (`model: opus`).
 
 ## Steps
 

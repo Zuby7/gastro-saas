@@ -3,7 +3,7 @@ name: validate-ticket
 description: Independently validate gastro-saas work using the opus-validator subagent, in a batch at the end of an epic, plus a fast same-model Sonnet self-check immediately for risk-labelled tickets, and return the required structured verdict.
 ---
 
-Epic-batch mode is the active default for every ticket (revised a third time, 2026-08-01 — back to batching for development speed; see `CLAUDE.md`'s Opus validation cadence). Per-ticket Opus mode is kept below only as a documented fallback, not currently used. Risk-labelled tickets additionally get an immediate Sonnet self-check (not a full Opus review) at ticket completion — see below.
+Epic-batch mode is the active default for every ticket (revised a fourth time, 2026-08-01 — back to batching for development speed; see `CLAUDE.md`'s Opus validation cadence). Per-ticket Opus mode is kept below only as a documented fallback, not currently used. Risk-labelled tickets additionally get an immediate Sonnet self-check (not a full Opus review) at ticket completion — see below.
 
 ## Epic-batch mode (active default — every ticket, regardless of risk label)
 
