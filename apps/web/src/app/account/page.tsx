@@ -2,10 +2,17 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logoutAction } from "./actions";
 import { CreateTenantForm } from "./create-tenant-form";
+import { InviteMemberForm } from "./invite-member-form";
 
 interface TenantMembershipRow {
+  tenant_id: string;
   role: string;
   tenants: { name: string; slug: string } | null;
+}
+
+interface RoleRow {
+  id: string;
+  name: string;
 }
 
 /**
@@ -34,10 +41,19 @@ export default async function AccountPage() {
 
   const { data: membership } = await supabase
     .from("tenant_memberships")
-    .select("role, tenants ( name, slug )")
+    .select("tenant_id, role, tenants ( name, slug )")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle<TenantMembershipRow>();
+
+  const { data: roles } = membership
+    ? await supabase
+        .from("roles")
+        .select("id, name")
+        .eq("tenant_id", membership.tenant_id)
+        .order("name")
+        .returns<RoleRow[]>()
+    : { data: [] as RoleRow[] };
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
@@ -63,6 +79,7 @@ export default async function AccountPage() {
       </dl>
 
       {!membership ? <CreateTenantForm /> : null}
+      {membership ? <InviteMemberForm roles={roles ?? []} /> : null}
 
       <form action={logoutAction}>
         <button

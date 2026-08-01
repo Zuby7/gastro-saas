@@ -2,7 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { CreateTenantSchema } from "@/lib/auth/schemas";
+import { CreateTenantSchema, InviteMemberSchema } from "@/lib/auth/schemas";
+import { sendInvitationEmail } from "@/lib/invitations/email";
+import { createInvitationToken, hashInvitationToken } from "@/lib/invitations/tokens";
 
 export async function logoutAction(): Promise<void> {
   const supabase = await createSupabaseServerClient();
@@ -13,6 +15,12 @@ export async function logoutAction(): Promise<void> {
 export interface CreateTenantFormState {
   error?: string;
   fieldErrors?: Partial<Record<"tenantName" | "tenantSlug", string>>;
+}
+
+export interface InviteMemberFormState {
+  error?: string;
+  success?: string;
+  fieldErrors?: Partial<Record<"email" | "roleId", string>>;
 }
 
 /**
@@ -79,4 +87,78 @@ export async function createTenantAction(
   }
 
   redirect("/account");
+}
+
+export async function inviteMemberAction(
+  _prevState: InviteMemberFormState,
+  formData: FormData,
+): Promise<InviteMemberFormState> {
+  const parsed = InviteMemberSchema.safeParse({
+    email: formData.get("email"),
+    roleId: formData.get("roleId"),
+  });
+
+  if (!parsed.success) {
+    const fieldErrors: InviteMemberFormState["fieldErrors"] = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0];
+      if (typeof field === "string" && !(field in fieldErrors)) {
+        (fieldErrors as Record<string, string>)[field] = issue.message;
+      }
+    }
+    return { error: "Bitte korrigieren Sie die markierten Felder.", fieldErrors };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("tenant_memberships")
+    .select("tenant_id, tenants ( name )")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle<{ tenant_id: string; tenants: { name: string } | null }>();
+
+  if (membershipError || !membership) {
+    return { error: "Sie sind noch keinem Restaurant zugeordnet." };
+  }
+
+  const token = createInvitationToken();
+  const tokenHash = hashInvitationToken(token);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error: rpcError } = await supabase.rpc("create_invitation", {
+    p_tenant_id: membership.tenant_id,
+    p_email: parsed.data.email,
+    p_role_id: parsed.data.roleId,
+    p_token_hash: tokenHash,
+    p_expires_at: expiresAt,
+  });
+
+  if (rpcError) {
+    return { error: "Die Einladung konnte nicht erstellt werden." };
+  }
+
+  const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const inviteUrl = `${origin}/invite/${token}`;
+
+  try {
+    await sendInvitationEmail({
+      to: parsed.data.email,
+      inviteUrl,
+      tenantName: membership.tenants?.name ?? "Ihrem Restaurant",
+    });
+  } catch {
+    return {
+      error: "Die Einladung wurde erstellt, aber die E-Mail konnte nicht versendet werden.",
+    };
+  }
+
+  return { success: "Einladung wurde erstellt und versendet." };
 }
