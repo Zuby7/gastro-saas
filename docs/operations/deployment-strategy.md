@@ -19,6 +19,16 @@ Cloudflare Pages/Workers via `@opennextjs/cloudflare` (see ADR-0001, `docs/platf
 - Migrations run automatically against local/preview/staging.
 - Migrations against production require explicit approval and a documented rollback note in the PR.
 
+### Local development (Supabase CLI)
+
+- The Supabase CLI is a dev dependency of `packages/database` (npm package `supabase`, installed via `pnpm install` -- no global/admin install needed, matching how `pnpm`/`gh` were installed on the dev machine per `docs/decisions/assumptions.md`), invoked as `pnpm --filter @gastro-saas/database exec supabase <command>` or via the package's `db:*` scripts (`db:start`, `db:stop`, `db:reset`, `db:lint`).
+- `supabase start` runs the full local stack (Postgres, Auth, Storage, Studio, etc.) via Docker and applies every migration under `supabase/migrations/` in filename order. `supabase stop` frees the Docker resources afterwards.
+- Migration file naming convention: `supabase/migrations/<YYYYMMDDHHMMSS>_<snake_case_name>.sql` (Supabase CLI default ordering).
+- `supabase/migrations/20260801030000_example_tenant_isolation_pattern.sql` is a reference-only migration (not a real domain table) demonstrating the mandatory tenant_id + RLS pattern from `docs/security/tenant-isolation.md` -- copy its shape for real tenant-scoped tables starting with ticket #4, but note its own comments about what it does _not_ cover (Layer 0 / guest paths).
+- `supabase/seed.sql` is the seed-script skeleton run by `supabase db reset`; currently a no-op until real domain tables exist.
+- CI validates migrations via `.github/workflows/migration-check.yml`, which runs `supabase start` (applies all migrations against a fresh local Postgres) followed by `supabase db lint` on every PR touching `supabase/**`.
+- Local env vars live in `.env.example` at the repo root; copy to `.env.local` and the values already match Supabase's well-known local-dev defaults -- no manual key lookup needed for local work.
+
 ## Background processing
 
 No dedicated queue system in the MVP. Email delivery, webhook handling, retryable integration sync, analytics aggregation, and scheduled availability changes use the simplest reliable mechanism the platform supports (Supabase Edge Functions / scheduled functions, Next.js route handlers). A dedicated queue is introduced only when a measured requirement justifies it (§13.4 of the source brief).

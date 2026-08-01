@@ -1,0 +1,17 @@
+-- ============================================================================
+-- Local dev seed skeleton (ticket #3)
+-- ============================================================================
+-- Runs automatically after migrations on `supabase db reset` (see
+-- [db.seed] in supabase/config.toml). Empty on purpose for now -- there is
+-- no real domain schema yet (ticket #4+). Add real seed data here once
+-- tenants/users/menus exist; keep it idempotent (safe to run repeatedly)
+-- and local-only (never seed anything resembling production data or real
+-- credentials).
+--
+-- Example of the shape a future seed might take, left commented out so this
+-- file stays a no-op until ticket #4+ adds real tables:
+--
+-- insert into example_tenants (id, name) values
+--   ('11111111-1111-1111-1111-111111111111', 'Trattoria Da Mario'),
+--   ('22222222-2222-2222-2222-222222222222', 'Burger Barn')
+-- on conflict (id) do nothing;

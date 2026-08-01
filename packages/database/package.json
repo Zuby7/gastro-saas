@@ -6,10 +6,15 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:lint": "supabase db lint"
   },
   "devDependencies": {
     "@gastro-saas/config": "workspace:*",
+    "supabase": "^2",
     "typescript": "^5"
   }
 }
