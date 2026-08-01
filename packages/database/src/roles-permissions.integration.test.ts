@@ -98,6 +98,7 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
       "analytics.read",
       "audit.read",
       "menu.publish",
+      "menu.read",
       "menu.write",
       "orders.cancel",
       "payments.refund",

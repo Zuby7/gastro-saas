@@ -162,4 +162,44 @@ describe.skipIf(!dbAvailable)("restaurant profile and menu management", () => {
     expect(published.rows[0]?.published_by_user_id).toBe(tenantA.ownerId);
     expect(published.rows[0]?.published_at).not.toBeNull();
   });
+
+  it("public menu query returns only one tenant's published menu and hides drafts", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA, tenantB } = fixture;
+    const draftAId = randomUUID();
+    const draftBId = randomUUID();
+    const categoryAId = randomUUID();
+    const categoryBId = randomUUID();
+
+    await admin.query(
+      `insert into menu_versions (id, tenant_id, status) values ($1, $2, 'draft'), ($3, $4, 'draft')`,
+      [draftAId, tenantA.tenantId, draftBId, tenantB.tenantId],
+    );
+    await admin.query(
+      `insert into categories (id, tenant_id, menu_version_id, name, sort_order)
+       values ($1, $2, $3, 'Tenant A Category', 1), ($4, $5, $6, 'Tenant B Category', 1)`,
+      [categoryAId, tenantA.tenantId, draftAId, categoryBId, tenantB.tenantId, draftBId],
+    );
+    await admin.query(
+      `insert into dishes (tenant_id, menu_version_id, category_id, name, price_cents, allergen_reviewed)
+       values ($1, $2, $3, 'Tenant A Dish', 1000, true), ($4, $5, $6, 'Tenant B Dish', 2000, true)`,
+      [tenantA.tenantId, draftAId, categoryAId, tenantB.tenantId, draftBId, categoryBId],
+    );
+
+    const hiddenDraft = await admin.query<{ menu: unknown }>(`select get_public_menu($1) as menu`, [
+      tenantA.slug,
+    ]);
+    expect(hiddenDraft.rows[0]?.menu).toBeNull();
+
+    await queryAsUser(admin, tenantA.ownerId, `select publish_menu_version($1)`, [draftAId]);
+
+    const publicMenu = await admin.query<{
+      menu: { categories: { dishes: { name: string }[] }[] };
+    }>(`select get_public_menu($1) as menu`, [tenantA.slug]);
+    const dishNames = publicMenu.rows[0]!.menu.categories.flatMap((category) =>
+      category.dishes.map((dish) => dish.name),
+    );
+    expect(dishNames).toContain("Tenant A Dish");
+    expect(dishNames).not.toContain("Tenant B Dish");
+  });
 });
