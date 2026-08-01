@@ -20,7 +20,10 @@ Entities are introduced through tickets as they're needed (§12 of the source br
 
 ## Authorization
 
-`roles`, `permissions`, `role_permissions`, `membership_roles`. Permission keys follow `area.resource.action`, e.g. `menu.publish`, `payments.refund`, `orders.cancel`, `audit.read` (ticket #6 — defined here, not yet enforced anywhere; no read function/endpoint exists yet) — full list in `.claude/rules/auth.md`.
+`roles`, `permissions`, `role_permissions`, `membership_roles`. Permission keys follow `area.resource.action`. Standard MVP permission keys:
+`users.invite`, `users.manage`, `roles.manage`, `menu.publish`, `orders.cancel`, `payments.refund`, `analytics.read`, `audit.read`.
+Ticket #9 introduces tenant-scoped standard roles (Owner, Manager, Kitchen, Service, Marketing), custom-role storage, `has_tenant_permission()` /
+`require_tenant_permission()` server-side checks, and an `analytics.read` DB gate so revenue/analytics data is not visible to every tenant member.
 
 ## Restaurant profile
 

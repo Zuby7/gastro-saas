@@ -1,0 +1,249 @@
+// Integration tests for tenant-scoped RBAC introduced by ticket #9.
+//
+// Same DB-probe/skip pattern as the other database integration suites: these
+// tests exercise real RLS policies/functions against local Supabase Postgres
+// when available, and fail instead of silently skipping in CI.
+import { randomUUID } from "node:crypto";
+import { Client } from "pg";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { queryAsUser, seedTwoTenantFixture, type TwoTenantFixture } from "@gastro-saas/testing";
+
+const DB_URL =
+  process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+
+const isCiEnvironment = Boolean(process.env.CI) || Boolean(process.env.SUPABASE_DB_URL);
+
+async function probeDatabase(): Promise<boolean> {
+  const probe = new Client({ connectionString: DB_URL });
+  try {
+    await probe.connect();
+    await probe.end();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const dbAvailable = await probeDatabase();
+
+if (!dbAvailable) {
+  if (isCiEnvironment) {
+    throw new Error(
+      `[roles-permissions.integration.test] CI or SUPABASE_DB_URL is set, but no reachable ` +
+        `Postgres was found at ${DB_URL}. Refusing to silently skip the RBAC permission-boundary ` +
+        "suite in CI -- check the migration-check workflow's `supabase start` step.",
+    );
+  }
+
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[roles-permissions.integration.test] Skipping: no reachable Postgres at ${DB_URL}. ` +
+      "Run `pnpm --filter @gastro-saas/database db:start` (requires a working local Docker setup) " +
+      "to exercise this test locally, or rely on the migration-check CI workflow.",
+  );
+}
+
+describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
+  const admin = new Client({ connectionString: DB_URL });
+  let fixture: TwoTenantFixture;
+
+  beforeAll(async () => {
+    await admin.connect();
+  });
+
+  afterAll(async () => {
+    await admin.end();
+  });
+
+  afterEach(async () => {
+    await fixture?.cleanup();
+  });
+
+  async function assignOnlySystemRole(userId: string, tenantId: string, roleKey: string) {
+    const membership = await admin.query<{ id: string }>(
+      `select id from tenant_memberships where tenant_id = $1 and user_id = $2`,
+      [tenantId, userId],
+    );
+    const membershipId = membership.rows[0]?.id;
+
+    const role = await admin.query<{ id: string }>(
+      `select id from roles where tenant_id = $1 and key = $2`,
+      [tenantId, roleKey],
+    );
+    const roleId = role.rows[0]?.id;
+
+    await admin.query(
+      `delete from membership_roles
+       where membership_id = $1
+         and role_id in (
+           select id from roles
+            where tenant_id = $2
+              and is_system = true
+         )`,
+      [membershipId, tenantId],
+    );
+    await admin.query(`insert into membership_roles (membership_id, role_id) values ($1, $2)`, [
+      membershipId,
+      roleId,
+    ]);
+
+    return { membershipId, roleId };
+  }
+
+  it("seeds every standard MVP permission key", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+
+    const result = await admin.query<{ key: string }>(`select key from permissions order by key`);
+    expect(result.rows.map((row) => row.key)).toEqual([
+      "analytics.read",
+      "audit.read",
+      "menu.publish",
+      "orders.cancel",
+      "payments.refund",
+      "roles.manage",
+      "users.invite",
+      "users.manage",
+    ]);
+  });
+
+  it("grants Owner all permissions and denies Kitchen revenue/analytics reads", async () => {
+    const kitchenUserId = randomUUID();
+    fixture = await seedTwoTenantFixture(admin, {
+      tenantA: {
+        additionalMembers: [
+          { userId: kitchenUserId, email: "kitchen@example.test", role: "staff" },
+        ],
+      },
+    });
+    const { tenantA } = fixture;
+    await assignOnlySystemRole(kitchenUserId, tenantA.tenantId, "kitchen");
+
+    const ownerRefund = await queryAsUser<{ has_tenant_permission: boolean }>(
+      admin,
+      tenantA.ownerId,
+      `select has_tenant_permission($1, 'payments.refund')`,
+      [tenantA.tenantId],
+    );
+    expect(ownerRefund.rows[0]?.has_tenant_permission).toBe(true);
+
+    await admin.query(`insert into analytics_events (tenant_id, event_type) values ($1, $2)`, [
+      tenantA.tenantId,
+      "revenue.daily",
+    ]);
+
+    const kitchenAnalytics = await queryAsUser(
+      admin,
+      kitchenUserId,
+      `select event_type from analytics_events where tenant_id = $1`,
+      [tenantA.tenantId],
+    );
+    expect(kitchenAnalytics.rows).toHaveLength(0);
+  });
+
+  it("denies Marketing the payments.refund permission", async () => {
+    const marketingUserId = randomUUID();
+    fixture = await seedTwoTenantFixture(admin, {
+      tenantA: {
+        additionalMembers: [
+          { userId: marketingUserId, email: "marketing@example.test", role: "staff" },
+        ],
+      },
+    });
+    const { tenantA } = fixture;
+    await assignOnlySystemRole(marketingUserId, tenantA.tenantId, "marketing");
+
+    await expect(
+      queryAsUser(
+        admin,
+        marketingUserId,
+        `select require_tenant_permission($1, 'payments.refund')`,
+        [tenantA.tenantId],
+      ),
+    ).rejects.toThrow(/Missing permission payments\.refund|permission denied/i);
+  });
+
+  it("audits role permission and membership role changes made through authenticated access", async () => {
+    const serviceUserId = randomUUID();
+    fixture = await seedTwoTenantFixture(admin, {
+      tenantA: {
+        additionalMembers: [
+          { userId: serviceUserId, email: "service@example.test", role: "staff" },
+        ],
+      },
+    });
+    const { tenantA } = fixture;
+
+    const customRole = await queryAsUser<{ id: string }>(
+      admin,
+      tenantA.ownerId,
+      `insert into roles (tenant_id, key, name, description, is_system)
+       values ($1, $2, $3, $4, false)
+       returning id`,
+      [tenantA.tenantId, "expediter", "Expediter", "Expo station"],
+    );
+    const customRoleId = customRole.rows[0]?.id;
+
+    await queryAsUser(
+      admin,
+      tenantA.ownerId,
+      `insert into role_permissions (role_id, permission_key) values ($1, 'orders.cancel')`,
+      [customRoleId],
+    );
+
+    const membership = await admin.query<{ id: string }>(
+      `select id from tenant_memberships where tenant_id = $1 and user_id = $2`,
+      [tenantA.tenantId, serviceUserId],
+    );
+
+    await queryAsUser(
+      admin,
+      tenantA.ownerId,
+      `insert into membership_roles (membership_id, role_id) values ($1, $2)`,
+      [membership.rows[0]?.id, customRoleId],
+    );
+
+    const auditRows = await admin.query<{ target_type: string }>(
+      `select target_type
+         from audit_logs
+        where tenant_id = $1
+          and actor_user_id = $2
+          and action = 'authorization.insert'
+        order by created_at`,
+      [tenantA.tenantId, tenantA.ownerId],
+    );
+
+    expect(auditRows.rows.map((row) => row.target_type)).toEqual([
+      "role_permissions",
+      "membership_roles",
+    ]);
+  });
+
+  it("blocks assigning a role across tenants", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA, tenantB } = fixture;
+
+    const tenantAMembership = await admin.query<{ id: string }>(
+      `select id from tenant_memberships where tenant_id = $1 and user_id = $2`,
+      [tenantA.tenantId, tenantA.ownerId],
+    );
+    const tenantBRole = await admin.query<{ id: string }>(
+      `select id from roles where tenant_id = $1 and key = 'manager'`,
+      [tenantB.tenantId],
+    );
+
+    await expect(
+      queryAsUser(
+        admin,
+        tenantA.ownerId,
+        `insert into membership_roles (membership_id, role_id) values ($1, $2)`,
+        [tenantAMembership.rows[0]?.id, tenantBRole.rows[0]?.id],
+      ),
+    ).rejects.toThrow(/same tenant|row-level security|permission denied/i);
+
+    const leaked = await admin.query(
+      `select 1 from membership_roles where membership_id = $1 and role_id = $2`,
+      [tenantAMembership.rows[0]?.id, tenantBRole.rows[0]?.id],
+    );
+    expect(leaked.rows).toHaveLength(0);
+  });
+});

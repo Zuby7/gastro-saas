@@ -77,6 +77,9 @@ describe.skipIf(!dbAvailable)("ticket #7: create_tenant_with_owner onboarding RP
     // the Owner membership while the tenant still exists, tripping that
     // trigger at commit.
     if (createdTenantIds.length > 0) {
+      await admin.query(`delete from audit_logs where tenant_id = any($1::uuid[])`, [
+        createdTenantIds,
+      ]);
       await admin.query(`delete from tenants where id = any($1::uuid[])`, [createdTenantIds]);
       createdTenantIds.length = 0;
     }
