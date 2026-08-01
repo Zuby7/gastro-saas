@@ -1,16 +1,18 @@
 name: Migration Check
 
-# Validates supabase/migrations/**. Implements the "migration validation" gate
-# that ticket #2 (CI pipeline) explicitly deferred pending this ticket (#3).
+# Validates supabase/migrations/** and (since ticket #4) the tenant-isolation
+# integration test in packages/database. This is the "Migration Validation"
+# gate referenced in docs/testing/test-strategy.md's CI gate order, and it is
+# a required status check on `main` (see docs/testing/test-strategy.md for
+# the enforced gate list) -- a broken migration or a failing cross-tenant RLS
+# test blocks merge.
 #
-# NOTE for whoever merges ticket #2's feat/2-ci-pipeline branch: that branch
-# adds .github/workflows/ci.yml with format/lint/typecheck/unit/build/secret-scan
-# jobs and already reserves "migration validation" as a follow-up slot in its
-# header comment. This job is intentionally its own workflow file (not folded
-# into ci.yml) so the two tickets don't collide in the same file; consider
-# merging this job into ci.yml as its own step once both branches land, so
-# there is a single CI entrypoint. Until then, this workflow runs independently
-# on the same triggers.
+# This job is intentionally its own workflow file, separate from
+# .github/workflows/ci.yml (format/lint/typecheck/unit/build/secret-scan),
+# so a `supabase start` failure or the RLS integration test are attributable
+# to their own named status check. Consider merging this job into ci.yml as
+# its own step later for a single CI entrypoint; not done yet since the two
+# workflows have historically evolved independently.
 #
 # Design choice: GitHub-hosted ubuntu-latest runners have Docker available
 # natively (not nested virtualization), so a real `supabase start` -- which
@@ -30,16 +32,29 @@ name: Migration Check
 # needs a real local Supabase Postgres instance, which only this runner
 # reliably provides (see that test file's header comment for why it can't be
 # verified on the current dev machine).
+#
+# Path filters intentionally also cover packages/database/** (and the
+# lockfile/root package.json) -- not just supabase/** -- because this job
+# also runs `pnpm --filter @gastro-saas/database test:integration`. A PR that
+# only touches the database package's client code or its integration test
+# must still trigger this job, otherwise a cross-tenant regression could ship
+# without the RLS test ever running.
 
 on:
   pull_request:
     paths:
       - "supabase/**"
+      - "packages/database/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
       - ".github/workflows/migration-check.yml"
   push:
     branches: [main]
     paths:
       - "supabase/**"
+      - "packages/database/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
       - ".github/workflows/migration-check.yml"
 
 concurrency:
@@ -69,7 +84,11 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned to match packages/database's devDependency (currently
+          # "^2" resolving to 2.111.0 in pnpm-lock.yaml) so CI uses the same
+          # CLI version developers run locally. Keep this in sync whenever
+          # that devDependency is bumped.
+          version: 2.111.0
 
       - name: Start local Supabase stack (applies all migrations)
         run: supabase start
