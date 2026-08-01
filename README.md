@@ -32,12 +32,22 @@ TypeScript (strict), Next.js (App Router), PostgreSQL via Supabase (auth, storag
 
 ## Getting started
 
-Application code has not been scaffolded yet (Epic 1 tickets cover this). Once scaffolded:
+The pnpm workspace is scaffolded: `apps/web` (Next.js App Router, TypeScript strict) plus
+`packages/ui`, `packages/config`, `packages/domain`, `packages/database`, `packages/testing`
+(see `docs/architecture/domain-boundaries.md` for what each package owns).
 
 ```bash
 pnpm install
-pnpm dev
+pnpm dev        # starts apps/web on http://localhost:3000
+pnpm lint       # ESLint across all workspace packages
+pnpm typecheck  # tsc --noEmit across all workspace packages
+pnpm test       # Vitest unit tests (currently packages/ui)
+pnpm build      # production build (currently apps/web)
+pnpm format     # Prettier --write
 ```
+
+Note: `pnpm` may not be on PATH in every shell on this machine — see
+`docs/decisions/assumptions.md`.
 
 ## License
 
