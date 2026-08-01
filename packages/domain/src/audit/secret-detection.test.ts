@@ -31,22 +31,28 @@ describe("assertSafeAuditMetadata", () => {
   });
 
   it("rejects a JWT-shaped string value", () => {
+    // Fake, non-functional JWT shape (no real signing key, not a real
+    // token) -- exists purely so the detector has a JWT-shaped value to
+    // reject. gitleaks:allow
     const fakeJwt =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.4gI-VYVN0Cfy8i8XKgpFvGZQ8wF3xKW8vSY9v0DDJhU";
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.4gI-VYVN0Cfy8i8XKgpFvGZQ8wF3xKW8vSY9v0DDJhU"; // gitleaks:allow
     expect(() => assertSafeAuditMetadata({ note: fakeJwt })).toThrow(UnsafeAuditMetadataError);
   });
 
   it("rejects an API-key-shaped string value", () => {
-    expect(() => assertSafeAuditMetadata({ note: "sk_test_51H8xyzabcdefghijklmno" })).toThrow(
-      UnsafeAuditMetadataError,
-    );
+    // Fake Stripe-test-key-shaped string, not a real key.
+    const fakeApiKey = "sk_test_51H8xyzabcdefghijklmno"; // gitleaks:allow
+    expect(() => assertSafeAuditMetadata({ note: fakeApiKey })).toThrow(UnsafeAuditMetadataError);
   });
 
   it("rejects a card-number-shaped string value", () => {
-    expect(() => assertSafeAuditMetadata({ note: "4242 4242 4242 4242" })).toThrow(
+    // Well-known Stripe test card numbers (never real cards).
+    const fakeCardNumberSpaced = "4242 4242 4242 4242"; // gitleaks:allow
+    const fakeCardNumberPlain = "4242424242424242"; // gitleaks:allow
+    expect(() => assertSafeAuditMetadata({ note: fakeCardNumberSpaced })).toThrow(
       UnsafeAuditMetadataError,
     );
-    expect(() => assertSafeAuditMetadata({ note: "4242424242424242" })).toThrow(
+    expect(() => assertSafeAuditMetadata({ note: fakeCardNumberPlain })).toThrow(
       UnsafeAuditMetadataError,
     );
   });

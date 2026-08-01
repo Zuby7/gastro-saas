@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@gastro-saas/config": "workspace:*",
+    "@gastro-saas/testing": "workspace:*",
     "@types/pg": "^8",
     "pg": "^8",
     "supabase": "^2",

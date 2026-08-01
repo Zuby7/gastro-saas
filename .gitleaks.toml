@@ -5,12 +5,13 @@ title = "gastro-saas gitleaks config"
 useDefault = true
 
 [allowlist]
-description = "Publicly documented local-dev-only defaults, or fake secret-shaped test fixtures, not real secrets"
+description = "Publicly documented local-dev-only defaults, not real secrets"
 paths = [
   '''^\.env\.example$''',
-  # Fixtures for negative-testing recordAuditEvent()'s secret detector
-  # (ticket #6) -- deliberately secret-*shaped* fake values (fake JWT, fake
-  # sk_test_ token, fake card number) so the detector has something real to
-  # reject. Not real credentials.
-  '''^packages/domain/src/audit/secret-detection\.test\.ts$''',
 ]
+# Fake secret-shaped fixtures in packages/domain/src/audit/secret-detection.test.ts
+# (ticket #6, negative-testing recordAuditEvent()'s secret detector) are
+# allowlisted individually via inline `# gitleaks:allow` comments on the
+# exact lines in that file, not via a whole-file path allowlist here --
+# narrower blast radius: unrelated real secrets accidentally added to that
+# file later would still be caught.

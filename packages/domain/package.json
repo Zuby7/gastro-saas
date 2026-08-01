@@ -6,13 +6,17 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "devDependencies": {
+    "@eslint/js": "^9",
     "@gastro-saas/config": "workspace:*",
     "@types/node": "^20.19.43",
+    "eslint": "^9",
     "typescript": "^5",
+    "typescript-eslint": "^8",
     "vitest": "^4"
   }
 }

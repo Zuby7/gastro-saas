@@ -171,10 +171,21 @@ export async function seedTwoTenantFixture(
       slug: tenantB.slug,
     },
     async cleanup() {
-      // Deleting the tenants cascades to tenant_memberships and any
-      // tenant-scoped rows (brands, locations, ...) a test seeded on top of
-      // this fixture. auth.users rows are not owned by `tenants` and must be
-      // removed explicitly.
+      // `audit_logs.tenant_id` is `on delete restrict` (ticket #6, Opus
+      // review cycle 1): a tenant with any audit history can never be
+      // deleted implicitly. Explicitly purge each fixture tenant's audit
+      // rows first so `delete from tenants` below doesn't hit an FK
+      // violation for tests that recorded audit events against this
+      // fixture's tenants.
+      await admin.query(`delete from audit_logs where tenant_id in ($1, $2)`, [
+        tenantA.tenantId,
+        tenantB.tenantId,
+      ]);
+
+      // Deleting the tenants cascades to tenant_memberships and any other
+      // tenant-scoped rows (brands, locations, analytics_events, ...) a test
+      // seeded on top of this fixture. auth.users rows are not owned by
+      // `tenants` and must be removed explicitly.
       await admin.query(`delete from tenants where id in ($1, $2)`, [
         tenantA.tenantId,
         tenantB.tenantId,
