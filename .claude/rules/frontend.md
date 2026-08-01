@@ -9,3 +9,4 @@ paths: ["apps/web/**", "packages/ui/**"]
 - Never trust client-side price/total calculations for anything shown at checkout — display the server-recalculated values.
 - Draft vs. published menu state must be visually unambiguous in the admin UI.
 - Tenant branding customization must never be allowed to break accessibility (e.g. contrast) — validate branding inputs against a minimum contrast ratio.
+- Design direction (per `docs/design/*` if present, and per the user's explicit request 2026-08-01 to avoid a generic/templated look): before building the public menu (Epic 5) or admin UI (Epic 4), use the `frontend-design` skill/plugin (github.com/anthropics/claude-code, `plugins/frontend-design`) if installed — it enforces a two-pass design-token-and-critique process aimed at avoiding templated "AI-generated" defaults. If not installed in this session, the user can add it via the Claude Code plugin marketplace (`anthropics/claude-code`) and install `frontend-design`.
