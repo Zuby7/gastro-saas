@@ -1,0 +1,9 @@
+{
+  "extends": "@gastro-saas/config/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "types": ["vitest/globals"]
+  },
+  "include": ["src/**/*.ts"]
+}

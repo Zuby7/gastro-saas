@@ -1,0 +1,58 @@
+/*
+ * Tailwind v4 theme extension mirroring `tokens.ts`.
+ * Keep in sync manually with the TS token source of truth — there is no
+ * build step generating one from the other yet (tracked as a possible
+ * follow-up, not required for the current foundation ticket).
+ */
+@theme {
+  --color-brand-50: #f2f8f6;
+  --color-brand-100: #dcece5;
+  --color-brand-200: #b9d9cb;
+  --color-brand-300: #8fc0ab;
+  --color-brand-400: #5fa287;
+  --color-brand-500: #3d8268;
+  --color-brand-600: #2c6753;
+  --color-brand-700: #245244;
+  --color-brand-800: #1f4237;
+  --color-brand-900: #1a372e;
+
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f7f7f6;
+  --color-neutral-100: #e7e6e4;
+  --color-neutral-200: #d1cfcb;
+  --color-neutral-300: #a9a6a0;
+  --color-neutral-400: #7d7972;
+  --color-neutral-500: #5c5952;
+  --color-neutral-600: #45423d;
+  --color-neutral-700: #332f2b;
+  --color-neutral-800: #211f1c;
+  --color-neutral-900: #141311;
+
+  --color-danger-500: #c0362c;
+  --color-danger-600: #9c2c24;
+  --color-success-500: #2f7d4f;
+  --color-success-600: #256440;
+  --color-warning-500: #b8791a;
+  --color-warning-600: #966215;
+
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+  --spacing-24: 6rem;
+
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+}
