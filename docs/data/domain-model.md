@@ -20,7 +20,7 @@ Entities are introduced through tickets as they're needed (§12 of the source br
 
 ## Authorization
 
-`roles`, `permissions`, `role_permissions`, `membership_roles`. Permission keys follow `area.resource.action`, e.g. `menu.publish`, `payments.refund`, `orders.cancel` — full list in `.claude/rules/auth.md`.
+`roles`, `permissions`, `role_permissions`, `membership_roles`. Permission keys follow `area.resource.action`, e.g. `menu.publish`, `payments.refund`, `orders.cancel`, `audit.read` (ticket #6 — defined here, not yet enforced anywhere; no read function/endpoint exists yet) — full list in `.claude/rules/auth.md`.
 
 ## Restaurant profile
 
@@ -56,7 +56,7 @@ Entities are introduced through tickets as they're needed (§12 of the source br
 
 ## Audit
 
-`audit_logs`.
+`audit_logs` (append-only, tenant-scoped, immutable — no UPDATE/DELETE from application code) and `analytics_events` (Grundgerüst only, no aggregation logic — that's Epic 9). Write-only via `recordAuditEvent()` in `packages/domain/src/audit`, which rejects secret-/payment-shaped metadata before it reaches the table. See `docs/security/threat-model.md`'s audit section and `supabase/migrations/20260801050000_audit_log_and_analytics_events_skeleton.sql`.
 
 ## Cross-cutting rules
 

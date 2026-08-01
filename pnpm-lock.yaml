@@ -77,6 +77,9 @@ importers:
       '@gastro-saas/config':
         specifier: workspace:*
         version: link:../config
+      '@gastro-saas/testing':
+        specifier: workspace:*
+        version: link:../testing
       '@types/pg':
         specifier: ^8
         version: 8.20.3
@@ -95,12 +98,27 @@ importers:
 
   packages/domain:
     devDependencies:
+      '@eslint/js':
+        specifier: ^9
+        version: 9.39.5
       '@gastro-saas/config':
         specifier: workspace:*
         version: link:../config
+      '@types/node':
+        specifier: ^20.19.43
+        version: 20.19.43
+      eslint:
+        specifier: ^9
+        version: 9.39.5(jiti@2.7.0)
       typescript:
         specifier: ^5
         version: 5.9.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      vitest:
+        specifier: ^4
+        version: 4.1.10(@types/node@20.19.43)(jsdom@25.0.1)(vite@8.2.0(@types/node@20.19.43)(jiti@2.7.0))
 
   packages/testing:
     devDependencies:

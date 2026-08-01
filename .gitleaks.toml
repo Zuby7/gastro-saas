@@ -5,7 +5,30 @@ title = "gastro-saas gitleaks config"
 useDefault = true
 
 [allowlist]
-description = "Publicly documented local-dev-only defaults, not real secrets"
+description = "Publicly documented local-dev-only defaults, or fake secret-shaped test fixtures (not real secrets)"
 paths = [
   '''^\.env\.example$''',
+]
+# Fake secret-shaped fixtures in packages/domain/src/audit/secret-detection.test.ts
+# (ticket #6, negative-testing recordAuditEvent()'s secret detector).
+#
+# Correction (Opus review cycle 1, artifacts/reviews/issue-6.json): gitleaks
+# (pinned version, see .github/workflows/ci.yml's gitleaks-action@v3) has no
+# inline `gitleaks:allow`-comment support -- that was tried first and still
+# failed CI, because gitleaks scans each historical commit's diff
+# independently and an inline comment added in a later commit doesn't retroactively
+# suppress the finding attributed to the earlier commit that introduced the
+# bare string. Allowlisting by the exact fake-secret content via `regexes`
+# below applies regardless of which commit/line the string appears on, and is
+# still far narrower than the whole-file `paths` allowlist this replaces:
+# a real secret accidentally added anywhere in that file later would not
+# match any of these fixed strings and would still be caught.
+regexes = [
+  # Fake, non-functional JWT shape (no real signing key).
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxIn0\.4gI-VYVN0Cfy8i8XKgpFvGZQ8wF3xKW8vSY9v0DDJhU''',
+  # Fake Stripe-test-key-shaped string, not a real key.
+  '''sk_test_51H8xyzabcdefghijklmno''',
+  # Well-known Stripe test card number (never a real card), spaced and plain forms.
+  '''4242 4242 4242 4242''',
+  '''4242424242424242''',
 ]
