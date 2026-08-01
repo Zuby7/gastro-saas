@@ -1,11 +1,12 @@
 name: Migration Check
 
 # Validates supabase/migrations/** and (since ticket #4) the tenant-isolation
-# integration test in packages/database. This is the "Migration Validation"
-# gate referenced in docs/testing/test-strategy.md's CI gate order, and it is
-# a required status check on `main` (see docs/testing/test-strategy.md for
-# the enforced gate list) -- a broken migration or a failing cross-tenant RLS
-# test blocks merge.
+# integration test in packages/database, plus (since ticket #5) the reusable
+# cross-tenant test harness's self-test in packages/testing. This is the
+# "Migration Validation" gate referenced in docs/testing/test-strategy.md's
+# CI gate order, and it is a required status check on `main` (see
+# docs/testing/test-strategy.md for the enforced gate list) -- a broken
+# migration or a failing cross-tenant RLS test blocks merge.
 #
 # This job is intentionally its own workflow file, separate from
 # .github/workflows/ci.yml (format/lint/typecheck/unit/build/secret-scan),
@@ -33,6 +34,11 @@ name: Migration Check
 # reliably; it has also been verified locally on the dev machine since the
 # Docker/disk-space blocker that originally motivated this workflow was
 # resolved.
+#
+# Ticket #5 adds a second integration step: the reusable cross-tenant test
+# harness's own self-test (packages/testing/src/tenant-fixture.integration.test.ts),
+# which exercises `seedTwoTenantFixture` / `expectCrossTenantDenied` against
+# the same real database.
 #
 # No path filters: this job is a required status check on `main`, and a
 # path-filtered required check would leave PRs that don't touch
@@ -88,6 +94,11 @@ jobs:
         env:
           SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
         run: pnpm --filter @gastro-saas/database test:integration
+
+      - name: Run cross-tenant test harness self-test (ticket #5)
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: pnpm --filter @gastro-saas/testing test:integration
 
       - name: Stop local Supabase stack
         if: always()

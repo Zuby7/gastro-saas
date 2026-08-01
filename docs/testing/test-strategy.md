@@ -8,6 +8,16 @@
 - **Accessibility** (Playwright + axe or equivalent): menu browsing, dish detail dialog, cart, checkout, admin menu editing — automated checks plus a manual checklist for these same flows before each release.
 - **Performance**: budgets for public page load, image delivery, JS payload, menu query, dashboard query — introduced once the core flow is stable, not before.
 
+## Cross-tenant test harness
+
+`packages/testing` (ticket #5) provides a reusable fixture for the tenant-isolation cross-tenant tests required above and in `docs/security/tenant-isolation.md`, so individual tickets don't have to re-derive it from scratch:
+
+- `seedTwoTenantFixture(admin)` seeds two tenants, each with an Owner membership (and optional extra members), directly against a real Postgres connection (bypassing RLS, like a `service_role`/migration/seed script would) — mirrors two tenants with similar shapes and returns a `cleanup()` to remove everything it created.
+- `queryAsUser(client, userId, sql, params)` runs a query as a simulated authenticated Supabase session for `userId` (`set role authenticated` + `set_config('request.jwt.claims', ...)`), exercising real RLS without depending on Epic 3's auth implementation.
+- `expectCrossTenantDenied({ client, actorUserId, sql, params })` asserts that a query attempting to read/write another tenant's row(s) is denied by RLS — accepting either denial shape (zero rows returned/affected, or a thrown row-level-security/permission-denied error) and failing the test if the query instead succeeds with foreign-tenant rows.
+
+These generalize the ad-hoc pattern `packages/database/src/tenants.integration.test.ts` (ticket #4) wrote inline. See `packages/testing/src/tenant-fixture.ts` for full API docs and `packages/testing/src/tenant-fixture.integration.test.ts` for a worked example against the `brands`/`locations` RLS model. Explicit non-goal: this harness has no UI-test coverage — it only exercises Postgres RLS directly via `pg`.
+
 ## Payment-specific tests
 
 Stripe test mode + mocked webhook signatures: success, failure, cancellation, duplicate webhook, delayed/out-of-order webhook, invalid signature, amount mismatch, partial refund, full refund.
