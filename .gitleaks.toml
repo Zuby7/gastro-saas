@@ -31,4 +31,10 @@ regexes = [
   # Well-known Stripe test card number (never a real card), spaced and plain forms.
   '''4242 4242 4242 4242''',
   '''4242424242424242''',
+  # Supabase's published local-dev-only demo anon/service_role JWTs (same
+  # values as .env.example -- reused as a fallback default in integration
+  # tests, e.g. packages/database/src/create-tenant-with-owner.integration.test.ts).
+  # Only ever work against a throwaway local Docker stack.
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9\.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0''',
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0\.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU''',
 ]

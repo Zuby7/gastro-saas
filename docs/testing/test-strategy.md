@@ -36,6 +36,8 @@ format → lint → typecheck → unit → integration → build → migration v
 
 Implemented in `.github/workflows/ci.yml`: format, lint, typecheck, unit, build, secret scan. Integration tests and migration validation (including the cross-tenant RLS integration test) run in the separate `.github/workflows/migration-check.yml` job, "Migration Validation". Dependency/security scan and E2E smoke are follow-up tickets once Playwright and a dependency-scan tool are introduced.
 
+**E2E-in-CI status (reaffirmed explicitly during ticket #7's fix cycle 1, 2026-08-01)**: Playwright (`apps/web/e2e/`, `apps/web/playwright.config.ts`) is introduced but deliberately still local-only, not a required CI status check. Reason: it needs both a real local Supabase stack (`supabase start`) and a running Next.js server in the same job, and no current CI job provisions both together (`migration-check.yml` only starts Supabase; `ci.yml` never starts a dev/prod server). This is not a silent gap -- both E2E specs were run locally against the real stack while validating ticket #7's fix cycle 1 and pass. Follow-up, not done here: add a CI job that runs `supabase start` + `next build && next start` + `playwright test` together, then promote it to a required "E2E Smoke" status check.
+
 ### Required status checks (branch protection on `main`)
 
 As of 2026-08-01 (backfilled per-ticket Opus review of ticket #3), `main`'s branch protection requires all of the following status checks to pass before merge, with `strict: true` (branch must be up to date) and `enforce_admins: true` (no bypass, including for repo admins):
