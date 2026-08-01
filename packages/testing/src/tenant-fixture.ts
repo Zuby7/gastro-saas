@@ -207,6 +207,12 @@ export async function queryAsUser<Row extends QueryResultRow = QueryResultRow>(
   try {
     return await client.query<Row>(sql, params);
   } finally {
+    // `request.jwt.claims` is set session-scoped (the `false` argument above),
+    // not transaction-local, so it survives past this call on `client`. Clear
+    // it here too -- otherwise a later query on the same `client` that forgets
+    // to go through `queryAsUser` again could silently keep acting as this
+    // simulated user instead of falling back to no identity.
+    await client.query("select set_config('request.jwt.claims', NULL, false)");
     await client.query("reset role");
   }
 }
@@ -239,6 +245,28 @@ export interface ExpectCrossTenantDeniedOptions {
  * Fails the test if the query instead returns/affects one or more rows
  * belonging to the other tenant, or throws an unrelated error.
  *
+ * **Known limitations, please read before use:**
+ *
+ * - For `UPDATE`/`DELETE`/`INSERT` **without** a `RETURNING` clause, `pg`
+ *   always returns `rows: []` regardless of how many rows were actually
+ *   affected -- `rows.length` alone cannot tell "denied" apart from "silently
+ *   mutated N rows of someone else's data". This helper therefore also checks
+ *   `result.rowCount`, which `pg` populates correctly from the server's
+ *   command tag even without `RETURNING`. Callers doing DML should still
+ *   prefer adding `RETURNING id` to `sql` where practical -- it gives the
+ *   clearest, most direct signal and lets a failure message show which row(s)
+ *   leaked.
+ * - A `SELECT count(*)` style query always returns exactly one row (the
+ *   count itself), which this helper would misreport as "not denied" even if
+ *   the count is 0. Don't pass aggregate queries to this helper -- select the
+ *   underlying rows directly instead. Not solved here; documented as a known
+ *   gap.
+ * - A "permission denied" / "row-level security" error only proves *some*
+ *   policy or grant rejected the statement -- it does not by itself prove
+ *   the *intended* tenant-scoping policy is what did the rejecting (e.g. a
+ *   missing `GRANT` to the `authenticated` role would also throw "permission
+ *   denied" and be indistinguishable from a working RLS policy here).
+ *
  * Usage:
  * ```ts
  * await expectCrossTenantDenied({
@@ -254,17 +282,31 @@ export async function expectCrossTenantDenied(
 ): Promise<void> {
   const { client, actorUserId, sql, params = [] } = options;
 
+  // Only a failure of the *database query itself* (e.g. a real RLS/grant
+  // denial thrown by Postgres) should be caught and re-interpreted below.
+  // The assertions that follow a successful query must be allowed to throw
+  // (and propagate) their own AssertionError directly -- catching them here
+  // and re-matching the message against the RLS-error regex would mask the
+  // real diagnosis, and (in the worst case) could make a genuine assertion
+  // failure misreport as a pass if its message ever happened to contain
+  // "permission denied".
+  let result: QueryResult<QueryResultRow>;
   try {
-    const result = await queryAsUser(client, actorUserId, sql, params);
-    expect(
-      result.rows,
-      "expected cross-tenant query to be denied by RLS (return/affect zero rows), " +
-        "but it returned rows belonging to another tenant",
-    ).toHaveLength(0);
+    result = await queryAsUser(client, actorUserId, sql, params);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     expect(message, `expected an RLS denial error, got: ${message}`).toMatch(
       /row-level security|permission denied/i,
     );
+    return;
   }
+
+  // See the "Known limitations" note above `rowCount` for why both checks
+  // are required: `rows.length` alone is vacuous for DML without RETURNING.
+  expect(
+    result.rows.length === 0 && (result.rowCount ?? 0) === 0,
+    "expected cross-tenant query to be denied by RLS (return/affect zero rows), " +
+      `but it returned ${result.rows.length} row(s) and affected rowCount=${result.rowCount} ` +
+      "belonging to another tenant",
+  ).toBe(true);
 }

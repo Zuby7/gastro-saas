@@ -152,10 +152,20 @@ describe.skipIf(!dbAvailable)("seedTwoTenantFixture + expectCrossTenantDenied", 
   it("fails the assertion if a cross-tenant read is not actually denied (harness self-check)", async () => {
     const fixture = await seedTwoTenantFixture(admin);
     try {
-      // tenantB's own Owner reading tenantB's own tenant row IS allowed by
-      // RLS -- expectCrossTenantDenied must correctly report this as a
+      // First prove the allow path directly: tenantB's own Owner reading
+      // tenantB's own tenant row IS allowed by RLS.
+      const allowed = await queryAsUser(
+        admin,
+        fixture.tenantB.ownerId,
+        `select id from tenants where id = $1`,
+        [fixture.tenantB.tenantId],
+      );
+      expect(allowed.rows.length).toBeGreaterThan(0);
+
+      // expectCrossTenantDenied must correctly report that same access as a
       // failed assertion, not as "denied", or the harness would be a false
-      // sense of security.
+      // sense of security -- match a specific message substring so this test
+      // can't also pass on an unrelated error (connection failure, typo).
       await expect(
         expectCrossTenantDenied({
           client: admin,
@@ -163,7 +173,9 @@ describe.skipIf(!dbAvailable)("seedTwoTenantFixture + expectCrossTenantDenied", 
           sql: `select id from tenants where id = $1`,
           params: [fixture.tenantB.tenantId],
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(
+        /returned \d+ row\(s\) and affected rowCount=.* belonging to another tenant/,
+      );
     } finally {
       await fixture.cleanup();
     }
