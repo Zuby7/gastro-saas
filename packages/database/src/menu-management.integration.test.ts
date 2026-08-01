@@ -287,9 +287,12 @@ describe.skipIf(!dbAvailable)("restaurant profile and menu management", () => {
     await queryAsUser(admin, tenantA.ownerId, `select publish_menu_version($1)`, [draftId]);
 
     await expect(
-      queryAsUser(admin, tenantA.ownerId, `update menu_versions set status = 'draft' where id = $1`, [
-        draftId,
-      ]),
+      queryAsUser(
+        admin,
+        tenantA.ownerId,
+        `update menu_versions set status = 'draft' where id = $1`,
+        [draftId],
+      ),
     ).rejects.toThrow(/can only be changed by publish_menu_version/i);
   });
 
