@@ -98,7 +98,7 @@ begin
         ), '[]'::jsonb)
       )
       order by c.sort_order, c.name
-    ), '[]'::jsonb)
+    ) filter (where c.id is not null), '[]'::jsonb)
   )
     into v_result
     from public.tenants t

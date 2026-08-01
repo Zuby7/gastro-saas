@@ -163,6 +163,81 @@ describe.skipIf(!dbAvailable)("restaurant profile and menu management", () => {
     expect(published.rows[0]?.published_at).not.toBeNull();
   });
 
+  // Regression test for a Codex review finding: publish_menu_version() used
+  // to transition the draft in place with nothing blocking further writes to
+  // it, so an admin could silently edit the live/published menu. Fixed by a
+  // write-guard trigger (locks categories/dishes/... once their menu_version
+  // leaves 'draft') plus auto-cloning a fresh draft on publish.
+  it("locks a published menu version against writes and auto-creates a fresh editable draft", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const draftId = randomUUID();
+    const categoryId = randomUUID();
+    const dishId = randomUUID();
+
+    await queryAsUser(
+      admin,
+      tenantA.ownerId,
+      `insert into menu_versions (id, tenant_id, status) values ($1, $2, 'draft')`,
+      [draftId, tenantA.tenantId],
+    );
+    await queryAsUser(
+      admin,
+      tenantA.ownerId,
+      `insert into categories (id, tenant_id, menu_version_id, name, sort_order)
+       values ($1, $2, $3, 'Pizza', 1)`,
+      [categoryId, tenantA.tenantId, draftId],
+    );
+    await queryAsUser(
+      admin,
+      tenantA.ownerId,
+      `insert into dishes (id, tenant_id, menu_version_id, category_id, name, price_cents, allergen_reviewed)
+       values ($1, $2, $3, $4, 'Margherita', 900, true)`,
+      [dishId, tenantA.tenantId, draftId, categoryId],
+    );
+
+    await queryAsUser(admin, tenantA.ownerId, `select publish_menu_version($1)`, [draftId]);
+
+    // The just-published version's dish is now read-only.
+    await expect(
+      queryAsUser(admin, tenantA.ownerId, `update dishes set price_cents = 1000 where id = $1`, [
+        dishId,
+      ]),
+    ).rejects.toThrow(/read-only/i);
+    await expect(
+      queryAsUser(admin, tenantA.ownerId, `delete from dishes where id = $1`, [dishId]),
+    ).rejects.toThrow(/read-only/i);
+
+    // A fresh draft with the same structure now exists for further editing.
+    const newDraft = await admin.query<{ id: string }>(
+      `select id from menu_versions where tenant_id = $1 and status = 'draft'`,
+      [tenantA.tenantId],
+    );
+    expect(newDraft.rows).toHaveLength(1);
+    const newDraftId = newDraft.rows[0]?.id;
+    expect(newDraftId).not.toBe(draftId);
+
+    const clonedDish = await admin.query<{ name: string; price_cents: number }>(
+      `select d.name, d.price_cents
+         from dishes d
+         join categories c on c.id = d.category_id
+        where c.menu_version_id = $1`,
+      [newDraftId],
+    );
+    expect(clonedDish.rows).toEqual([
+      expect.objectContaining({ name: "Margherita", price_cents: 900 }),
+    ]);
+
+    // The cloned dish is fully editable (it belongs to the new draft, not
+    // the published version).
+    await queryAsUser(
+      admin,
+      tenantA.ownerId,
+      `update dishes set price_cents = 950 where name = 'Margherita' and menu_version_id = $1`,
+      [newDraftId],
+    );
+  });
+
   it("public menu query returns only one tenant's published menu and hides drafts", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA, tenantB } = fixture;

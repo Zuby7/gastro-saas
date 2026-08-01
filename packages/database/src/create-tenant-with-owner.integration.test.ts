@@ -134,6 +134,47 @@ describe.skipIf(!dbAvailable)("ticket #7: create_tenant_with_owner onboarding RP
     expect(tenantRow.rows[0]).toMatchObject({ name: tenantName, slug: tenantSlug });
   });
 
+  // Codex review finding: createTenantAction had no server-side check that
+  // the caller has zero memberships, so any authenticated user could call
+  // create_tenant_with_owner repeatedly via .rpc() (bypassing the /account
+  // form entirely) and create unlimited tenants. Fixed at the DB layer in
+  // 20260801130000_tenant_creation_guard.sql.
+  it("rejects a second create_tenant_with_owner call for a user who already has a tenant", async () => {
+    const unique = randomUUID();
+    const email = `owner-${unique}@example.test`;
+    const password = "Sup3rSecurePassw0rd!";
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    expect(signUpError).toBeNull();
+    createdUserIds.push(signUpData.user!.id);
+
+    const { data: firstTenantId, error: firstError } = await supabase.rpc(
+      "create_tenant_with_owner",
+      { p_tenant_name: "First Restaurant", p_tenant_slug: `first-${unique.slice(0, 8)}` },
+    );
+    expect(firstError).toBeNull();
+    createdTenantIds.push(firstTenantId as string);
+
+    const { data: secondTenantId, error: secondError } = await supabase.rpc(
+      "create_tenant_with_owner",
+      { p_tenant_name: "Second Restaurant", p_tenant_slug: `second-${unique.slice(0, 8)}` },
+    );
+    expect(secondTenantId).toBeNull();
+    expect(secondError?.message).toMatch(/already belongs to a tenant/i);
+
+    const memberships = await admin.query(
+      `select tenant_id from tenant_memberships where user_id = $1`,
+      [signUpData.user!.id],
+    );
+    expect(memberships.rows).toHaveLength(1);
+  });
+
   it("never leaves a bare tenant behind if the RPC is called twice with the same slug (unique violation)", async () => {
     const unique = randomUUID();
     const email = `owner-${unique}@example.test`;

@@ -78,6 +78,12 @@ export async function createTenantAction(
   if (rpcError) {
     const slugTaken =
       rpcError.code === "23505" || rpcError.message.toLowerCase().includes("duplicate");
+    const alreadyHasTenant = rpcError.message.toLowerCase().includes("already belongs to a tenant");
+
+    if (alreadyHasTenant) {
+      redirect("/account");
+    }
+
     return {
       error: slugTaken
         ? "Dieser Restaurant-Slug ist bereits vergeben. Bitte wählen Sie einen anderen."
@@ -133,6 +139,27 @@ export async function inviteMemberAction(
   const tokenHash = hashInvitationToken(token);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
+  const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const inviteUrl = `${origin}/invite/${token}`;
+
+  // Codex review fix: send the email BEFORE persisting the invitation. The
+  // raw token only ever exists in memory (only its hash is stored, per
+  // single-use-token best practice) -- persisting first and emailing second
+  // meant a failed send left a permanently unusable invite row with no way
+  // to recover or resend the token. Sending first means a failure leaves
+  // nothing behind to clean up; the admin just retries the action.
+  try {
+    await sendInvitationEmail({
+      to: parsed.data.email,
+      inviteUrl,
+      tenantName: membership.tenants?.name ?? "Ihrem Restaurant",
+    });
+  } catch {
+    return {
+      error: "Die Einladungs-E-Mail konnte nicht versendet werden. Bitte versuchen Sie es erneut.",
+    };
+  }
+
   const { error: rpcError } = await supabase.rpc("create_invitation", {
     p_tenant_id: membership.tenant_id,
     p_email: parsed.data.email,
@@ -142,21 +169,9 @@ export async function inviteMemberAction(
   });
 
   if (rpcError) {
-    return { error: "Die Einladung konnte nicht erstellt werden." };
-  }
-
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const inviteUrl = `${origin}/invite/${token}`;
-
-  try {
-    await sendInvitationEmail({
-      to: parsed.data.email,
-      inviteUrl,
-      tenantName: membership.tenants?.name ?? "Ihrem Restaurant",
-    });
-  } catch {
     return {
-      error: "Die Einladung wurde erstellt, aber die E-Mail konnte nicht versendet werden.",
+      error:
+        "Die Einladungs-E-Mail wurde versendet, aber die Einladung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
     };
   }
 

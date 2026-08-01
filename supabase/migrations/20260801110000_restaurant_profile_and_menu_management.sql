@@ -342,6 +342,60 @@ create trigger dish_additive_assignments_tenant_match before insert or update on
 create trigger dish_dietary_label_assignments_tenant_match before insert or update on dish_dietary_label_assignments for each row execute function ensure_assignment_tenant_match();
 
 -- ----------------------------------------------------------------------------
+-- Draft/publish write guard (fixes: published/archived menu versions were
+-- previously still writable -- app-layer permission checks alone don't stop
+-- an admin action from silently editing the live menu; RLS's write policies
+-- below only check permission, not menu-version status). categories/dishes
+-- carry menu_version_id directly; their children are locked transitively via
+-- dish_id -> dishes.menu_version_id. option_groups/options are intentionally
+-- NOT version-scoped (shared library across versions, like ingredients) --
+-- reviewed and accepted as out of scope for this guard, tracked as a
+-- residual risk rather than solved here.
+-- ----------------------------------------------------------------------------
+create or replace function ensure_menu_version_editable()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_menu_version_id uuid;
+  v_dish_id uuid;
+  v_status text;
+begin
+  if tg_table_name in ('categories', 'dishes') then
+    v_menu_version_id := coalesce(new.menu_version_id, old.menu_version_id);
+    select status into v_status from public.menu_versions where id = v_menu_version_id;
+  else
+    v_dish_id := coalesce(new.dish_id, old.dish_id);
+    select mv.status into v_status
+      from public.dishes d
+      join public.menu_versions mv on mv.id = d.menu_version_id
+     where d.id = v_dish_id;
+  end if;
+
+  if v_status is not null and v_status <> 'draft' then
+    raise exception '% is read-only once its menu version leaves draft status (current status: %)', tg_table_name, v_status
+      using errcode = 'read_only_sql_transaction';
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger categories_menu_version_editable before insert or update or delete on categories for each row execute function ensure_menu_version_editable();
+create trigger dishes_menu_version_editable before insert or update or delete on dishes for each row execute function ensure_menu_version_editable();
+create trigger dish_variants_menu_version_editable before insert or update or delete on dish_variants for each row execute function ensure_menu_version_editable();
+create trigger dish_option_group_assignments_menu_version_editable before insert or update or delete on dish_option_group_assignments for each row execute function ensure_menu_version_editable();
+create trigger removable_ingredients_menu_version_editable before insert or update or delete on removable_ingredients for each row execute function ensure_menu_version_editable();
+create trigger dish_allergen_assignments_menu_version_editable before insert or update or delete on dish_allergen_assignments for each row execute function ensure_menu_version_editable();
+create trigger dish_additive_assignments_menu_version_editable before insert or update or delete on dish_additive_assignments for each row execute function ensure_menu_version_editable();
+create trigger dish_dietary_label_assignments_menu_version_editable before insert or update or delete on dish_dietary_label_assignments for each row execute function ensure_menu_version_editable();
+
+-- ----------------------------------------------------------------------------
 -- RLS
 -- ----------------------------------------------------------------------------
 alter table restaurant_profiles enable row level security;
@@ -479,6 +533,93 @@ begin
 end;
 $$;
 
+-- Deep-clones a menu version's full structure (categories, dishes, variants,
+-- and all dish assignment tables) into a brand-new 'draft' version. Called
+-- by publish_menu_version() so publishing never leaves the tenant without an
+-- editable draft -- without this, the admin UI would have nothing to edit
+-- after the first publish. New rows get fresh ids (via temp id-mapping
+-- tables); option_groups/options/ingredients/allergens/additives/dietary_labels
+-- are tenant-scoped, not version-scoped, so they're referenced as-is, not
+-- cloned.
+create or replace function clone_menu_version_as_draft(p_source_menu_version_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_tenant_id uuid;
+  v_source_version_number integer;
+  v_new_version_id uuid;
+begin
+  select tenant_id, version_number into v_tenant_id, v_source_version_number
+    from public.menu_versions
+   where id = p_source_menu_version_id;
+
+  if v_tenant_id is null then
+    raise exception 'Source menu version not found' using errcode = 'invalid_parameter_value';
+  end if;
+
+  insert into public.menu_versions (tenant_id, status, version_number)
+  values (v_tenant_id, 'draft', v_source_version_number + 1)
+  returning id into v_new_version_id;
+
+  create temporary table _clone_category_map (old_id uuid primary key, new_id uuid not null) on commit drop;
+  create temporary table _clone_dish_map (old_id uuid primary key, new_id uuid not null) on commit drop;
+
+  insert into _clone_category_map (old_id, new_id)
+  select id, gen_random_uuid() from public.categories where menu_version_id = p_source_menu_version_id;
+
+  insert into public.categories (id, tenant_id, menu_version_id, name, sort_order, archived_at)
+  select cm.new_id, c.tenant_id, v_new_version_id, c.name, c.sort_order, c.archived_at
+    from public.categories c
+    join _clone_category_map cm on cm.old_id = c.id
+   where c.menu_version_id = p_source_menu_version_id;
+
+  insert into _clone_dish_map (old_id, new_id)
+  select id, gen_random_uuid() from public.dishes where menu_version_id = p_source_menu_version_id;
+
+  insert into public.dishes (id, tenant_id, menu_version_id, category_id, media_asset_id, name, description, price_cents, currency, allergen_reviewed, archived_at)
+  select dm.new_id, d.tenant_id, v_new_version_id, cm.new_id, d.media_asset_id, d.name, d.description, d.price_cents, d.currency, d.allergen_reviewed, d.archived_at
+    from public.dishes d
+    join _clone_dish_map dm on dm.old_id = d.id
+    join _clone_category_map cm on cm.old_id = d.category_id
+   where d.menu_version_id = p_source_menu_version_id;
+
+  insert into public.dish_variants (tenant_id, dish_id, name, price_cents, currency, is_available, sort_order)
+  select dv.tenant_id, dm.new_id, dv.name, dv.price_cents, dv.currency, dv.is_available, dv.sort_order
+    from public.dish_variants dv
+    join _clone_dish_map dm on dm.old_id = dv.dish_id;
+
+  insert into public.dish_option_group_assignments (dish_id, option_group_id, tenant_id, sort_order)
+  select dm.new_id, a.option_group_id, a.tenant_id, a.sort_order
+    from public.dish_option_group_assignments a
+    join _clone_dish_map dm on dm.old_id = a.dish_id;
+
+  insert into public.removable_ingredients (dish_id, ingredient_id, tenant_id)
+  select dm.new_id, r.ingredient_id, r.tenant_id
+    from public.removable_ingredients r
+    join _clone_dish_map dm on dm.old_id = r.dish_id;
+
+  insert into public.dish_allergen_assignments (dish_id, allergen_id, tenant_id)
+  select dm.new_id, a.allergen_id, a.tenant_id
+    from public.dish_allergen_assignments a
+    join _clone_dish_map dm on dm.old_id = a.dish_id;
+
+  insert into public.dish_additive_assignments (dish_id, additive_id, tenant_id)
+  select dm.new_id, a.additive_id, a.tenant_id
+    from public.dish_additive_assignments a
+    join _clone_dish_map dm on dm.old_id = a.dish_id;
+
+  insert into public.dish_dietary_label_assignments (dish_id, dietary_label_id, tenant_id)
+  select dm.new_id, a.dietary_label_id, a.tenant_id
+    from public.dish_dietary_label_assignments a
+    join _clone_dish_map dm on dm.old_id = a.dish_id;
+
+  return v_new_version_id;
+end;
+$$;
+
 create or replace function publish_menu_version(p_menu_version_id uuid)
 returns void
 language plpgsql
@@ -515,10 +656,17 @@ begin
 
   insert into public.audit_logs (tenant_id, actor_user_id, action, target_type, target_id)
   values (v_tenant_id, v_actor_user_id, 'menu.published', 'menu_version', p_menu_version_id::text);
+
+  -- Publishing must never leave the tenant without an editable draft --
+  -- the write-guard trigger above now locks the just-published version, so
+  -- without this the admin UI would have nothing left to edit.
+  perform public.clone_menu_version_as_draft(p_menu_version_id);
 end;
 $$;
 
 revoke all on function run_menu_publish_checks(uuid) from public;
 revoke all on function publish_menu_version(uuid) from public;
+revoke all on function clone_menu_version_as_draft(uuid) from public;
 grant execute on function run_menu_publish_checks(uuid) to authenticated, service_role;
 grant execute on function publish_menu_version(uuid) to authenticated, service_role;
+grant execute on function clone_menu_version_as_draft(uuid) to service_role;
