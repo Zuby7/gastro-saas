@@ -24,4 +24,18 @@ A ticket is not Done until: relevant unit/integration/E2E tests exist and pass, 
 
 format → lint → typecheck → unit → integration → build → migration validation → secret scan → dependency/security scan → E2E smoke (where environment permits). Opus validation happens only after this passes; Opus never substitutes for these tools.
 
-Implemented in `.github/workflows/ci.yml` (ticket #2): format, lint, typecheck, unit, build, secret scan, each as its own required GitHub Actions job. Integration tests and migration validation land with ticket #3 (database setup); dependency/security scan and E2E smoke are follow-up tickets once Playwright and a dependency-scan tool are introduced.
+Implemented in `.github/workflows/ci.yml`: format, lint, typecheck, unit, build, secret scan. Integration tests and migration validation (including the cross-tenant RLS integration test) run in the separate `.github/workflows/migration-check.yml` job, "Migration Validation". Dependency/security scan and E2E smoke are follow-up tickets once Playwright and a dependency-scan tool are introduced.
+
+### Required status checks (branch protection on `main`)
+
+As of 2026-08-01 (backfilled per-ticket Opus review of ticket #3), `main`'s branch protection requires all of the following status checks to pass before merge, with `strict: true` (branch must be up to date) and `enforce_admins: true` (no bypass, including for repo admins):
+
+- `Format Check`
+- `Lint`
+- `Typecheck`
+- `Unit Tests`
+- `Build`
+- `Secret Scan`
+- `Migration Validation` (runs `supabase start`, `supabase db lint`, and the tenant-isolation integration test — added because a broken migration or a failing cross-tenant RLS test must block merge, not just warn)
+
+Any new required CI job must be added to branch protection via the GitHub API (`gh api -X PUT repos/<owner>/<repo>/branches/main/protection`) in the same PR that introduces it — a job that isn't required doesn't actually gate anything.

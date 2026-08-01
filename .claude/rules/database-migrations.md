@@ -3,6 +3,7 @@ description: Database & migration rules
 paths: ["packages/database/**", "supabase/migrations/**"]
 ---
 
+- Migration file naming convention: `supabase/migrations/<YYYYMMDDHHMMSS>_<snake_case_name>.sql` (Supabase CLI default ordering — see `docs/operations/deployment-strategy.md`).
 - Every new tenant-scoped table ships its Row Level Security policy in the _same_ migration — never a follow-up ticket.
 - Money columns are integer minor units (cents) with an explicit `currency` column — never floating point.
 - Historical order/payment data is immutable: `order_items`/`order_item_selections` snapshot purchase-time name/price/tax/variant/extras independent of the live menu rows.
