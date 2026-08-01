@@ -23,3 +23,5 @@ A ticket is not Done until: relevant unit/integration/E2E tests exist and pass, 
 ## CI gate order (deterministic before Opus)
 
 format → lint → typecheck → unit → integration → build → migration validation → secret scan → dependency/security scan → E2E smoke (where environment permits). Opus validation happens only after this passes; Opus never substitutes for these tools.
+
+Implemented in `.github/workflows/ci.yml` (ticket #2): format, lint, typecheck, unit, build, secret scan, each as its own required GitHub Actions job. Integration tests and migration validation land with ticket #3 (database setup); dependency/security scan and E2E smoke are follow-up tickets once Playwright and a dependency-scan tool are introduced.

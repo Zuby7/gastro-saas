@@ -8,4 +8,4 @@ paths: ["packages/domain/identity/**", "packages/domain/authorization/**"]
 - Standard role templates (Owner, Manager, Kitchen, Service, Marketing) are starting points — tenants can define custom roles with fine-grained permission sets.
 - At least one Owner membership per tenant at all times — enforced at the data layer, not just the UI, to prevent accidental lockout.
 - Invitations are single-use, expiring, and scoped to one tenant + one role.
-- Every permission boundary needs a test proving the *denied* case, not just the allowed case (e.g. "kitchen role cannot read revenue").
+- Every permission boundary needs a test proving the _denied_ case, not just the allowed case (e.g. "kitchen role cannot read revenue").
