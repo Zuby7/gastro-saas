@@ -1,0 +1,45 @@
+{
+  "ticket": "architecture-review-pass-1",
+  "verdict": "CHANGES_REQUESTED",
+  "acceptance_criteria": [
+    {"criterion": "Documentation reflects a multi-tenant gastronomy SaaS with menu mgmt, ordering, secure payments, analytics, ratings, RBAC", "status": "PASS", "evidence": "product-vision.md items 1-12 map 1:1 onto epics 1-12 in mvp-scope.md; domain-boundaries.md defines a module per capability"},
+    {"criterion": "Every step of the MVP acceptance scenario (mvp-scope.md) has backing tickets", "status": "FAIL", "evidence": "No ticket covers transactional order-confirmation email or a VAT/tax model, though both are required by the scenario and referenced elsewhere in the docs"},
+    {"criterion": "Stack choice is coherent and ADR-0001 reasoning is sound", "status": "PASS", "evidence": "ADR-0001 records real alternatives with concrete rejection reasons; Cloudflare-over-Vercel is justified by the commercial-use ToS restriction"},
+    {"criterion": "Two-layer tenant isolation is sufficient and consistent across rules and tickets", "status": "FAIL", "evidence": "Guest checkout (cart/order/rating) has no membership; neither documented layer defined that path before this review"},
+    {"criterion": "Payment design never trusts client totals, gates on verified webhooks, stays test-mode-only", "status": "PASS", "evidence": "payments.md + ticket 24/25 acceptance criteria close the client-total and client-redirect holes explicitly"},
+    {"criterion": "Threat model has no material gaps for this domain", "status": "FAIL", "evidence": "No MFA path for Owner/Manager accounts controlling Stripe payouts/refunds"},
+    {"criterion": "39 tickets are logically sequenced with sensible dependencies", "status": "FAIL", "evidence": "Cross-tenant harness (ticket 5) sequenced before auth (ticket 7) it would need; analytics_events referenced before its creating ticket"},
+    {"criterion": "Nothing materially over-engineered for an MVP", "status": "PASS", "evidence": "Epic 12 correctly phase:post-mvp; non-goals.md and domain-boundaries.md both forbid pre-building unneeded tables"}
+  ],
+  "review_findings_summary": "12 findings (1 critical, 4 high, 5 medium, 2 low). Critical: guest-path tenant isolation undefined. High: missing transactional-email ticket, missing tax/VAT model, undefined Stripe Connect account/charge topology, no MVP-phase imprint/privacy ticket. See docs/decisions/assumptions.md for what was fixed immediately vs. deferred as ticket-level follow-up.",
+  "tenant_isolation": "FAIL_THEN_FIXED",
+  "payment_safety": "PASS",
+  "fixes_applied_this_pass": [
+    "docs/security/tenant-isolation.md + .claude/rules/tenant-isolation.md: added Layer 0 (unauthenticated/guest path isolation model)",
+    "docs/data/domain-model.md: added tax/VAT model",
+    "docs/architecture/adr/0002-stripe-connect-account-model.md: recorded Express + destination-charge decision with liability consequences",
+    "docs/operations/deployment-strategy.md + docs/platform/service-register.md: resolved the free-tier backups contradiction via a Cloudflare R2 pg_dump job",
+    ".claude/rules/payments.md: added amount-mismatch handling and awaiting_payment expiry",
+    "docs/security/threat-model.md + docs/decisions/assumptions.md: recorded MFA as an explicit accepted risk for MVP, not silently dropped"
+  ],
+  "deferred_as_ticket_followups": [
+    "Fix ticket #4 wording: 'exactly one Owner' -> 'at least one Owner'",
+    "Add a transactional-email ticket (Resend order confirmation/status change)",
+    "Add an MVP-phase imprint/privacy/consent ticket to Epic 5",
+    "Re-sequence ticket #5 (cross-tenant harness) to not depend on ticket #7 (auth)",
+    "Move analytics_events table creation earlier than ticket #31",
+    "Seed packages/ui design tokens in ticket #1",
+    "Mark ticket #39 blocked on a real integration partner"
+  ],
+  "residual_risks": [
+    "Supabase free tier pauses after 7 days idle and has no built-in backups (mitigated via the new R2 job, but the restore path is untested until Epic 11)",
+    "@opennextjs/cloudflare is a community adapter — raw-body handling for Stripe webhook signature verification on Workers must be proven in ticket 25",
+    "Cloudflare Workers free tier caps at 100,000 requests/day",
+    "Resend free tier caps at 100 emails/day",
+    "Sentry free tier allows only 1 dashboard user",
+    "Dispute/chargeback handling, penetration testing, GDPR Art. 30 records, and vendor DPAs remain unassessed"
+  ],
+  "required_actions_before_next_epic_start": [
+    "Apply the 7 deferred ticket-level fixes above before Epic 3/4/5/6/7/12 tickets are picked up, respectively"
+  ]
+}

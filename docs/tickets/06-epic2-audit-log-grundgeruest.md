@@ -5,7 +5,7 @@ Teil von **Epic 2: Architektur & Datenfundament**.
 Als Plattformbetreiber möchte ich sicherheitsrelevante Aktionen nachvollziehen können, ohne sensible Daten zu speichern.
 
 ## Umfang
-Tabelle `audit_logs` (tenant, actor, action, target_type, target_id, timestamp, safe metadata, correlation id) + Write-only-Interface in `packages/domain/audit`.
+Tabelle `audit_logs` (tenant, actor, action, target_type, target_id, timestamp, safe metadata, correlation id) + Write-only-Interface in `packages/domain/audit`. Zusätzlich (nach Opus-Architektur-Review vorgezogen, damit spätere Tickets nicht gegen eine fehlende Tabelle schreiben): Grundgerüst der Tabelle `analytics_events` (tenant, event_type, dish/order-Referenz, timestamp) — ohne Auswertungslogik, die folgt erst in Epic 9.
 
 ## Explizite Nicht-Ziele
 Kein UI zum Anzeigen des Audit-Logs (folgt in Epic 11).
@@ -22,7 +22,7 @@ Keine.
 
 ## Auswirkungen
 - **API**: `recordAuditEvent()`-Funktion.
-- **Datenbank/Migration**: Neue Tabelle `audit_logs`.
+- **Datenbank/Migration**: Neue Tabellen `audit_logs` und `analytics_events` (Grundgerüst).
 - **Mandantentrennung (Tenant-Isolation)**: Audit-Einträge sind tenant-gescoped.
 - **Berechtigungen**: `audit.read` Berechtigung definiert (Nutzung folgt später).
 - **Sicherheit**: Verhindert versehentliches Loggen von Secrets.

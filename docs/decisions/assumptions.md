@@ -16,6 +16,20 @@ Decisions made autonomously because they were low-risk, reversible, and didn't r
 - **Repository name/visibility**: `gastro-saas`, private — confirmed with the user directly (not assumed).
 - **Package manager for the eventual app code**: pnpm, per the source brief's own stack default.
 
+## User-directed decisions (explicit instructions, not autonomous assumptions)
+
+- **Opus validation cadence**: the user explicitly changed the default from per-ticket Opus validation to end-of-epic batch validation, to avoid reviewing "every line of code" at high cost. Exception, kept mandatory per-ticket: payments/webhooks/refunds, auth/authorization/permissions, tenant-scoped migrations/RLS, and any `risk:*`-labelled ticket. See `CLAUDE.md` and `.claude/skills/ship-ticket/SKILL.md` / `.claude/skills/validate-ticket/SKILL.md`.
+- **License policy**: every code dependency must be free, open source, and permissively licensed for commercial resale (MIT/Apache 2.0/BSD-style) — no paid licenses, no copyleft (GPL/AGPL). See `docs/platform/service-register.md`. The one unavoidable exception is Stripe's real-money transaction fee (2.9% + 30¢), which is a payment-processing cost, not a software license cost, and only applies once the user explicitly activates production payments — everything in the MVP build itself runs on free tools and Stripe test mode.
+- **Repository name/visibility**: `gastro-saas`, private — confirmed with the user directly.
+- **GitHub tickets language**: German titles/descriptions, per explicit instruction.
+- **MFA for Owner/Manager**: not built in this foundation pass (accepted risk, tracked in `docs/security/threat-model.md`) — flagged by the Opus architecture review as a gap for accounts that control Stripe payouts/refunds. Should become a real ticket before a pilot tenant's Stripe account goes live with real payouts, not indefinitely deferred.
+
+## Opus architecture review (2026-08-01) — what was fixed vs. deferred
+
+The pre-implementation Opus review (`artifacts/reviews/architecture-review-pass-1.json`) returned `CHANGES_REQUESTED` with 12 findings. Fixed in this pass: the guest/unauthenticated-path tenant-isolation gap (critical — added "Layer 0" to `docs/security/tenant-isolation.md` and `.claude/rules/tenant-isolation.md`), the missing tax/VAT model (added to `docs/data/domain-model.md`), the undefined Stripe Connect account/charge topology (`docs/architecture/adr/0002-stripe-connect-account-model.md`), the backups-vs-free-tier contradiction (Cloudflare R2 backup job added to `docs/operations/deployment-strategy.md` and the service register), and the amount-mismatch/`awaiting_payment`-expiry gaps in `.claude/rules/payments.md`.
+
+Deferred to ticket-level fixes (tracked as follow-up, not yet done): correcting ticket #4's "exactly one Owner" wording to "at least one Owner", adding a transactional-email ticket (order confirmation via Resend — currently only invitations are covered), adding an MVP-phase imprint/privacy/consent ticket (currently only a post-MVP retention/export ticket exists), re-sequencing the cross-tenant-harness ticket (#5) to not depend on auth (#7), moving `analytics_events` table creation earlier than ticket #31, seeding `packages/ui` design tokens in ticket #1, and marking ticket #39 (integration reconciliation) as blocked on a real integration partner rather than freely schedulable. These should be applied to the GitHub Issues before Epic 3/4/6/7/12 work starts, respectively.
+
 ## Explicitly not decided yet (needs the user or a later ticket)
 
 - Real Stripe/Supabase/Resend/Sentry/PostHog/Better Stack account creation — these need the user's own email/identity and, for Stripe, banking details for payouts.

@@ -16,9 +16,13 @@ Note: `pnpm` may not be on PATH in every shell on this machine — see `docs/dec
 
 ## Mandatory Sonnet → deterministic checks → Opus workflow
 
-Every ticket: `sonnet-implementer` (model: sonnet) implements → deterministic checks run (format, lint, typecheck, unit, integration, build, migration validation, secret scan) → `opus-validator` (model: opus, read-only) reviews the diff and evidence → verdict is exactly one of `APPROVED` / `CHANGES_REQUESTED` / `BLOCKED`. Max 3 repair cycles; after that, mark `BLOCKED` with a concise blocker report — never weaken acceptance criteria, disable tests, or remove security checks to force a pass. See `.claude/agents/` and skills `/prepare-ticket` → `/implement-ticket` → `/validate-ticket` → `/ship-ticket`.
+Every ticket: `sonnet-implementer` (model: sonnet) implements → deterministic checks run (format, lint, typecheck, unit, integration, build, migration validation, secret scan). See `.claude/agents/` and skills `/prepare-ticket` → `/implement-ticket` → `/validate-ticket` → `/ship-ticket`.
 
-Opus validation is mandatory for: app code, tests, migrations, DB policies, access control, payment logic, webhooks, analytics calculations, API schemas, infra/CI/deploy config, auth config, storage config, scripts, hooks, dependency/package updates, security-sensitive docs, architecture decisions. Lightweight review only for pure spelling fixes — every PR still gets a recorded verdict.
+**Opus validation cadence** (explicit user decision, 2026-08-01 — overrides a per-ticket-always default for cost reasons): `opus-validator` reviews **at the end of each epic/milestone**, against the accumulated diff of all its tickets, not after every individual ticket. Exception — these ticket categories are still validated individually, immediately, because the blast radius of a mistake is too high to batch: payments/webhooks/refunds, auth/authorization/permissions, tenant-scoped DB migrations and RLS policies, and anything labelled `risk:security`, `risk:tenant-isolation`, `risk:payment`, `risk:migration`, or `risk:privacy`. Non-risk-labelled tickets (most UI/analytics/docs work) batch into the end-of-epic review.
+
+Verdict is exactly one of `APPROVED` / `CHANGES_REQUESTED` / `BLOCKED`, at whichever granularity applied (ticket or epic). Max 3 repair cycles per validated unit; after that, mark it `BLOCKED` with a concise blocker report — never weaken acceptance criteria, disable tests, or remove security checks to force a pass.
+
+Opus review scope (ticket- or epic-level, per the cadence above) covers: app code, tests, migrations, DB policies, access control, payment logic, webhooks, analytics calculations, API schemas, infra/CI/deploy config, auth config, storage config, scripts, hooks, dependency/package updates, security-sensitive docs, architecture decisions. Lightweight review only for pure spelling fixes — every epic still gets a recorded verdict before its milestone is closed.
 
 ## Tenant isolation (non-negotiable)
 

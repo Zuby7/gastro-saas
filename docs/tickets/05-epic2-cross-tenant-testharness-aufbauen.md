@@ -11,7 +11,7 @@ Testfixture in `packages/testing`, das zwei Tenants mit ähnlichen Daten seedet 
 Keine UI-Tests in diesem Ticket.
 
 ## Abhängigkeiten
-Abhängig von "Tenant- und Mitgliedschafts-Datenmodell".
+Abhängig von "Tenant- und Mitgliedschafts-Datenmodell". **Nicht** abhängig von der Auth-Implementierung (Epic 3): die Fixture erzeugt Test-Sessions direkt auf DB-/JWT-Ebene (z. B. via Supabase Admin-API oder direkt signierte Test-Tokens), damit dieses Ticket vor Epic 3 bearbeitet werden kann (Korrektur nach Opus-Architektur-Review, siehe `docs/decisions/assumptions.md`).
 
 ## Akzeptanzkriterien
 - [ ] Fixture erzeugt zwei Tenants mit Mitgliedschaften.

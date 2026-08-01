@@ -11,7 +11,7 @@ Retry-Mechanismus mit Backoff, Dead-Letter-Ablage nach Grenzwert, Reconciliation
 Kein voll automatisches Self-Healing ohne jede Sichtbarkeit für das Team.
 
 ## Abhängigkeiten
-Abhängig von "Provider-neutrale Integrationsschnittstelle mit Mock-Provider".
+Abhängig von "Provider-neutrale Integrationsschnittstelle mit Mock-Provider". **Blockiert bis ein echter Integrationspartner angebunden wird** (Korrektur nach Opus-Architektur-Review): Retry/Backoff/Dead-Letter/Reconciliation gegen einen Mock-Provider ohne reale Fehlerfälle ist spekulative Komplexität, die `docs/product/non-goals.md` bewusst ausschließt. Dieses Ticket ist erst aufnahmefähig, sobald ein realer Integrationspartner (offizielle API) feststeht und echte Fehlerfälle beobachtbar sind.
 
 ## Akzeptanzkriterien
 - [ ] Ein fehlgeschlagener Sync-Job wird automatisch mit Backoff wiederholt.

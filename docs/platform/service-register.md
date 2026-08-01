@@ -4,6 +4,12 @@ Discovery source: [free-for.dev](https://free-for.dev/#/). Every entry below was
 
 Policy: one provider per capability, free tier only, until a documented requirement forces an upgrade. Two capabilities in this stack **cannot be genuinely free** — flagged explicitly below rather than silently worked around.
 
+## License policy for code dependencies
+
+Per explicit user instruction (2026-08-01): every library/framework in the codebase must be free, open source, and permissively licensed for commercial resale — no paid licenses, no copyleft license (GPL/AGPL) that would force this proprietary codebase to be open-sourced. Every stack choice in ADR-0001 satisfies this: Next.js/React (MIT), TypeScript (Apache 2.0), Tailwind CSS (MIT), Zod (MIT), Vitest (MIT), Playwright (Apache 2.0), the Supabase client libraries (MIT/Apache 2.0), and the Stripe SDK (MIT) are all permissive. Any new dependency added in a future ticket must be checked against this rule before it's added — flag it in that ticket's PR if unsure, don't assume.
+
+**One unavoidable exception, called out explicitly rather than hidden**: real card payment processing always carries a per-transaction fee (Stripe: 2.9% + 30¢, see below) — this is not a software license cost, it's the cost of moving real money through a card network, and no provider (Stripe or any competitor) processes real payments for free. Stripe **test mode**, which the entire MVP runs in, is completely free. Production activation — and therefore the point where real fees start — requires the user's explicit approval, per `.claude/rules/payments.md`.
+
 ## Source control, issues, CI — GitHub
 - Free plan: unlimited public/private repos, Issues, Projects (beta boards).
 - Actions (private repos): 2,000 Linux-equivalent minutes/month, 500 MB artifact storage. Windows minutes cost 2x, macOS 10x against the quota. Public repos: unlimited Actions minutes.
@@ -55,6 +61,11 @@ Policy: one provider per capability, free tier only, until a documented requirem
 ## DNS / CDN — Cloudflare
 - Already selected for hosting; DNS and CDN are part of the same free plan (unlimited bandwidth, free SSL, free Turnstile for bot protection).
 - Decision: **default**, one account covers hosting + DNS + CDN + bot protection.
+
+## Database backups — Cloudflare R2 (free tier)
+- Free tier: 10 GB storage, no egress fees (unlike S3). Used only as the target for the scheduled `pg_dump` backup job described in `docs/operations/deployment-strategy.md` — resolves the contradiction the Opus architecture review flagged (release checklist required backups; Supabase Free has none).
+- Credit card: required to create a Cloudflare account with R2 enabled, but no charge occurs within the free storage/egress limits.
+- Decision: **default**, same Cloudflare account already used for hosting/DNS/CDN.
 
 ## Uptime monitoring — Better Stack (chosen over UptimeRobot)
 - UptimeRobot free plan, as of December 2024, restricts free-tier use to personal/non-commercial projects — explicitly prohibits commercial/business/client use. Disqualified for the same reason as Vercel Hobby.

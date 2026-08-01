@@ -16,7 +16,7 @@ Abhängig von "Supabase lokal einrichten".
 ## Akzeptanzkriterien
 - [ ] Migrationen laufen fehlerfrei.
 - [ ] Jede Tabelle hat eine RLS-Policy im selben Migrationsfile.
-- [ ] Ein Tenant kann genau einem Owner zugeordnet werden.
+- [ ] Ein Tenant hat zu jedem Zeitpunkt mindestens einen Owner (Constraint auf Datenbankebene, nicht nur UI) — siehe Ticket "Owner-Schutz vor versehentlicher Entfernung".
 
 ## UI-Zustände
 Keine.

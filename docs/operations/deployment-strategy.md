@@ -29,6 +29,10 @@ No dedicated queue system in the MVP. Email delivery, webhook handling, retryabl
 - Uptime: Better Stack (free tier — see service register for why UptimeRobot was rejected).
 - Product usage (of the SaaS app itself, not restaurant sales): PostHog.
 
+## Backups (free-tier — resolves a contradiction flagged by the Opus architecture review)
+
+Supabase's free tier includes no managed backups. Since the user requires an entirely free setup, production backups are a scheduled GitHub Actions job (within the free 2,000 min/month budget) running `pg_dump` against the Supabase database and uploading the encrypted dump to a Cloudflare R2 bucket (R2 free tier: 10 GB storage, no egress fee — same Cloudflare account already used for hosting). A restore is tested at least once before the first real pilot tenant goes live, and that test is itself a `/release-check` item, not assumed to work.
+
 ## Release checklist (`/release-check`)
 
-Before any staging→production promotion: migrations validated, environment variables verified, observability wired up, backups/rollback plan confirmed, smoke tests green. Never deploys to production itself — it only validates readiness; the actual production deploy always needs separate explicit human approval.
+Before any staging→production promotion: migrations validated, environment variables verified, observability wired up, the free-tier backup job has a verified recent successful run and a tested restore, smoke tests green. Never deploys to production itself — it only validates readiness; the actual production deploy always needs separate explicit human approval.

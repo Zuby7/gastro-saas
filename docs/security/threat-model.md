@@ -12,6 +12,7 @@ Scope: multi-tenant gastronomy SaaS handling menu data, orders, payments (via St
 | Stolen sessions | Secure, httpOnly, short-lived session cookies; session invalidation on password change |
 | Invitation abuse | Invitations are single-use, expiring, scoped to one tenant + role |
 | Owner lockout | At least one Owner membership required per tenant at all times; enforced at the DB constraint level, not just UI |
+| Stolen Owner/Manager credentials (controls Stripe Connect payouts and refunds) | Optional TOTP MFA (Supabase Auth supports it on the free tier) offered to Owner/Manager roles — **accepted risk for MVP if not built in time**, see `docs/decisions/assumptions.md`; must be revisited before real payouts flow through a tenant's account |
 | Payment manipulation / price tampering | Server always recalculates order totals from current menu data; client-submitted totals are never trusted (`.claude/rules/payments.md`) |
 | Webhook spoofing / replay | Stripe webhook signature verification on every event; `payment_webhook_events` table enforces idempotency by event ID |
 | Order tampering | Orders are immutable once paid; state machine rejects invalid transitions |

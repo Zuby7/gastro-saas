@@ -451,5 +451,30 @@
       "phase:post-mvp"
     ],
     "milestone": 12
+  },
+  {
+    "file": "docs/tickets/40-epic7-transaktions-e-mails-bestellbestaetigung.md",
+    "title": "[Epic 7] Transaktions-E-Mails (Bestellbestätigung)",
+    "labels": [
+      "type:feature",
+      "area:payments",
+      "priority:high",
+      "phase:mvp"
+    ],
+    "milestone": 7,
+    "issue": 40
+  },
+  {
+    "file": "docs/tickets/41-epic5-impressum-datenschutz-consent.md",
+    "title": "[Epic 5] Impressum, Datenschutz & Consent",
+    "labels": [
+      "type:feature",
+      "area:frontend",
+      "priority:high",
+      "phase:mvp",
+      "risk:privacy"
+    ],
+    "milestone": 5,
+    "issue": 41
   }
 ]
