@@ -30,27 +30,42 @@
 --     tenants, not who may read/write within one they already belong to.
 --
 -- "At least one Owner at all times" (acceptance criterion):
--- Enforced at the database level via a DEFERRABLE INITIALLY DEFERRED
--- constraint trigger on `tenant_memberships` that fires only on UPDATE/DELETE
--- of an existing Owner row (never on INSERT), and only evaluates at
--- transaction commit. This avoids the chicken-and-egg problem on a tenant's
--- very first membership insert (there is nothing to check yet -- adding a
--- membership can never reduce the Owner count) while still blocking, at
--- commit time, any transaction that would leave a tenant with zero Owners
--- (e.g. deleting the last Owner row, or demoting the last Owner to
--- manager/staff). Because the check is deferred to commit, a single
--- transaction that removes one Owner while adding/promoting another Owner in
--- the same transaction is still allowed. A tenant that is created but never
--- given an Owner membership at all is a distinct, application-level
--- responsibility of ticket #7's onboarding flow (it must create the tenant
--- and its first Owner membership in one transaction/RPC); this trigger cannot
--- observe that gap because it lives on `tenant_memberships`, not `tenants`.
+-- Enforced at the database level via two DEFERRABLE INITIALLY DEFERRED
+-- constraint triggers, both evaluated at transaction commit:
+--   1. `tenant_memberships_owner_guard` on `tenant_memberships`, firing on
+--      DELETE of an Owner row, on UPDATE that changes an Owner's role away
+--      from 'owner', and on UPDATE that re-parents an Owner row to a
+--      different tenant_id (`old.tenant_id <> new.tenant_id`) -- all three
+--      can otherwise silently strip a tenant's last Owner.
+--   2. `tenants_created_with_owner` on `tenants`, firing AFTER INSERT,
+--      asserting at commit that the newly created tenant has at least one
+--      Owner membership. This closes the gap trigger (1) cannot see: a bare
+--      `insert into tenants(...)` with zero memberships. Ticket #7's
+--      onboarding flow must still insert the tenant and its first Owner
+--      membership atomically in one transaction/RPC -- the DB now *enforces*
+--      that requirement rather than merely relying on it.
+-- Because both checks are deferred to commit, a single transaction that
+-- removes one Owner while adding/promoting another Owner (or that inserts a
+-- tenant followed by its first Owner membership) in the same transaction is
+-- still allowed.
+--
+-- Interaction with `auth.users` deletion: because `tenant_memberships.user_id`
+-- references `auth.users(id) on delete cascade`, deleting the sole Owner's
+-- `auth.users` row cascades into deleting their `tenant_memberships` row,
+-- which trips `tenant_memberships_owner_guard` at commit and aborts the
+-- entire `DELETE` if no other Owner exists for that tenant. This is
+-- intentional and is an explicit prerequisite for future onboarding/
+-- account-deletion tickets: an ownership transfer (promote another member to
+-- Owner) or a full tenant deletion must precede deleting a sole Owner's user
+-- account.
 --
 -- Rollback: additive-only versus the previous migration (drops three
 -- example-only tables, creates four real ones + helper functions/triggers).
 -- Down-migration a maintainer can run by hand against a local/throwaway DB:
 --   drop table if exists locations;
 --   drop table if exists brands;
+--   drop trigger if exists tenants_created_with_owner on tenants;
+--   drop function if exists enforce_tenant_has_owner_on_create();
 --   drop trigger if exists tenant_memberships_owner_guard on tenant_memberships;
 --   drop function if exists enforce_tenant_has_owner();
 --   drop table if exists tenant_memberships;
@@ -73,6 +88,7 @@ drop table if exists example_tenants;
 create or replace function set_updated_at()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   new.updated_at = now();
@@ -135,35 +151,45 @@ create index tenant_memberships_user_id_idx on tenant_memberships (user_id);
 -- row-visibility into the table being queried. These functions never accept
 -- a tenant_id from anywhere other than the row being checked -- the *acting
 -- user* is always resolved via auth.uid(), never a client-supplied value.
+--
+-- `set search_path = ''` (not `public`) is deliberate and load-bearing:
+-- Postgres always searches `pg_temp` first for unqualified relation names,
+-- even when `pg_temp` isn't listed in `search_path`, and Supabase grants TEMP
+-- on the database to PUBLIC by default. Any authenticated session could
+-- otherwise run `create temp table tenant_memberships (...)` to shadow the
+-- real table inside a SECURITY DEFINER function, making it return
+-- attacker-controlled results -- a full cross-tenant RLS bypass. With
+-- `search_path = ''` there is no schema to resolve an unqualified name
+-- against, so every reference below is fully schema-qualified instead.
 -- ----------------------------------------------------------------------------
 create or replace function is_tenant_member(p_tenant_id uuid)
 returns boolean
 language sql
 security definer
-set search_path = public
+set search_path = ''
 stable
 as $$
   select exists (
     select 1
-    from tenant_memberships
+    from public.tenant_memberships
     where tenant_id = p_tenant_id
       and user_id = auth.uid()
   );
 $$;
 
 comment on function is_tenant_member(uuid) is
-  'True if the currently authenticated user (auth.uid()) has any membership row for the given tenant. SECURITY DEFINER to avoid RLS self-recursion on tenant_memberships.';
+  'True if the currently authenticated user (auth.uid()) has any membership row for the given tenant. SECURITY DEFINER to avoid RLS self-recursion on tenant_memberships. search_path = '''' + schema-qualified refs to prevent pg_temp table-shadowing bypass.';
 
 create or replace function is_tenant_owner(p_tenant_id uuid)
 returns boolean
 language sql
 security definer
-set search_path = public
+set search_path = ''
 stable
 as $$
   select exists (
     select 1
-    from tenant_memberships
+    from public.tenant_memberships
     where tenant_id = p_tenant_id
       and user_id = auth.uid()
       and role = 'owner'
@@ -171,7 +197,7 @@ as $$
 $$;
 
 comment on function is_tenant_owner(uuid) is
-  'True if the currently authenticated user (auth.uid()) has an Owner membership for the given tenant. SECURITY DEFINER to avoid RLS self-recursion on tenant_memberships.';
+  'True if the currently authenticated user (auth.uid()) has an Owner membership for the given tenant. SECURITY DEFINER to avoid RLS self-recursion on tenant_memberships. search_path = '''' + schema-qualified refs to prevent pg_temp table-shadowing bypass.';
 
 revoke all on function is_tenant_member(uuid) from public;
 revoke all on function is_tenant_owner(uuid) from public;
@@ -215,7 +241,13 @@ create policy tenants_update_owner
 -- ----------------------------------------------------------------------------
 alter table tenant_memberships enable row level security;
 
-grant select, update, delete on tenant_memberships to authenticated;
+-- Column-level UPDATE grant only: authenticated Owners may change a
+-- membership's `role`, but must never be able to rewrite `user_id` on an
+-- existing row (that would let an Owner add an arbitrary user to the tenant,
+-- bypassing the invitation flow entirely) or re-parent `tenant_id` freely
+-- through anything other than the guarded path below.
+grant select, delete on tenant_memberships to authenticated;
+grant update (role) on tenant_memberships to authenticated;
 grant select, insert, update, delete on tenant_memberships to service_role;
 
 create policy tenant_memberships_select_member
@@ -251,7 +283,7 @@ create or replace function enforce_tenant_has_owner()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_tenant_id uuid;
@@ -260,23 +292,27 @@ begin
   v_tenant_id := old.tenant_id;
 
   if (tg_op = 'DELETE' and old.role = 'owner')
-     or (tg_op = 'UPDATE' and old.role = 'owner' and new.role <> 'owner') then
-    -- If the tenant itself no longer exists (e.g. `delete from tenants ...`
-    -- cascaded into deleting all of its memberships in the same
+     or (
+       tg_op = 'UPDATE'
+       and old.role = 'owner'
+       and (new.role <> 'owner' or new.tenant_id <> old.tenant_id)
+     ) then
+    -- If the (source) tenant itself no longer exists (e.g. `delete from
+    -- tenants ...` cascaded into deleting all of its memberships in the same
     -- transaction), there is nothing to protect -- skip the check so
     -- deleting a whole tenant is never blocked by its own Owner cleanup.
-    if not exists (select 1 from tenants where id = v_tenant_id) then
+    if not exists (select 1 from public.tenants where id = v_tenant_id) then
       return null;
     end if;
 
     select count(*) into v_remaining_owners
-    from tenant_memberships
+    from public.tenant_memberships
     where tenant_id = v_tenant_id
       and role = 'owner';
 
     if v_remaining_owners = 0 then
       raise exception
-        'Tenant % must keep at least one Owner membership; refusing to remove/demote the last Owner.',
+        'Tenant % must keep at least one Owner membership; refusing to remove/demote/re-parent the last Owner.',
         v_tenant_id
         using errcode = 'check_violation';
     end if;
@@ -287,13 +323,52 @@ end;
 $$;
 
 comment on function enforce_tenant_has_owner() is
-  'Deferred constraint trigger backing the "every tenant has at least one Owner at all times" invariant. Fires only on UPDATE/DELETE of an existing Owner row (never INSERT, so a tenant''s first membership insert is never blocked) and is evaluated at transaction commit, so a single transaction may swap Owners without tripping it.';
+  'Deferred constraint trigger backing the "every tenant has at least one Owner at all times" invariant. Fires on DELETE of an Owner row, on UPDATE demoting an Owner away from role = owner, and on UPDATE re-parenting an Owner row to a different tenant_id (never on INSERT, so a tenant''s first membership insert is never blocked). Evaluated at transaction commit, so a single transaction may swap Owners without tripping it. search_path = '''' + schema-qualified refs to prevent pg_temp table-shadowing bypass.';
 
 create constraint trigger tenant_memberships_owner_guard
   after update or delete on tenant_memberships
   deferrable initially deferred
   for each row
   execute function enforce_tenant_has_owner();
+
+-- ----------------------------------------------------------------------------
+-- "At least one Owner at all times", part 2: a tenant created with zero
+-- memberships at all (the trigger above lives on tenant_memberships, so it
+-- can never observe that case).
+-- ----------------------------------------------------------------------------
+create or replace function enforce_tenant_has_owner_on_create()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_owner_count int;
+begin
+  select count(*) into v_owner_count
+  from public.tenant_memberships
+  where tenant_id = new.id
+    and role = 'owner';
+
+  if v_owner_count = 0 then
+    raise exception
+      'Tenant % must be created together with at least one Owner membership in the same transaction.',
+      new.id
+      using errcode = 'check_violation';
+  end if;
+
+  return null; -- ignored, this is an AFTER trigger
+end;
+$$;
+
+comment on function enforce_tenant_has_owner_on_create() is
+  'Deferred constraint trigger requiring a newly inserted tenant to have at least one Owner membership by commit time. Ticket #7''s onboarding flow must insert the tenant and its first Owner membership atomically in one transaction/RPC; this trigger enforces that at the database level rather than relying on it. search_path = '''' + schema-qualified refs to prevent pg_temp table-shadowing bypass.';
+
+create constraint trigger tenants_created_with_owner
+  after insert on tenants
+  deferrable initially deferred
+  for each row
+  execute function enforce_tenant_has_owner_on_create();
 
 -- ----------------------------------------------------------------------------
 -- brands
@@ -381,13 +456,13 @@ create or replace function enforce_location_brand_same_tenant()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_brand_tenant_id uuid;
 begin
   if new.brand_id is not null then
-    select tenant_id into v_brand_tenant_id from brands where id = new.brand_id;
+    select tenant_id into v_brand_tenant_id from public.brands where id = new.brand_id;
 
     if v_brand_tenant_id is null or v_brand_tenant_id <> new.tenant_id then
       raise exception
@@ -399,6 +474,9 @@ begin
   return new;
 end;
 $$;
+
+comment on function enforce_location_brand_same_tenant() is
+  'Data-integrity guard ensuring location.brand_id (if set) belongs to the same tenant_id as the location. search_path = '''' + schema-qualified refs to prevent pg_temp table-shadowing bypass.';
 
 create trigger locations_brand_same_tenant
   before insert or update on locations

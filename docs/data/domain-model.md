@@ -9,9 +9,14 @@ Entities are introduced through tickets as they're needed (§12 of the source br
 > **Implemented (ticket #4):** `tenants`, `tenant_memberships`, `brands`, `locations` and their RLS policies ship in
 > `supabase/migrations/20260801040000_tenant_membership_brand_location_model.sql`. `tenant_memberships` currently
 > carries a minimal fixed `role` column (`owner` | `manager` | `staff`) rather than the full RBAC tables below — those
-> land with ticket #9. A tenant is guaranteed at least one Owner membership at all times via a deferred
-> database constraint trigger (see the migration's header comment). `users` and `invitations` are not yet
-> implemented (tickets #7/#8).
+> land with ticket #9. A tenant is guaranteed at least one Owner membership at all times via two deferred
+> database constraint triggers — one on `tenant_memberships` (covering delete/demote/re-parent of the last Owner)
+> and one on `tenants` (covering a tenant inserted with zero memberships) — see the migration's header comment.
+> All SECURITY DEFINER helper functions use `search_path = ''` with fully schema-qualified references to prevent
+> a `pg_temp` table-shadowing RLS bypass. **Prerequisite for future onboarding/account-deletion tickets:** because
+> `tenant_memberships.user_id` cascades from `auth.users`, deleting the `auth.users` row of a tenant's sole Owner
+> now fails at commit (the Owner-guard trigger aborts the whole `DELETE`) — an ownership transfer or full tenant
+> deletion must happen first. `users` and `invitations` are not yet implemented (tickets #7/#8).
 
 ## Authorization
 

@@ -13,8 +13,12 @@
 // cannot be verified locally (Docker Desktop's containerd storage was
 // corrupted by a full C: drive -- same known blocker as ticket #3, see
 // PR #44 and docs/decisions/assumptions.md). The test therefore probes for
-// a reachable database and skips (with a clear log message) if none is
-// found, so `pnpm test` stays green on machines without the local stack.
+// a reachable database. Locally, with no CI/SUPABASE_DB_URL signal, it skips
+// (with a clear log message) so `pnpm test` stays green on machines without
+// the local stack. In CI (`CI` or `SUPABASE_DB_URL` set), a failed probe
+// throws instead of skipping -- silently skipping the entire cross-tenant/
+// RLS/owner-invariant suite in the one environment that can actually run it
+// would defeat the point of having it.
 // It is wired into `.github/workflows/migration-check.yml`, which runs a
 // real `supabase start` on a GitHub-hosted runner and therefore actually
 // exercises this test in CI.
@@ -24,6 +28,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const DB_URL =
   process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+
+const isCiEnvironment = Boolean(process.env.CI) || Boolean(process.env.SUPABASE_DB_URL);
 
 async function probeDatabase(): Promise<boolean> {
   const probe = new Client({ connectionString: DB_URL });
@@ -39,6 +45,17 @@ async function probeDatabase(): Promise<boolean> {
 const dbAvailable = await probeDatabase();
 
 if (!dbAvailable) {
+  if (isCiEnvironment) {
+    // In CI, a missing database is a real failure, not something to skip
+    // past -- this suite carries the tenant-isolation and Owner-invariant
+    // regression tests and must actually run wherever it can.
+    throw new Error(
+      `[tenants.integration.test] CI or SUPABASE_DB_URL is set, but no reachable Postgres was ` +
+        `found at ${DB_URL}. Refusing to silently skip the RLS/tenant-isolation suite in CI -- ` +
+        "check the migration-check workflow's `supabase start` step.",
+    );
+  }
+
   // eslint-disable-next-line no-console
   console.warn(
     `[tenants.integration.test] Skipping: no reachable Postgres at ${DB_URL}. ` +
@@ -88,6 +105,11 @@ describe.skipIf(!dbAvailable)("tenant/membership/brand/location RLS", () => {
       "owner-b@example.test",
     ]);
 
+    // A tenant must be created together with its first Owner membership in
+    // the same transaction -- `tenants_created_with_owner` (a deferred
+    // constraint trigger) asserts at commit that every tenant has at least
+    // one Owner, so a bare `insert into tenants` alone would abort here.
+    await admin.query("begin");
     await admin.query(`insert into tenants (id, name, slug) values ($1, $2, $3), ($4, $5, $6)`, [
       tenantAId,
       "Trattoria Da Mario",
@@ -101,6 +123,7 @@ describe.skipIf(!dbAvailable)("tenant/membership/brand/location RLS", () => {
       `insert into tenant_memberships (tenant_id, user_id, role) values ($1, $2, 'owner'), ($3, $4, 'owner')`,
       [tenantAId, userAId, tenantBId, userBId],
     );
+    await admin.query("commit");
 
     await admin.query(`insert into brands (id, tenant_id, name, slug) values ($1, $2, $3, $4)`, [
       brandAId,
@@ -184,6 +207,59 @@ describe.skipIf(!dbAvailable)("tenant/membership/brand/location RLS", () => {
     expect(stillIntact.rows[0]?.name).toBe("Burger Barn Downtown");
   });
 
+  it(
+    "is not bypassed by a temp table shadowing tenant_memberships " +
+      "(SECURITY DEFINER search_path hardening)",
+    async () => {
+      const client = new Client({ connectionString: DB_URL });
+      await client.connect();
+      try {
+        await client.query("set role authenticated");
+        await client.query("select set_config('request.jwt.claims', $1, false)", [
+          JSON.stringify({ sub: userAId, role: "authenticated" }),
+        ]);
+
+        // Any authenticated session can create a TEMP table (Supabase grants
+        // TEMP on the database to PUBLIC by default), and Postgres searches
+        // pg_temp *before* any schema in search_path for unqualified names.
+        // An attacker who is only a member of tenant A tries to shadow the
+        // real tenant_memberships table with a fake row granting them
+        // 'owner' access to tenant B.
+        await client.query(`
+          create temp table tenant_memberships (
+            tenant_id uuid,
+            user_id uuid,
+            role text
+          )
+        `);
+        await client.query(
+          `insert into pg_temp.tenant_memberships (tenant_id, user_id, role) values ($1, $2, 'owner')`,
+          [tenantBId, userAId],
+        );
+
+        // is_tenant_member()/is_tenant_owner() are SECURITY DEFINER with
+        // search_path = '' and schema-qualified references, so they must
+        // still resolve against the real public.tenant_memberships, not the
+        // attacker's temp shadow table -- tenant B stays inaccessible.
+        const crossTenantAttempt = await client.query(
+          `select id from locations where tenant_id = $1`,
+          [tenantBId],
+        );
+        expect(crossTenantAttempt.rows).toHaveLength(0);
+
+        await expect(
+          client.query(
+            `insert into brands (tenant_id, name, slug) values ($1, 'Shadow Bypass', 'shadow-bypass')`,
+            [tenantBId],
+          ),
+        ).rejects.toThrow(/row-level security|permission denied/i);
+      } finally {
+        await client.query("reset role").catch(() => undefined);
+        await client.end();
+      }
+    },
+  );
+
   it("keeps at least one Owner per tenant: removing the last Owner is rejected at commit", async () => {
     await admin.query("begin");
     await admin.query(`delete from tenant_memberships where tenant_id = $1 and role = 'owner'`, [
@@ -198,6 +274,80 @@ describe.skipIf(!dbAvailable)("tenant/membership/brand/location RLS", () => {
       [tenantBId, userBId],
     );
     expect(membership.rows[0]?.role).toBe("owner");
+  });
+
+  it("keeps at least one Owner per tenant: re-parenting the sole Owner to another tenant is rejected at commit", async () => {
+    await admin.query("begin");
+    await admin.query(
+      `update tenant_memberships set tenant_id = $1 where tenant_id = $2 and user_id = $3 and role = 'owner'`,
+      [tenantAId, tenantBId, userBId],
+    );
+    await expect(admin.query("commit")).rejects.toThrow(/at least one Owner/i);
+
+    const membership = await admin.query(
+      `select tenant_id from tenant_memberships where user_id = $1`,
+      [userBId],
+    );
+    expect(membership.rows[0]?.tenant_id).toBe(tenantBId);
+  });
+
+  it("rejects an authenticated Owner rewriting user_id on an existing membership (privilege, not RLS)", async () => {
+    await expect(
+      queryAsUser(
+        admin,
+        userBId,
+        `update tenant_memberships set user_id = $1 where tenant_id = $2 and user_id = $3`,
+        [userAId, tenantBId, userBId],
+      ),
+    ).rejects.toThrow(/permission denied/i);
+
+    // Confirm the row was not changed.
+    const membership = await admin.query(
+      `select user_id from tenant_memberships where tenant_id = $1 and role = 'owner'`,
+      [tenantBId],
+    );
+    expect(membership.rows[0]?.user_id).toBe(userBId);
+  });
+
+  it("keeps at least one Owner per tenant: a bare tenant insert with no membership is rejected at commit", async () => {
+    const bareTenantId = randomUUID();
+    await admin.query("begin");
+    await admin.query(`insert into tenants (id, name, slug) values ($1, $2, $3)`, [
+      bareTenantId,
+      "Bare Tenant",
+      `bare-tenant-${bareTenantId.slice(0, 8)}`,
+    ]);
+    await expect(admin.query("commit")).rejects.toThrow(/at least one Owner membership/i);
+
+    const found = await admin.query(`select id from tenants where id = $1`, [bareTenantId]);
+    expect(found.rows).toHaveLength(0);
+  });
+
+  it("allows creating a tenant and its first Owner membership atomically in one transaction", async () => {
+    const newTenantId = randomUUID();
+    const newOwnerId = randomUUID();
+    await admin.query(`insert into auth.users (id, email) values ($1, $2)`, [
+      newOwnerId,
+      "new-owner@example.test",
+    ]);
+
+    await admin.query("begin");
+    await admin.query(`insert into tenants (id, name, slug) values ($1, $2, $3)`, [
+      newTenantId,
+      "Atomic Tenant",
+      `atomic-tenant-${newTenantId.slice(0, 8)}`,
+    ]);
+    await admin.query(
+      `insert into tenant_memberships (tenant_id, user_id, role) values ($1, $2, 'owner')`,
+      [newTenantId, newOwnerId],
+    );
+    await admin.query("commit");
+
+    const result = await admin.query(`select id from tenants where id = $1`, [newTenantId]);
+    expect(result.rows).toHaveLength(1);
+
+    await admin.query(`delete from tenants where id = $1`, [newTenantId]);
+    await admin.query(`delete from auth.users where id = $1`, [newOwnerId]);
   });
 
   it("allows swapping Owners within a single transaction (deferred check passes at commit)", async () => {
