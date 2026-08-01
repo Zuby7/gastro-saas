@@ -29,33 +29,21 @@ name: Migration Check
 #
 # Ticket #4 adds a "Run integration tests" step after `supabase start`: the
 # required cross-tenant RLS test (packages/database/src/tenants.integration.test.ts)
-# needs a real local Supabase Postgres instance, which only this runner
-# reliably provides (see that test file's header comment for why it can't be
-# verified on the current dev machine).
+# needs a real local Supabase Postgres instance. This runner provides it
+# reliably; it has also been verified locally on the dev machine since the
+# Docker/disk-space blocker that originally motivated this workflow was
+# resolved.
 #
-# Path filters intentionally also cover packages/database/** (and the
-# lockfile/root package.json) -- not just supabase/** -- because this job
-# also runs `pnpm --filter @gastro-saas/database test:integration`. A PR that
-# only touches the database package's client code or its integration test
-# must still trigger this job, otherwise a cross-tenant regression could ship
-# without the RLS test ever running.
+# No path filters: this job is a required status check on `main`, and a
+# path-filtered required check would leave PRs that don't touch
+# supabase/**/packages/database/** stuck on "Expected -- waiting for status
+# to be reported" forever (hit in practice; see PR #48's review history).
+# It runs on every PR/push to main unconditionally instead.
 
 on:
   pull_request:
-    paths:
-      - "supabase/**"
-      - "packages/database/**"
-      - "pnpm-lock.yaml"
-      - "package.json"
-      - ".github/workflows/migration-check.yml"
   push:
     branches: [main]
-    paths:
-      - "supabase/**"
-      - "packages/database/**"
-      - "pnpm-lock.yaml"
-      - "package.json"
-      - ".github/workflows/migration-check.yml"
 
 concurrency:
   group: migration-check-${{ github.workflow }}-${{ github.ref }}
