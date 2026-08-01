@@ -26,6 +26,15 @@ export const RegisterSchema = z.object({
 
 export type RegisterInput = z.infer<typeof RegisterSchema>;
 
+/**
+ * Server-side validation boundary for the /account "create your restaurant"
+ * fallback (ticket #7 fix cycle 1, item 4/5): same tenant name/slug rules
+ * as registration, reused rather than duplicated.
+ */
+export const CreateTenantSchema = RegisterSchema.pick({ tenantName: true, tenantSlug: true });
+
+export type CreateTenantInput = z.infer<typeof CreateTenantSchema>;
+
 /** Server-side validation boundary for the login form. */
 export const LoginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Bitte geben Sie eine gültige E-Mail-Adresse ein."),

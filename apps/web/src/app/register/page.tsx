@@ -28,6 +28,16 @@ export default function RegisterPage() {
         </p>
       ) : null}
 
+      {state.info ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-md border border-neutral-300 bg-neutral-100 p-3 text-sm text-foreground"
+        >
+          {state.info}
+        </p>
+      ) : null}
+
       <form action={formAction} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1">
           <label htmlFor="tenantName" className="text-sm font-medium text-foreground">

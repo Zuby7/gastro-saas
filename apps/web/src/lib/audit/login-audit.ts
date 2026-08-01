@@ -1,57 +1,42 @@
-import { recordAuditEvent } from "@gastro-saas/domain";
-import { auditQueryClient, getAuditDbPool } from "./audit-client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Records a failed login attempt via `recordAuditEvent()` (ticket #6),
- * attributed to the tenant of the first membership found for the attempted
- * email.
+ * Records a failed login attempt for `auth.login.failed`, attributed to the
+ * tenant of the first membership found for the attempted email.
  *
- * Design decision (ticket #7 acceptance criterion: "failed login attempts
- * are audited"): `audit_logs.tenant_id` is `NOT NULL`
- * (supabase/migrations/20260801050000_audit_log_and_analytics_events_skeleton.sql)
- * -- it is a tenant-scoped table by design, not a general system event log.
- * A failed login attempt against an email that does not resolve to any
- * existing tenant membership (unknown account, or a Supabase Auth user with
- * no tenant yet) therefore has no tenant to attribute an audit_logs row to.
- * Rather than inventing a synthetic "system tenant" sentinel (which would
- * need its own fake Owner membership just to satisfy the
- * tenants_created_with_owner invariant, and would mix unrelated tenants'
- * failed-login noise into one shared, meaningless tenant_id), that case is
- * intentionally skipped here: it is still captured for brute-force
- * detection via `auth_rate_limit_attempts` (tenant-agnostic, written
- * regardless of whether the email resolves to anything), just not written
- * to the tenant-scoped `audit_logs` table.
+ * Ticket #7 fix cycle 1: previously did this via a raw `pg` Pool connected
+ * with `SUPABASE_DB_URL` (the Postgres **superuser** connection string)
+ * directly from the web app's request path -- bypassing RLS entirely from
+ * user-facing request handling (Opus finding, artifacts/reviews/issue-7.json
+ * item 8). Now delegated entirely to `record_failed_login_audit_event()`, a
+ * `SECURITY DEFINER` RPC (see
+ * supabase/migrations/20260801070000_auth_rate_limit_atomic_and_login_audit_rpc.sql)
+ * called through the existing service-role admin Supabase client -- the
+ * same least-privilege pattern already used for the rate limiter, no direct
+ * superuser Postgres connection needed from `apps/web` anymore.
  *
- * Known limitation: a user with memberships in more than one tenant (not
- * possible yet in this ticket's scope -- only the invitation flow, ticket
- * #8, can add a second membership) would only have the failed attempt
- * attributed to one arbitrarily-chosen tenant. Acceptable for this ticket;
- * revisit if/when ticket #8 makes multi-tenant membership common.
+ * Callers must not `await` this in the request path that determines
+ * response timing: it must run as fire-and-forget (`void
+ * recordFailedLoginAttempt(...)`), otherwise its extra DB round-trip (which
+ * only happens for emails that resolve to a real tenant membership) would
+ * reopen the exact timing side channel this same fix cycle closed for the
+ * overall login response (see login/actions.ts and
+ * docs/security/threat-model.md "Enumeration").
+ *
+ * Known limitation: a user with memberships in more than one tenant would
+ * only have the failed attempt attributed to one arbitrarily-chosen tenant
+ * (unchanged from the original ticket #7 design -- see the RPC's own
+ * comment).
  */
-export async function recordFailedLoginAttempt(email: string): Promise<void> {
+export async function recordFailedLoginAttempt(
+  admin: SupabaseClient,
+  email: string,
+): Promise<void> {
   try {
-    const pool = getAuditDbPool();
-    const result = await pool.query<{ tenant_id: string; user_id: string }>(
-      `select tm.tenant_id as tenant_id, u.id as user_id
-       from auth.users u
-       join public.tenant_memberships tm on tm.user_id = u.id
-       where u.email = $1
-       limit 1`,
-      [email],
-    );
-
-    const match = result.rows[0];
-    if (!match) {
-      return;
+    const { error } = await admin.rpc("record_failed_login_audit_event", { p_email: email });
+    if (error) {
+      console.error("[audit] failed to record failed login attempt", error);
     }
-
-    await recordAuditEvent(auditQueryClient, {
-      tenantId: match.tenant_id,
-      actorUserId: match.user_id,
-      action: "auth.login.failed",
-      targetType: "user",
-      targetId: match.user_id,
-    });
   } catch (error) {
     // Audit logging must never break the login flow itself.
     console.error("[audit] failed to record failed login attempt", error);

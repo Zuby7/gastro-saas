@@ -4,12 +4,14 @@ import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseRateLimitStore } from "@/lib/auth/supabase-rate-limit-store";
-import { isRateLimited } from "@/lib/auth/rate-limit";
+import { reserveAndCheckRateLimit } from "@/lib/auth/rate-limit";
 import { getClientIp } from "@/lib/auth/client-ip";
 import { RegisterSchema } from "@/lib/auth/schemas";
 
 export interface RegisterFormState {
   error?: string;
+  /** Non-error informational message (e.g. "check your email to confirm"). */
+  info?: string;
   fieldErrors?: Partial<Record<"tenantName" | "tenantSlug" | "email" | "password", string>>;
 }
 
@@ -47,7 +49,7 @@ export async function registerAction(
   const admin = createSupabaseAdminClient();
   const rateLimitStore = createSupabaseRateLimitStore(admin);
 
-  const limited = await isRateLimited(rateLimitStore, {
+  const { limited, attemptId } = await reserveAndCheckRateLimit(rateLimitStore, {
     scope: "register",
     ip,
     email,
@@ -63,28 +65,49 @@ export async function registerAction(
   const supabase = await createSupabaseServerClient();
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
 
-  await rateLimitStore.recordAttempt(
-    "register",
-    ip,
-    email,
-    Boolean(signUpData?.session) && !signUpError,
-  );
-
-  if (signUpError || !signUpData.session) {
+  if (signUpError) {
     // Registration duplicate-email disclosure is accepted UX here (this
     // ticket's enumeration-safety acceptance criterion targets LOGIN
     // failures specifically -- see docs/security/threat-model.md
     // "Enumeration": "no email exists leaks beyond what's necessary for
     // UX", and telling a user their own email is already registered during
     // signup is normal, necessary UX).
-    const alreadyRegistered =
-      signUpError?.message.toLowerCase().includes("already registered") ||
-      (signUpData?.user && signUpData.user.identities?.length === 0);
+    //
+    // Ticket #7 fix cycle 1, item 4: an "already registered" email might
+    // belong to an orphaned auth user (a previous signUp() succeeded but
+    // create_tenant_with_owner() failed, e.g. slug conflict) -- pointing
+    // them at /login rather than a dead end lets the /account fallback
+    // (item 4/5) complete onboarding for that same account.
+    const alreadyRegistered = signUpError.message.toLowerCase().includes("already registered");
 
     return {
       error: alreadyRegistered
-        ? "Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich stattdessen an."
+        ? "Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an, um Ihr Restaurant anzulegen oder fortzufahren."
         : "Registrierung nicht möglich. Bitte überprüfen Sie Ihre Eingaben und versuchen Sie es erneut.",
+    };
+  }
+
+  if (signUpData.user && signUpData.user.identities?.length === 0) {
+    return {
+      error:
+        "Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an, um Ihr Restaurant anzulegen oder fortzufahren.",
+    };
+  }
+
+  if (!signUpData.session) {
+    // Ticket #7 fix cycle 1, item 5: with `auth.email.enable_confirmations
+    // = true` (the expected production posture -- local dev currently runs
+    // with it `false`, see supabase/config.toml and
+    // docs/decisions/assumptions.md), signUp() creates the auth.users row
+    // but establishes no session, so create_tenant_with_owner() (which
+    // resolves the owner from auth.uid()) cannot run yet. Tenant creation
+    // is deferred to the user's first confirmed sign-in: loginAction's
+    // redirect to /account lands on a session with zero tenant
+    // memberships, and /account's "create your restaurant" fallback
+    // (item 4) lets them create the tenant then -- this is not a dead end,
+    // just a later step.
+    return {
+      info: "Bitte bestätigen Sie Ihre E-Mail-Adresse über den Link, den wir Ihnen geschickt haben. Melden Sie sich danach an, um Ihr Restaurant anzulegen.",
     };
   }
 
@@ -99,10 +122,12 @@ export async function registerAction(
     return {
       error: slugTaken
         ? "Dieser Restaurant-Slug ist bereits vergeben. Bitte wählen Sie einen anderen."
-        : "Ihr Konto wurde erstellt, aber der Restaurant-Tenant konnte nicht angelegt werden. Bitte kontaktieren Sie den Support.",
+        : "Ihr Konto wurde erstellt, aber der Restaurant-Tenant konnte nicht angelegt werden. Bitte melden Sie sich an, um es über Ihr Konto erneut zu versuchen.",
       fieldErrors: slugTaken ? { tenantSlug: "Dieser Slug ist bereits vergeben." } : undefined,
     };
   }
+
+  await rateLimitStore.markSucceeded(attemptId);
 
   redirect("/account");
 }

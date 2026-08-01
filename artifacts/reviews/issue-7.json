@@ -1,0 +1,51 @@
+{
+  "ticket": "7",
+  "cycle": 1,
+  "verdict": "CHANGES_REQUESTED",
+  "acceptance_criteria": [
+    { "criterion": "Neuer Nutzer kann sich registrieren und wird automatisch Owner eines neuen Tenants", "status": "PASS" },
+    { "criterion": "Login funktioniert mit sicherer Session-Verwaltung", "status": "PASS" },
+    { "criterion": "Fehlerhafte Anmeldeversuche geben keine Enumerationshinweise preis", "status": "FAIL" },
+    { "criterion": "Rate-Limiting auf Auth-Routen", "status": "FAIL" }
+  ],
+  "deterministic_checks": {
+    "format": "PASS", "lint": "PASS", "typecheck": "PASS", "unit_tests": "PASS",
+    "integration_tests": "PASS", "e2e_tests": "NOT_RUN", "build": "PASS", "security": "PASS"
+  },
+  "tenant_isolation": "PASS",
+  "authorization": "PASS",
+  "payment_safety": "NOT_APPLICABLE",
+  "accessibility": "PASS",
+  "data_integrity": "FAIL",
+  "maintainability": "PASS",
+  "review_findings": [
+    { "severity": "high", "area": "enumeration/timing", "summary": "Login response time leaks email existence: 74ms (existing+wrong pw) vs 11ms (nonexistent) -- reliable existence oracle despite identical error messages." },
+    { "severity": "high", "area": "rate-limit/IP resolution", "summary": "getClientIp() prefers client-supplied x-forwarded-for over cf-connecting-ip -- fully spoofable behind Cloudflare, defeats IP-scoped limiting." },
+    { "severity": "medium", "area": "rate-limit/concurrency", "summary": "Check-then-act (SELECT count, then INSERT) is not atomic -- parallel requests can all pass." },
+    { "severity": "medium", "area": "data-integrity/onboarding atomicity", "summary": "signUp() and create_tenant_with_owner() are separate transactions -- an RPC failure (e.g. slug taken) leaves an orphaned auth user with no tenant and no recovery path." },
+    { "severity": "medium", "area": "prod readiness", "summary": "Whole flow depends on auth.email.enable_confirmations=false; with confirmations on (expected prod posture) no tenant is ever created." },
+    { "severity": "medium", "area": "rate-limit/availability", "summary": "Successful attempts count toward the same limit and the email key is attacker-supplied -- any third party can lock a known victim's email out of login." },
+    { "severity": "medium", "area": "test coverage", "summary": "No test proves rate-limiter/generic-error is actually wired into the server actions; E2E suite not in CI." },
+    { "severity": "medium", "area": "web-tier DB privilege", "summary": "apps/web uses a raw pg Pool with the postgres superuser connection string (SUPABASE_DB_URL) for audit writes -- outside RLS, in the request path." },
+    { "severity": "low", "area": "rate-limit fail-open", "summary": "countAttempts() fails open on DB error; justification (GoTrue's own throttling) doesn't hold for server-action calls." },
+    { "severity": "low", "area": "authorization/abuse", "summary": "Any authenticated user can call create_tenant_with_owner unboundedly via PostgREST directly -- no per-user cap." },
+    { "severity": "low", "area": "accessibility", "summary": "New login/register/account pages have no axe test despite an established pattern in the repo." }
+  ],
+  "residual_risks": [
+    "Failed logins for tenantless/unknown emails aren't in audit_logs (documented tradeoff, acceptable given NOT NULL tenant_id).",
+    "auth_rate_limit_attempts has no pruning job -- unbounded growth.",
+    "recordFailedLoginAttempt attributes the event to the victim as actorUserId -- misleading semantics.",
+    "audit pg Pool won't work on Cloudflare Workers (acknowledged, deployment-blocking later not now).",
+    "config.toml minimum_password_length=6 vs the app's 12-char rule -- direct GoTrue signups weaker than the app path."
+  ],
+  "required_actions": [
+    "Fix client IP resolution to prefer cf-connecting-ip / a trusted XFF hop -- blocking.",
+    "Address the login timing oracle or get explicit re-scoping of the AC -- blocking.",
+    "Make the rate-limit decision atomic.",
+    "Close the orphaned-auth-user-without-tenant path.",
+    "Handle or explicitly document/ticket the enable_confirmations=true production path.",
+    "Stop counting successful attempts toward the limit; mitigate third-party email lockout.",
+    "Add action-level tests for rate-limit enforcement and identical login error strings; decide E2E-in-CI status.",
+    "Replace superuser SUPABASE_DB_URL usage in the request path with a least-privilege path."
+  ]
+}

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logoutAction } from "./actions";
+import { CreateTenantForm } from "./create-tenant-form";
 
 interface TenantMembershipRow {
   role: string;
@@ -14,6 +15,12 @@ interface TenantMembershipRow {
  * session. Not gated on any particular role/permission (that's ticket #9's
  * scope); this page only proves the "protected route" pattern this ticket's
  * acceptance criteria call for.
+ *
+ * A session with zero tenant memberships (ticket #7 fix cycle 1, item 4/5:
+ * an orphaned auth user from a failed create_tenant_with_owner() call at
+ * registration, or a just-confirmed-email user whose tenant creation was
+ * deferred to first login) renders the "create your restaurant" fallback
+ * instead of the normal welcome content.
  */
 export default async function AccountPage() {
   const supabase = await createSupabaseServerClient();
@@ -54,6 +61,8 @@ export default async function AccountPage() {
           </>
         ) : null}
       </dl>
+
+      {!membership ? <CreateTenantForm /> : null}
 
       <form action={logoutAction}>
         <button
