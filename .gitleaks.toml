@@ -1,0 +1,11 @@
+title = "gastro-saas gitleaks config"
+
+[extend]
+# Start from gitleaks' built-in default rule set and layer our allowlist on top.
+useDefault = true
+
+[allowlist]
+description = "Publicly documented local-dev-only defaults, not real secrets"
+paths = [
+  '''^\.env\.example$''',
+]

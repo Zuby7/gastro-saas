@@ -22,7 +22,7 @@ Guest checkout (`docs/product/mvp-scope.md`) means cart creation, order creation
 ## Layer 2: Database Row Level Security (Postgres/Supabase)
 
 - Every tenant-scoped table has an explicit `tenant_id` column and an RLS policy restricting rows to the caller's tenant membership.
-- RLS is the safety net if an application-layer check is ever missed — it must never be the *only* layer, and it must never be disabled "temporarily" for convenience.
+- RLS is the safety net if an application-layer check is ever missed — it must never be the _only_ layer, and it must never be disabled "temporarily" for convenience.
 - Every new tenant-scoped table's migration must ship its RLS policy in the same migration — no follow-up ticket to "add RLS later."
 
 ## Testing requirement

@@ -10,17 +10,17 @@ Foundation phase. No product features are implemented yet — this repository cu
 
 ## Documentation map
 
-| Topic | Location |
-|---|---|
-| Product vision, MVP scope, non-goals | `docs/product/` |
-| Architecture decisions (ADRs), system context, domain boundaries | `docs/architecture/` |
-| Data model | `docs/data/domain-model.md` |
-| Security: threat model, tenant isolation | `docs/security/` |
-| External service choices (free-tier-first) | `docs/platform/service-register.md` |
-| Test strategy | `docs/testing/test-strategy.md` |
-| Deployment & operations | `docs/operations/deployment-strategy.md` |
-| Assumptions made without asking | `docs/decisions/assumptions.md` |
-| Ticket backlog (also on GitHub Issues) | `docs/tickets/` |
+| Topic                                                            | Location                                 |
+| ---------------------------------------------------------------- | ---------------------------------------- |
+| Product vision, MVP scope, non-goals                             | `docs/product/`                          |
+| Architecture decisions (ADRs), system context, domain boundaries | `docs/architecture/`                     |
+| Data model                                                       | `docs/data/domain-model.md`              |
+| Security: threat model, tenant isolation                         | `docs/security/`                         |
+| External service choices (free-tier-first)                       | `docs/platform/service-register.md`      |
+| Test strategy                                                    | `docs/testing/test-strategy.md`          |
+| Deployment & operations                                          | `docs/operations/deployment-strategy.md` |
+| Assumptions made without asking                                  | `docs/decisions/assumptions.md`          |
+| Ticket backlog (also on GitHub Issues)                           | `docs/tickets/`                          |
 
 ## Engineering workflow
 

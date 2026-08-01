@@ -2,23 +2,13 @@
   {
     "file": "docs/tickets/01-epic1-next-js-typescript-grundgeruest-aufsetzen.md",
     "title": "[Epic 1] Next.js/TypeScript-Grundgerüst aufsetzen",
-    "labels": [
-      "type:feature",
-      "area:frontend",
-      "priority:high",
-      "phase:foundation"
-    ],
+    "labels": ["type:feature", "area:frontend", "priority:high", "phase:foundation"],
     "milestone": 1
   },
   {
     "file": "docs/tickets/02-epic1-ci-pipeline-einrichten-lint-typecheck-tests-build.md",
     "title": "[Epic 1] CI-Pipeline einrichten (Lint, Typecheck, Tests, Build)",
-    "labels": [
-      "type:feature",
-      "type:infrastructure",
-      "priority:high",
-      "phase:foundation"
-    ],
+    "labels": ["type:feature", "type:infrastructure", "priority:high", "phase:foundation"],
     "milestone": 1
   },
   {
@@ -73,25 +63,13 @@
   {
     "file": "docs/tickets/07-epic3-registrierung-login-und-tenant-onboarding.md",
     "title": "[Epic 3] Registrierung, Login und Tenant-Onboarding",
-    "labels": [
-      "type:feature",
-      "area:auth",
-      "priority:critical",
-      "phase:mvp",
-      "risk:security"
-    ],
+    "labels": ["type:feature", "area:auth", "priority:critical", "phase:mvp", "risk:security"],
     "milestone": 3
   },
   {
     "file": "docs/tickets/08-epic3-mitarbeiter-einladungen.md",
     "title": "[Epic 3] Mitarbeiter-Einladungen",
-    "labels": [
-      "type:feature",
-      "area:auth",
-      "priority:high",
-      "phase:mvp",
-      "risk:security"
-    ],
+    "labels": ["type:feature", "area:auth", "priority:high", "phase:mvp", "risk:security"],
     "milestone": 3
   },
   {
@@ -109,71 +87,37 @@
   {
     "file": "docs/tickets/10-epic3-owner-schutz-vor-versehentlicher-entfernung.md",
     "title": "[Epic 3] Owner-Schutz vor versehentlicher Entfernung",
-    "labels": [
-      "type:feature",
-      "area:permissions",
-      "priority:high",
-      "phase:mvp",
-      "risk:security"
-    ],
+    "labels": ["type:feature", "area:permissions", "priority:high", "phase:mvp", "risk:security"],
     "milestone": 3
   },
   {
     "file": "docs/tickets/11-epic4-restaurant-profil-oeffnungszeiten.md",
     "title": "[Epic 4] Restaurant-Profil & Öffnungszeiten",
-    "labels": [
-      "type:feature",
-      "area:menu",
-      "priority:high",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:menu", "priority:high", "phase:mvp"],
     "milestone": 4
   },
   {
     "file": "docs/tickets/12-epic4-kategorien-und-gerichte-mit-bildupload.md",
     "title": "[Epic 4] Kategorien und Gerichte mit Bildupload",
-    "labels": [
-      "type:feature",
-      "area:menu",
-      "priority:critical",
-      "phase:mvp",
-      "risk:security"
-    ],
+    "labels": ["type:feature", "area:menu", "priority:critical", "phase:mvp", "risk:security"],
     "milestone": 4
   },
   {
     "file": "docs/tickets/13-epic4-varianten-optionsgruppen-und-extras.md",
     "title": "[Epic 4] Varianten, Optionsgruppen und Extras",
-    "labels": [
-      "type:feature",
-      "area:menu",
-      "priority:high",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:menu", "priority:high", "phase:mvp"],
     "milestone": 4
   },
   {
     "file": "docs/tickets/14-epic4-allergene-zusatzstoffe-und-ernaehrungslabels.md",
     "title": "[Epic 4] Allergene, Zusatzstoffe und Ernährungslabels",
-    "labels": [
-      "type:feature",
-      "area:menu",
-      "priority:high",
-      "phase:mvp",
-      "risk:privacy"
-    ],
+    "labels": ["type:feature", "area:menu", "priority:high", "phase:mvp", "risk:privacy"],
     "milestone": 4
   },
   {
     "file": "docs/tickets/15-epic4-entwurf-veroeffentlichungs-workflow-mit-qualitaetspruefung.md",
     "title": "[Epic 4] Entwurf/Veröffentlichungs-Workflow mit Qualitätsprüfung",
-    "labels": [
-      "type:feature",
-      "area:menu",
-      "priority:critical",
-      "phase:mvp",
-      "risk:migration"
-    ],
+    "labels": ["type:feature", "area:menu", "priority:critical", "phase:mvp", "risk:migration"],
     "milestone": 4
   },
   {
@@ -191,69 +135,37 @@
   {
     "file": "docs/tickets/17-epic5-speisekarten-ui-mit-kategorien-navigation.md",
     "title": "[Epic 5] Speisekarten-UI mit Kategorien-Navigation",
-    "labels": [
-      "type:feature",
-      "area:frontend",
-      "priority:high",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:frontend", "priority:high", "phase:mvp"],
     "milestone": 5
   },
   {
     "file": "docs/tickets/18-epic5-gericht-detailansicht-mit-auswahl.md",
     "title": "[Epic 5] Gericht-Detailansicht mit Auswahl",
-    "labels": [
-      "type:feature",
-      "area:frontend",
-      "priority:critical",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:frontend", "priority:critical", "phase:mvp"],
     "milestone": 5
   },
   {
     "file": "docs/tickets/19-epic5-qr-code-generierung.md",
     "title": "[Epic 5] QR-Code-Generierung",
-    "labels": [
-      "type:feature",
-      "area:frontend",
-      "priority:medium",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:frontend", "priority:medium", "phase:mvp"],
     "milestone": 5
   },
   {
     "file": "docs/tickets/20-epic6-warenkorb-mit-serverseitiger-preisberechnung.md",
     "title": "[Epic 6] Warenkorb mit serverseitiger Preisberechnung",
-    "labels": [
-      "type:feature",
-      "area:ordering",
-      "priority:critical",
-      "phase:mvp",
-      "risk:payment"
-    ],
+    "labels": ["type:feature", "area:ordering", "priority:critical", "phase:mvp", "risk:payment"],
     "milestone": 6
   },
   {
     "file": "docs/tickets/21-epic6-bestell-zustandsmaschine-und-checkout-flow.md",
     "title": "[Epic 6] Bestell-Zustandsmaschine und Checkout-Flow",
-    "labels": [
-      "type:feature",
-      "area:ordering",
-      "priority:critical",
-      "phase:mvp",
-      "risk:payment"
-    ],
+    "labels": ["type:feature", "area:ordering", "priority:critical", "phase:mvp", "risk:payment"],
     "milestone": 6
   },
   {
     "file": "docs/tickets/22-epic6-bestellstatus-seite-fuer-kunden.md",
     "title": "[Epic 6] Bestellstatus-Seite für Kunden",
-    "labels": [
-      "type:feature",
-      "area:ordering",
-      "priority:medium",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:ordering", "priority:medium", "phase:mvp"],
     "milestone": 6
   },
   {
@@ -272,13 +184,7 @@
   {
     "file": "docs/tickets/24-epic7-checkout-zahlungsabwicklung.md",
     "title": "[Epic 7] Checkout-Zahlungsabwicklung",
-    "labels": [
-      "type:feature",
-      "area:payments",
-      "priority:critical",
-      "phase:mvp",
-      "risk:payment"
-    ],
+    "labels": ["type:feature", "area:payments", "priority:critical", "phase:mvp", "risk:payment"],
     "milestone": 7
   },
   {
@@ -297,13 +203,7 @@
   {
     "file": "docs/tickets/26-epic7-rueckerstattungen.md",
     "title": "[Epic 7] Rückerstattungen",
-    "labels": [
-      "type:feature",
-      "area:payments",
-      "priority:high",
-      "phase:mvp",
-      "risk:payment"
-    ],
+    "labels": ["type:feature", "area:payments", "priority:high", "phase:mvp", "risk:payment"],
     "milestone": 7
   },
   {
@@ -321,90 +221,49 @@
   {
     "file": "docs/tickets/28-epic8-kuechen-workflow-statuswechsel.md",
     "title": "[Epic 8] Küchen-Workflow (Statuswechsel)",
-    "labels": [
-      "type:feature",
-      "area:ordering",
-      "priority:high",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:ordering", "priority:high", "phase:mvp"],
     "milestone": 8
   },
   {
     "file": "docs/tickets/29-epic8-ausverkauft-steuerung.md",
     "title": "[Epic 8] Ausverkauft-Steuerung",
-    "labels": [
-      "type:feature",
-      "area:menu",
-      "priority:high",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:menu", "priority:high", "phase:mvp"],
     "milestone": 8
   },
   {
     "file": "docs/tickets/30-epic9-analytics-grunddashboard.md",
     "title": "[Epic 9] Analytics-Grunddashboard",
-    "labels": [
-      "type:feature",
-      "area:analytics",
-      "priority:high",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:analytics", "priority:high", "phase:mvp"],
     "milestone": 9
   },
   {
     "file": "docs/tickets/31-epic9-topseller-und-low-performer-analyse.md",
     "title": "[Epic 9] Topseller- und Low-Performer-Analyse",
-    "labels": [
-      "type:feature",
-      "area:analytics",
-      "priority:medium",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:analytics", "priority:medium", "phase:mvp"],
     "milestone": 9
   },
   {
     "file": "docs/tickets/32-epic9-trendvergleiche-und-extras-analytics.md",
     "title": "[Epic 9] Trendvergleiche und Extras-Analytics",
-    "labels": [
-      "type:feature",
-      "area:analytics",
-      "priority:medium",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:analytics", "priority:medium", "phase:mvp"],
     "milestone": 9
   },
   {
     "file": "docs/tickets/33-epic10-verifizierte-bewertungen-nach-bestellung.md",
     "title": "[Epic 10] Verifizierte Bewertungen nach Bestellung",
-    "labels": [
-      "type:feature",
-      "area:reviews",
-      "priority:medium",
-      "phase:mvp",
-      "risk:privacy"
-    ],
+    "labels": ["type:feature", "area:reviews", "priority:medium", "phase:mvp", "risk:privacy"],
     "milestone": 10
   },
   {
     "file": "docs/tickets/34-epic10-moderationsqueue-fuer-bewertungen.md",
     "title": "[Epic 10] Moderationsqueue für Bewertungen",
-    "labels": [
-      "type:feature",
-      "area:reviews",
-      "priority:low",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:reviews", "priority:low", "phase:mvp"],
     "milestone": 10
   },
   {
     "file": "docs/tickets/35-epic11-error-und-uptime-monitoring-einrichten.md",
     "title": "[Epic 11] Error- und Uptime-Monitoring einrichten",
-    "labels": [
-      "type:feature",
-      "area:operations",
-      "priority:high",
-      "phase:post-mvp"
-    ],
+    "labels": ["type:feature", "area:operations", "priority:high", "phase:post-mvp"],
     "milestone": 11
   },
   {
@@ -422,58 +281,32 @@
   {
     "file": "docs/tickets/37-epic11-produktionsbereitschafts-checkliste-release-check.md",
     "title": "[Epic 11] Produktionsbereitschafts-Checkliste (/release-check)",
-    "labels": [
-      "type:feature",
-      "area:operations",
-      "priority:medium",
-      "phase:post-mvp"
-    ],
+    "labels": ["type:feature", "area:operations", "priority:medium", "phase:post-mvp"],
     "milestone": 11
   },
   {
     "file": "docs/tickets/38-epic12-provider-neutrale-integrationsschnittstelle-mit-mock-provider.md",
     "title": "[Epic 12] Provider-neutrale Integrationsschnittstelle mit Mock-Provider",
-    "labels": [
-      "type:feature",
-      "area:integrations",
-      "priority:medium",
-      "phase:post-mvp"
-    ],
+    "labels": ["type:feature", "area:integrations", "priority:medium", "phase:post-mvp"],
     "milestone": 12
   },
   {
     "file": "docs/tickets/39-epic12-fehlerbehandlung-retry-und-reconciliation.md",
     "title": "[Epic 12] Fehlerbehandlung, Retry und Reconciliation",
-    "labels": [
-      "type:feature",
-      "area:integrations",
-      "priority:low",
-      "phase:post-mvp"
-    ],
+    "labels": ["type:feature", "area:integrations", "priority:low", "phase:post-mvp"],
     "milestone": 12
   },
   {
     "file": "docs/tickets/40-epic7-transaktions-e-mails-bestellbestaetigung.md",
     "title": "[Epic 7] Transaktions-E-Mails (Bestellbestätigung)",
-    "labels": [
-      "type:feature",
-      "area:payments",
-      "priority:high",
-      "phase:mvp"
-    ],
+    "labels": ["type:feature", "area:payments", "priority:high", "phase:mvp"],
     "milestone": 7,
     "issue": 40
   },
   {
     "file": "docs/tickets/41-epic5-impressum-datenschutz-consent.md",
     "title": "[Epic 5] Impressum, Datenschutz & Consent",
-    "labels": [
-      "type:feature",
-      "area:frontend",
-      "priority:high",
-      "phase:mvp",
-      "risk:privacy"
-    ],
+    "labels": ["type:feature", "area:frontend", "priority:high", "phase:mvp", "risk:privacy"],
     "milestone": 5,
     "issue": 41
   }

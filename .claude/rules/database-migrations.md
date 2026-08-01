@@ -3,7 +3,7 @@ description: Database & migration rules
 paths: ["packages/database/**", "supabase/migrations/**"]
 ---
 
-- Every new tenant-scoped table ships its Row Level Security policy in the *same* migration — never a follow-up ticket.
+- Every new tenant-scoped table ships its Row Level Security policy in the _same_ migration — never a follow-up ticket.
 - Money columns are integer minor units (cents) with an explicit `currency` column — never floating point.
 - Historical order/payment data is immutable: `order_items`/`order_item_selections` snapshot purchase-time name/price/tax/variant/extras independent of the live menu rows.
 - Prefer archive/soft-delete over hard delete for anything that participates in historical orders.
