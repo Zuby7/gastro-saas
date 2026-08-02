@@ -34,7 +34,7 @@ Scope: multi-tenant gastronomy SaaS handling menu data, orders, payments (via St
 ## Explicit residual responsibility split
 
 - **Enforced by software**: tenant isolation, payment integrity, webhook verification, auth/authorization, input validation, rate limiting, secret handling.
-- **Tenant's legal responsibility, not automatable**: accuracy of allergen/additive declarations, correctness of legal/imprint content, compliance with local food-safety and consumer-protection law. The platform's rule-based quality checks (§11 of the source brief) catch _missing_ or _structurally inconsistent_ data — they are not legal compliance certification, and the product must never claim otherwise.
+- **Tenant's legal responsibility, not automatable**: accuracy of allergen/additive declarations, correctness of legal/imprint content, compliance with local food-safety and consumer-protection law. The platform's rule-based quality checks (§11 of the source brief) catch _missing_ or _structurally inconsistent_ data — they are not legal compliance certification, and the product must never claim otherwise. The admin allergen/additive/dietary-label editor (`apps/web/src/app/account/menu/dishes/[dishId]/assignable-lookup-section.tsx`) surfaces this same boundary directly in its UI copy ("vom Restaurant angegeben, keine Rechtsprüfung").
 
 ## Not yet assessed (flag for `/security-gate` before each relevant ticket)
 
