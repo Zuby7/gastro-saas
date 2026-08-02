@@ -14,6 +14,25 @@
 -- menu_versions rows and the admin menu editor has nothing to attach
 -- categories/dishes to -- clone_menu_version_as_draft() only clones an
 -- *existing* version, it doesn't bootstrap the very first one.
+--
+-- Opus cycle-3 finding (fixed here, artifacts/reviews/epic-3-5-batch.json):
+-- the original version was a plain SELECT-then-INSERT get-or-create with no
+-- lock/unique constraint -- two concurrent calls for the same tenant (e.g.
+-- two browser tabs, or the race the admin menu page's render-time call
+-- could trigger) could both observe "no existing draft" and both INSERT
+-- their own "first" draft, landing on the same version_number. Empirically
+-- reproduced by the reviewer (two parallel transactions, same owner, both
+-- inserted).
+--
+-- Fixed with `pg_advisory_xact_lock`, keyed on the tenant id, taken BEFORE
+-- the SELECT -- same idiom already used for the auth rate-limiter's
+-- concurrency fix (see reserve_auth_rate_limit_attempt() in
+-- 20260801070000_auth_rate_limit_atomic_and_login_audit_rpc.sql). This
+-- serializes concurrent callers for the same tenant so the
+-- read-then-decide-then-insert sequence below can never race; the lock is
+-- released automatically at transaction end (commit or rollback), so no
+-- explicit unlock is needed and a crashed/killed session can't leave it
+-- held forever.
 -- ----------------------------------------------------------------------------
 create or replace function create_initial_draft_menu_version(p_tenant_id uuid)
 returns uuid
@@ -27,6 +46,11 @@ declare
   v_new_version_id uuid;
 begin
   perform public.require_tenant_permission(p_tenant_id, 'menu.write');
+
+  -- Serializes concurrent callers for the same tenant -- see the function
+  -- header comment above. Must be taken before the SELECT below so no two
+  -- callers can both observe "no existing draft" at once.
+  perform pg_advisory_xact_lock(hashtextextended('create_initial_draft_menu_version:' || p_tenant_id::text, 0));
 
   select id into v_existing_draft_id
     from public.menu_versions
@@ -52,7 +76,7 @@ end;
 $$;
 
 comment on function create_initial_draft_menu_version(uuid) is
-  'Get-or-create a tenant''s current draft menu_version. Gated on menu.write via require_tenant_permission (same permission the RLS policies on menu_versions already require), tenant_id always taken from the caller''s own argument which the application resolves from the authenticated session''s membership, never from client-supplied context.';
+  'Get-or-create a tenant''s current draft menu_version. Gated on menu.write via require_tenant_permission (same permission the RLS policies on menu_versions already require), tenant_id always taken from the caller''s own argument which the application resolves from the authenticated session''s membership, never from client-supplied context. Concurrency-safe: pg_advisory_xact_lock keyed on tenant_id, taken before the get-or-create SELECT, prevents two concurrent callers from both inserting a "first" draft (Opus cycle-3 fix, see the function body comment).';
 
 revoke all on function create_initial_draft_menu_version(uuid) from public;
 grant execute on function create_initial_draft_menu_version(uuid) to authenticated, service_role;

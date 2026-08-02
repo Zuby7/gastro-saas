@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
+import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-event";
 import { OpeningHoursSchema, ProfileSchema, WEEKDAYS } from "./schemas";
 
 export interface ProfileFormState {
@@ -94,6 +95,14 @@ export async function saveProfileAction(
   if (upsertError) {
     return { error: "Das Profil konnte nicht gespeichert werden. Bitte versuchen Sie es erneut." };
   }
+
+  await recordMenuAdminAuditEvent(supabase, {
+    tenantId: membership.tenantId,
+    actorUserId: user.id,
+    action: "restaurant_profile.updated",
+    targetType: "restaurant_profile",
+    targetId: membership.tenantId,
+  });
 
   revalidatePath("/account/profile");
   return { success: "Profil wurde gespeichert." };

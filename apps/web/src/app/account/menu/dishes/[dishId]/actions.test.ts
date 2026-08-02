@@ -283,9 +283,16 @@ describe("uploadDishImageAction", () => {
         return {
           update: () => ({
             eq: () => ({
-              eq: async () => ({ error: null }),
+              eq: () => ({
+                select: async () => ({ data: [{ id: "dish-1" }], error: null }),
+              }),
             }),
           }),
+        };
+      }
+      if (table === "audit_logs") {
+        return {
+          insert: async () => ({ error: null }),
         };
       }
       throw new Error(`unexpected table: ${table}`);

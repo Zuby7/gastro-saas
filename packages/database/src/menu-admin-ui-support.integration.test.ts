@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Client } from "pg";
+import { Client, Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   expectCrossTenantDenied,
@@ -48,9 +48,11 @@ describe.skipIf(!dbAvailable)(
   () => {
     const admin = new Client({ connectionString: DB_URL });
     let fixture: TwoTenantFixture;
+    let pool: Pool;
 
     beforeAll(async () => {
       await admin.connect();
+      pool = new Pool({ connectionString: DB_URL, max: 20 });
     });
 
     afterEach(async () => {
@@ -59,7 +61,35 @@ describe.skipIf(!dbAvailable)(
 
     afterAll(async () => {
       await admin.end();
+      await pool.end();
     });
+
+    /**
+     * Runs `sql` as a simulated authenticated session for `userId`, on a
+     * connection checked out from `pool` (not `admin`/`queryAsUser`'s single
+     * shared client) so multiple calls can genuinely run concurrently on
+     * separate physical connections -- required to actually exercise
+     * `pg_advisory_xact_lock`'s serialization rather than accidentally
+     * serializing for free because everything shares one client/session.
+     */
+    async function queryAsUserPooled<Row extends Record<string, unknown>>(
+      userId: string,
+      sql: string,
+      params: unknown[] = [],
+    ) {
+      const client = await pool.connect();
+      try {
+        await client.query("set role authenticated");
+        await client.query("select set_config('request.jwt.claims', $1, false)", [
+          JSON.stringify({ sub: userId, role: "authenticated" }),
+        ]);
+        return await client.query<Row>(sql, params);
+      } finally {
+        await client.query("select set_config('request.jwt.claims', NULL, false)").catch(() => {});
+        await client.query("reset role").catch(() => {});
+        client.release();
+      }
+    }
 
     it("creates a draft menu version and is idempotent on repeated calls", async () => {
       fixture = await seedTwoTenantFixture(admin);
@@ -88,6 +118,52 @@ describe.skipIf(!dbAvailable)(
       );
       expect(stored.rows[0]).toMatchObject({ status: "draft", tenant_id: tenantA.tenantId });
     });
+
+    it(
+      "is concurrency-safe: N parallel calls for the same tenant create exactly one draft, " +
+        "and every caller gets back the same id (Opus cycle-3 fix, artifacts/reviews/epic-3-5-batch.json)",
+      async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const concurrency = 15;
+
+        const results = await Promise.all(
+          Array.from({ length: concurrency }, () =>
+            queryAsUserPooled<{ create_initial_draft_menu_version: string }>(
+              tenantA.ownerId,
+              `select create_initial_draft_menu_version($1)`,
+              [tenantA.tenantId],
+            ),
+          ),
+        );
+
+        const draftIds = results.map((r) => r.rows[0]?.create_initial_draft_menu_version);
+        expect(draftIds).toHaveLength(concurrency);
+        expect(draftIds.every((id) => typeof id === "string" && id.length > 0)).toBe(true);
+
+        // Every concurrent caller must have been handed back the exact same
+        // draft id -- the pre-fix SELECT-then-INSERT race let two parallel
+        // callers each create their own "first" draft with distinct ids.
+        const uniqueIds = new Set(draftIds);
+        expect(uniqueIds.size).toBe(1);
+
+        const draftCount = await admin.query(
+          `select count(*)::int as count from menu_versions where tenant_id = $1 and status = 'draft'`,
+          [tenantA.tenantId],
+        );
+        expect(draftCount.rows[0]?.count).toBe(1);
+
+        const versionNumbers = await admin.query<{ version_number: number }>(
+          `select version_number from menu_versions where tenant_id = $1`,
+          [tenantA.tenantId],
+        );
+        // Only one row exists at all for this fresh tenant, so there is no
+        // duplicate version_number to begin with -- this assertion also
+        // guards against a regression that inserts more than one row while
+        // somehow still returning the same id to every caller.
+        expect(versionNumbers.rows).toHaveLength(1);
+      },
+    );
 
     it("rejects calls without menu.write for the target tenant (cross-tenant)", async () => {
       fixture = await seedTwoTenantFixture(admin);

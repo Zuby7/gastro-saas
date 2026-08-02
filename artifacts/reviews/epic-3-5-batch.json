@@ -1,0 +1,29 @@
+{
+  "ticket": "epic-3-5-batch",
+  "cycle": 3,
+  "verdict": "CHANGES_REQUESTED",
+  "note": "Cycle 2 (security fixes) was APPROVED. Cycle 3 reviews the Epic 4 admin UI added afterward on the same PR/branch.",
+  "review_findings": [
+    { "severity": "high", "area": "data-integrity/create_initial_draft_menu_version", "summary": "Get-or-create is not concurrency-safe (SELECT-then-INSERT, no lock/unique constraint) -- two parallel calls create two 'first' drafts with identical version_number. Empirically reproduced. Blocking." },
+    { "severity": "medium", "area": "data-integrity/moveCategoryAction", "summary": "Three separate non-transactional UPDATEs with a sentinel sort_order=-1, no error checking -- a failed middle step can strand a category at -1 permanently." },
+    { "severity": "medium", "area": "observability", "summary": "Tickets #11/#12 require audited changes; profile/opening-hours/category/dish/upload mutations write no audit_logs." },
+    { "severity": "medium", "area": "scope/#12 re-encoding", "summary": "Re-encoding is explicitly in #12's scope AND security section (risk:security-labelled ticket); deferring to #72 is reasonable but must not be silently marked as fully done." },
+    { "severity": "low", "area": "upload validation", "summary": "MIME type is client-supplied only, no magic-byte check -- not currently exploitable (bucket allowlist + private + signed URLs) but should be hardened alongside #72's re-encoding." },
+    { "severity": "low", "area": "side effects on GET", "summary": "MenuPage's server-render calls getOrCreateDraftMenuVersionId, writing to DB on every page load -- contributes to the race in the blocking finding." },
+    { "severity": "low", "area": "error handling", "summary": "Update actions check only `error`, not affected-row-count -- a foreign/invalid dishId reports success without writing anything." },
+    { "severity": "low", "area": "a11y/UX reorder substitution", "summary": "Up/Down buttons are an acceptable Drag-Sort substitute, but focus is lost after reorder and no aria-live announcement; dishes/variants have no reorder UI at all despite a sort_order column." }
+  ],
+  "tenant_isolation": "PASS",
+  "authorization": "PASS",
+  "payment_safety": "NOT_APPLICABLE",
+  "accessibility": "PASS",
+  "data_integrity": "FAIL",
+  "maintainability": "PASS",
+  "required_actions": [
+    "Make create_initial_draft_menu_version concurrency-safe (advisory lock or partial unique index) + concurrent integration test -- blocking merge.",
+    "Make moveCategoryAction transactional/error-checked (prefer an RPC).",
+    "Add audit logging for profile/menu/upload mutations or get explicit user sign-off on the deviation.",
+    "Explicitly flag the re-encoding scope move (#12 -> #72) in the PR/ticket, don't mark #12 fully done until then.",
+    "Add row-count checks in update actions and storage cleanup in the last upload error branch."
+  ]
+}

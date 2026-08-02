@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { getOrCreateDraftMenuVersionId } from "@/lib/menu/current-draft";
+import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-event";
 import { CategoryNameSchema, DishSchema } from "./schemas";
 
 export interface MenuActionState {
@@ -182,17 +183,21 @@ export async function moveCategoryAction(
     return { success: "Bereits an dieser Position." };
   }
 
-  // Swap via a temporary offset to avoid the (tenant_id, menu_version_id,
-  // sort_order) uniqueness constraint colliding mid-swap.
-  await supabase.from("categories").update({ sort_order: -1 }).eq("id", current.id);
-  await supabase
-    .from("categories")
-    .update({ sort_order: current.sort_order })
-    .eq("id", neighbor.id);
-  await supabase
-    .from("categories")
-    .update({ sort_order: neighbor.sort_order })
-    .eq("id", current.id);
+  // Atomic swap (one transaction, error-checked) via the
+  // swap_category_sort_order RPC -- see
+  // supabase/migrations/20260802100000_menu_category_reorder_rpc.sql. Was
+  // previously three separate, non-transactional client-side `.update()`
+  // calls with no error check on the middle two, which could strand a
+  // category permanently at the sentinel `sort_order = -1` if one failed
+  // partway through (Opus cycle-3 finding).
+  const { error: swapError } = await supabase.rpc("swap_category_sort_order", {
+    p_category_id: current.id,
+    p_neighbor_id: neighbor.id,
+  });
+
+  if (swapError) {
+    return { error: "Die Reihenfolge konnte nicht aktualisiert werden." };
+  }
 
   revalidatePath("/account/menu");
   return { success: "Reihenfolge aktualisiert." };
@@ -271,18 +276,33 @@ export async function createDishAction(
 
   const draftId = await getOrCreateDraftMenuVersionId(supabase, tenantId);
 
-  const { error: insertError } = await supabase.from("dishes").insert({
-    tenant_id: tenantId,
-    menu_version_id: draftId,
-    category_id: parsed.data.categoryId,
-    name: parsed.data.name,
-    description: parsed.data.description,
-    price_cents: parsed.data.priceCents ? Number(parsed.data.priceCents) : null,
-  });
+  const { data: createdDish, error: insertError } = await supabase
+    .from("dishes")
+    .insert({
+      tenant_id: tenantId,
+      menu_version_id: draftId,
+      category_id: parsed.data.categoryId,
+      name: parsed.data.name,
+      description: parsed.data.description,
+      price_cents: parsed.data.priceCents ? Number(parsed.data.priceCents) : null,
+    })
+    .select("id")
+    .single<{ id: string }>();
 
-  if (insertError) {
+  if (insertError || !createdDish) {
     return { error: "Das Gericht konnte nicht angelegt werden." };
   }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  await recordMenuAdminAuditEvent(supabase, {
+    tenantId,
+    actorUserId: user?.id ?? null,
+    action: "dish.created",
+    targetType: "dish",
+    targetId: createdDish.id,
+  });
 
   revalidatePath("/account/menu");
   return { success: "Gericht wurde angelegt." };
@@ -310,15 +330,27 @@ export async function archiveDishAction(
     throw error;
   }
 
-  const { error: updateError } = await supabase
+  const { data: archivedRows, error: updateError } = await supabase
     .from("dishes")
     .update({ archived_at: new Date().toISOString() })
     .eq("id", dishId)
-    .eq("tenant_id", tenantId);
+    .eq("tenant_id", tenantId)
+    .select("id");
 
-  if (updateError) {
+  if (updateError || !archivedRows || archivedRows.length === 0) {
     return { error: "Das Gericht konnte nicht archiviert werden (ggf. bereits veröffentlicht)." };
   }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  await recordMenuAdminAuditEvent(supabase, {
+    tenantId,
+    actorUserId: user?.id ?? null,
+    action: "dish.archived",
+    targetType: "dish",
+    targetId: dishId,
+  });
 
   revalidatePath("/account/menu");
   return { success: "Gericht wurde archiviert." };

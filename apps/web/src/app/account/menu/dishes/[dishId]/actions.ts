@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
+import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-event";
 import {
   ALLOWED_IMAGE_TYPES,
   AssignmentEntitySchema,
@@ -110,7 +111,7 @@ export async function updateDishBasicsAction(
   const denied = await ensurePermission(supabase, tenantId);
   if (denied) return denied;
 
-  const { error } = await supabase
+  const { data: updatedRows, error } = await supabase
     .from("dishes")
     .update({
       name: parsed.data.name,
@@ -118,9 +119,10 @@ export async function updateDishBasicsAction(
       price_cents: parsed.data.priceCents ? Number(parsed.data.priceCents) : null,
     })
     .eq("id", dishId)
-    .eq("tenant_id", tenantId);
+    .eq("tenant_id", tenantId)
+    .select("id");
 
-  if (error) {
+  if (error || !updatedRows || updatedRows.length === 0) {
     return { error: "Das Gericht konnte nicht gespeichert werden (ggf. bereits veröffentlicht)." };
   }
 
@@ -140,13 +142,14 @@ export async function setAllergenReviewedAction(
   const denied = await ensurePermission(supabase, tenantId);
   if (denied) return denied;
 
-  const { error } = await supabase
+  const { data: updatedRows, error } = await supabase
     .from("dishes")
     .update({ allergen_reviewed: reviewed })
     .eq("id", dishId)
-    .eq("tenant_id", tenantId);
+    .eq("tenant_id", tenantId)
+    .select("id");
 
-  if (error) {
+  if (error || !updatedRows || updatedRows.length === 0) {
     return { error: "Der Allergen-Prüfstatus konnte nicht gespeichert werden." };
   }
 
@@ -466,6 +469,10 @@ export async function uploadDishImageAction(
     return { error: "Das Bild konnte nicht hochgeladen werden." };
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { data: mediaAsset, error: insertError } = await supabase
     .from("media_assets")
     .insert({
@@ -474,7 +481,7 @@ export async function uploadDishImageAction(
       content_type: file.type,
       size_bytes: file.size,
       alt_text: altText,
-      created_by_user_id: (await supabase.auth.getUser()).data.user?.id ?? null,
+      created_by_user_id: user?.id ?? null,
     })
     .select("id")
     .single<{ id: string }>();
@@ -484,17 +491,33 @@ export async function uploadDishImageAction(
     return { error: "Die Bildmetadaten konnten nicht gespeichert werden." };
   }
 
-  const { error: dishUpdateError } = await supabase
+  const { data: updatedRows, error: dishUpdateError } = await supabase
     .from("dishes")
     .update({ media_asset_id: mediaAsset.id })
     .eq("id", dishId)
-    .eq("tenant_id", tenantId);
+    .eq("tenant_id", tenantId)
+    .select("id");
 
-  if (dishUpdateError) {
+  if (dishUpdateError || !updatedRows || updatedRows.length === 0) {
+    // The storage object + media_assets row were already created above --
+    // clean both up rather than leaving them orphaned (Opus cycle-3 finding:
+    // this was the one error branch in this action that didn't already
+    // clean up after itself, unlike the insertError branch just above).
+    await supabase.from("media_assets").delete().eq("id", mediaAsset.id);
+    await supabase.storage.from("dish-media").remove([storagePath]);
     return {
-      error: "Das Bild wurde hochgeladen, konnte dem Gericht aber nicht zugewiesen werden.",
+      error: "Das Bild konnte dem Gericht nicht zugewiesen werden (ggf. bereits veröffentlicht).",
     };
   }
+
+  await recordMenuAdminAuditEvent(supabase, {
+    tenantId,
+    actorUserId: user?.id ?? null,
+    action: "dish.image_uploaded",
+    targetType: "dish",
+    targetId: dishId,
+    metadata: { mediaAssetId: mediaAsset.id, contentType: file.type, sizeBytes: file.size },
+  });
 
   revalidateDish(dishId);
   return { success: "Bild wurde hochgeladen." };
