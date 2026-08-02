@@ -275,5 +275,157 @@ describe.skipIf(!dbAvailable)(
       // local-DB test data (random path, no collision risk) and isn't cleaned
       // up here for that reason.
     });
+
+    // Opus cycle-4 finding: swap_category_sort_order (added by the cycle-3
+    // fix in supabase/migrations/20260802100000_menu_category_reorder_rpc.sql)
+    // shipped with zero test coverage. Behavior was verified correct by the
+    // reviewer manually; these are the regression tests for that.
+    describe("swap_category_sort_order", () => {
+      it("swaps two sibling categories' sort_order", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const draftId = (
+          await queryAsUser<{ create_initial_draft_menu_version: string }>(
+            admin,
+            tenantA.ownerId,
+            `select create_initial_draft_menu_version($1)`,
+            [tenantA.tenantId],
+          )
+        ).rows[0]!.create_initial_draft_menu_version;
+
+        const firstId = randomUUID();
+        const secondId = randomUUID();
+        await admin.query(
+          `insert into categories (id, tenant_id, menu_version_id, name, sort_order) values ($1, $2, $3, 'Starters', 1)`,
+          [firstId, tenantA.tenantId, draftId],
+        );
+        await admin.query(
+          `insert into categories (id, tenant_id, menu_version_id, name, sort_order) values ($1, $2, $3, 'Mains', 2)`,
+          [secondId, tenantA.tenantId, draftId],
+        );
+
+        await queryAsUser(admin, tenantA.ownerId, `select swap_category_sort_order($1, $2)`, [
+          firstId,
+          secondId,
+        ]);
+
+        const rows = await admin.query<{ id: string; sort_order: number }>(
+          `select id, sort_order from categories where id in ($1, $2)`,
+          [firstId, secondId],
+        );
+        expect(rows.rows.find((r) => r.id === firstId)?.sort_order).toBe(2);
+        expect(rows.rows.find((r) => r.id === secondId)?.sort_order).toBe(1);
+      });
+
+      it("rejects a cross-tenant caller", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA, tenantB } = fixture;
+        const draftId = (
+          await queryAsUser<{ create_initial_draft_menu_version: string }>(
+            admin,
+            tenantA.ownerId,
+            `select create_initial_draft_menu_version($1)`,
+            [tenantA.tenantId],
+          )
+        ).rows[0]!.create_initial_draft_menu_version;
+
+        const firstId = randomUUID();
+        const secondId = randomUUID();
+        await admin.query(
+          `insert into categories (id, tenant_id, menu_version_id, name, sort_order) values ($1, $2, $3, 'Starters', 1)`,
+          [firstId, tenantA.tenantId, draftId],
+        );
+        await admin.query(
+          `insert into categories (id, tenant_id, menu_version_id, name, sort_order) values ($1, $2, $3, 'Mains', 2)`,
+          [secondId, tenantA.tenantId, draftId],
+        );
+
+        await expect(
+          queryAsUser(admin, tenantB.ownerId, `select swap_category_sort_order($1, $2)`, [
+            firstId,
+            secondId,
+          ]),
+        ).rejects.toThrow(
+          /Missing permission menu\.write|permission denied|insufficient_privilege/i,
+        );
+      });
+
+      it("rejects a neighbor from a different tenant/menu version", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA, tenantB } = fixture;
+        const draftId = (
+          await queryAsUser<{ create_initial_draft_menu_version: string }>(
+            admin,
+            tenantA.ownerId,
+            `select create_initial_draft_menu_version($1)`,
+            [tenantA.tenantId],
+          )
+        ).rows[0]!.create_initial_draft_menu_version;
+        const otherDraftId = (
+          await queryAsUser<{ create_initial_draft_menu_version: string }>(
+            admin,
+            tenantB.ownerId,
+            `select create_initial_draft_menu_version($1)`,
+            [tenantB.tenantId],
+          )
+        ).rows[0]!.create_initial_draft_menu_version;
+
+        const ownCategoryId = randomUUID();
+        const foreignCategoryId = randomUUID();
+        await admin.query(
+          `insert into categories (id, tenant_id, menu_version_id, name, sort_order) values ($1, $2, $3, 'Starters', 1)`,
+          [ownCategoryId, tenantA.tenantId, draftId],
+        );
+        await admin.query(
+          `insert into categories (id, tenant_id, menu_version_id, name, sort_order) values ($1, $2, $3, 'Mains', 1)`,
+          [foreignCategoryId, tenantB.tenantId, otherDraftId],
+        );
+
+        await expect(
+          queryAsUser(admin, tenantA.ownerId, `select swap_category_sort_order($1, $2)`, [
+            ownCategoryId,
+            foreignCategoryId,
+          ]),
+        ).rejects.toThrow(/not found in the same tenant\/menu version/i);
+      });
+
+      it("rejects a swap once the menu version is published", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const draftId = (
+          await queryAsUser<{ create_initial_draft_menu_version: string }>(
+            admin,
+            tenantA.ownerId,
+            `select create_initial_draft_menu_version($1)`,
+            [tenantA.tenantId],
+          )
+        ).rows[0]!.create_initial_draft_menu_version;
+
+        const firstId = randomUUID();
+        const secondId = randomUUID();
+        const dishId = randomUUID();
+        await admin.query(
+          `insert into categories (id, tenant_id, menu_version_id, name, sort_order) values ($1, $2, $3, 'Starters', 1)`,
+          [firstId, tenantA.tenantId, draftId],
+        );
+        await admin.query(
+          `insert into categories (id, tenant_id, menu_version_id, name, sort_order) values ($1, $2, $3, 'Mains', 2)`,
+          [secondId, tenantA.tenantId, draftId],
+        );
+        await admin.query(
+          `insert into dishes (id, tenant_id, menu_version_id, category_id, name, price_cents, allergen_reviewed)
+           values ($1, $2, $3, $4, 'Margherita', 900, true)`,
+          [dishId, tenantA.tenantId, draftId, firstId],
+        );
+        await queryAsUser(admin, tenantA.ownerId, `select publish_menu_version($1)`, [draftId]);
+
+        await expect(
+          queryAsUser(admin, tenantA.ownerId, `select swap_category_sort_order($1, $2)`, [
+            firstId,
+            secondId,
+          ]),
+        ).rejects.toThrow(/read-only/i);
+      });
+    });
   },
 );
