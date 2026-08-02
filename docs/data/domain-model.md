@@ -20,11 +20,15 @@ Entities are introduced through tickets as they're needed (§12 of the source br
 
 ## Authorization
 
-`roles`, `permissions`, `role_permissions`, `membership_roles`. Permission keys follow `area.resource.action`, e.g. `menu.publish`, `payments.refund`, `orders.cancel`, `audit.read` (ticket #6 — defined here, not yet enforced anywhere; no read function/endpoint exists yet) — full list in `.claude/rules/auth.md`.
+`roles`, `permissions`, `role_permissions`, `membership_roles`. Permission keys follow `area.resource.action`. Standard MVP permission keys:
+`users.invite`, `users.manage`, `roles.manage`, `menu.publish`, `orders.cancel`, `payments.refund`, `analytics.read`, `audit.read`.
+Ticket #9 introduces tenant-scoped standard roles (Owner, Manager, Kitchen, Service, Marketing), custom-role storage, `has_tenant_permission()` /
+`require_tenant_permission()` server-side checks, and an `analytics.read` DB gate so revenue/analytics data is not visible to every tenant member.
 
 ## Restaurant profile
 
 `restaurant_profiles`, `opening_hours`, `fulfillment_settings`, `payment_accounts` (Stripe Connect account reference, onboarding status).
+Ticket #11 introduces `restaurant_profiles` and `opening_hours` with tenant-scoped RLS and timezone-aware profile storage. Admin UI: `apps/web/src/app/account/profile` (profile form + opening-hours editor, gated on `tenant.settings.write`).
 
 ## Tax
 
@@ -33,6 +37,9 @@ Entities are introduced through tickets as they're needed (§12 of the source br
 ## Menu
 
 `menu_versions`, `menus`, `categories`, `dishes`, `dish_variants`, `option_groups`, `options`, `dish_option_group_assignments`, `ingredients`, `removable_ingredients`, `allergens`, `additives`, `dietary_labels`, `dish_allergen_assignments`, `dish_additive_assignments`, `media_assets`, `availability_schedules`, `channel_availability`.
+Tickets #12-#15 introduce the draft/published menu foundation, tenant-scoped image metadata, variants/options/extras, restaurant-provided allergen/additive/dietary-label assignments, and server-side publish checks. Allergen/additive data is "provided by the restaurant"; the platform does not certify legal correctness.
+
+Admin UI (added on top of the DB-only foundation above after the epic-3-5-batch Opus review flagged it as undelivered): `apps/web/src/app/account/menu` (categories/dishes editor + publish workflow) and `apps/web/src/app/account/menu/dishes/[dishId]` (variants, option groups/extras, allergen/additive/dietary-label assignment, image upload), gated on `menu.write`/`menu.publish`. Image upload goes through the private `dish-media` Supabase Storage bucket (tenant-prefixed paths, RLS policies in `supabase/migrations/20260802090000_menu_admin_ui_support.sql`); server-side re-encoding of uploaded images is deferred (github.com/Zuby7/gastro-saas/issues/72). A tenant's first draft `menu_versions` row is get-or-created via the `create_initial_draft_menu_version` RPC in the same migration.
 
 ## Ordering
 

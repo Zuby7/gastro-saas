@@ -106,6 +106,11 @@ export async function registerAction(
     // memberships, and /account's "create your restaurant" fallback
     // (item 4) lets them create the tenant then -- this is not a dead end,
     // just a later step.
+    //
+    // Codex review fix: signUp() itself succeeded here -- this is not a
+    // failed attempt, so it must not count toward the rate limit (otherwise
+    // legitimate confirm-email registrations self-throttle).
+    await rateLimitStore.markSucceeded(attemptId);
     return {
       info: "Bitte bestätigen Sie Ihre E-Mail-Adresse über den Link, den wir Ihnen geschickt haben. Melden Sie sich danach an, um Ihr Restaurant anzulegen.",
     };
