@@ -73,14 +73,23 @@ export default async function CartPage({ params }: CartPageProps) {
               </span>
             </div>
 
-            <button
-              type="button"
-              disabled={!cart.checkoutReady}
-              title="Der Bestell-/Zahlungsvorgang wird in einem späteren Ticket ergänzt (Epic 7)."
-              className="rounded-md bg-brand-600 px-4 py-3 font-medium text-neutral-0 transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Zur Kasse
-            </button>
+            {cart.checkoutReady ? (
+              <Link
+                href={`/r/${slug}/checkout`}
+                className="rounded-md bg-brand-600 px-4 py-3 text-center font-medium text-neutral-0 transition-colors hover:bg-brand-700"
+              >
+                Zur Kasse
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled
+                title="Bitte entfernen Sie nicht verfügbare Artikel, um fortzufahren."
+                className="rounded-md bg-brand-600 px-4 py-3 font-medium text-neutral-0 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Zur Kasse
+              </button>
+            )}
           </>
         )}
       </div>

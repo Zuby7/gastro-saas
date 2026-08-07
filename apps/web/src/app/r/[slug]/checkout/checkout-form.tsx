@@ -1,0 +1,157 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import { formatPrice } from "@/lib/public-menu/format";
+import { checkoutAction, type CheckoutFormState } from "./actions";
+
+interface CheckoutFormProps {
+  tenantSlug: string;
+  checkoutReady: boolean;
+}
+
+const initialState: CheckoutFormState = {};
+
+export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
+  // `tenantSlug` is bound server-side, not read from a client-editable form
+  // field -- see the doc comment on `checkoutAction` in `./actions.ts`.
+  const [state, formAction, isPending] = useActionState(
+    checkoutAction.bind(null, tenantSlug),
+    initialState,
+  );
+  const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "table">("pickup");
+
+  if (state.order) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="rounded-lg border border-brand-600 bg-brand-600/10 p-5 text-foreground"
+      >
+        <p className="font-display text-xl font-semibold text-brand-700">Bestellung aufgenommen</p>
+        <p className="mt-2 text-sm">
+          Ihre Bestellung über {formatPrice(state.order.totalCents, state.order.currency)} wurde
+          erfasst und wartet auf die Zahlungsabwicklung. Sie erhalten in Kürze eine Möglichkeit, den
+          Status Ihrer Bestellung einzusehen.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form action={formAction} className="flex flex-col gap-6" noValidate>
+      <fieldset className="flex flex-col gap-3">
+        <legend className="text-sm font-semibold text-foreground">
+          Wie möchten Sie bestellen?
+        </legend>
+        <label className="flex items-center gap-2 text-foreground">
+          <input
+            type="radio"
+            name="fulfillmentType"
+            value="pickup"
+            checked={fulfillmentType === "pickup"}
+            onChange={() => setFulfillmentType("pickup")}
+            className="h-4 w-4 accent-brand-600"
+          />
+          Abholung
+        </label>
+        <label className="flex items-center gap-2 text-foreground">
+          <input
+            type="radio"
+            name="fulfillmentType"
+            value="table"
+            checked={fulfillmentType === "table"}
+            onChange={() => setFulfillmentType("table")}
+            className="h-4 w-4 accent-brand-600"
+          />
+          Tischbestellung
+        </label>
+      </fieldset>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="customerName" className="text-sm font-medium text-foreground">
+          Name
+        </label>
+        <input
+          id="customerName"
+          name="customerName"
+          type="text"
+          required
+          maxLength={200}
+          autoComplete="name"
+          className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+        />
+      </div>
+
+      {fulfillmentType === "pickup" ? (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="customerPhone" className="text-sm font-medium text-foreground">
+            Telefonnummer (optional, für Rückfragen zur Abholung)
+          </label>
+          <input
+            id="customerPhone"
+            name="customerPhone"
+            type="tel"
+            maxLength={40}
+            autoComplete="tel"
+            className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="tableIdentifier" className="text-sm font-medium text-foreground">
+            Tischnummer
+          </label>
+          <input
+            id="tableIdentifier"
+            name="tableIdentifier"
+            type="text"
+            required
+            maxLength={40}
+            className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+          />
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="customerNote" className="text-sm font-medium text-foreground">
+          Hinweis (optional)
+        </label>
+        <textarea
+          id="customerNote"
+          name="customerNote"
+          maxLength={500}
+          rows={3}
+          className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+        />
+      </div>
+
+      {state.error ? (
+        <p
+          role="alert"
+          aria-live="assertive"
+          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm font-medium text-danger-600"
+        >
+          {state.error}
+        </p>
+      ) : null}
+
+      {!checkoutReady ? (
+        <p
+          role="alert"
+          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm font-medium text-danger-600"
+        >
+          Ihr Warenkorb enthält nicht mehr verfügbare Artikel oder ist leer. Bitte prüfen Sie Ihren
+          Warenkorb, bevor Sie fortfahren.
+        </p>
+      ) : null}
+
+      <button
+        type="submit"
+        disabled={isPending || !checkoutReady}
+        className="rounded-md bg-brand-600 px-4 py-3 font-medium text-neutral-0 transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {isPending ? "Bestellung wird aufgegeben…" : "Bestellung abschicken"}
+      </button>
+    </form>
+  );
+}

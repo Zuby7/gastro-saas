@@ -1,4 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { readCartToken, writeCartTokenCookie } from "./cookie";
+import { createCartToken, hashCartToken } from "./token";
 import type { CartView } from "./types";
 
 /**
@@ -20,6 +22,37 @@ export async function resolveTenantIdBySlug(tenantSlug: string): Promise<string 
     .maybeSingle<{ id: string }>();
 
   return data?.id ?? null;
+}
+
+export interface GuestCartContext {
+  tenantId: string;
+  cartId: string;
+}
+
+/**
+ * Resolves (or creates) the calling guest's cart for `tenantSlug`,
+ * server-side: reads the httpOnly cart cookie if present, otherwise mints a
+ * fresh opaque token and writes it back. `tenant_id` always comes from this
+ * slug lookup, never from a client-supplied value -- see
+ * `docs/security/tenant-isolation.md` Layer 0. Shared by every guest cart
+ * action (`apps/web/src/app/r/[slug]/cart/actions.ts`) and the checkout
+ * action (`apps/web/src/app/r/[slug]/checkout/actions.ts`, ticket #21) so
+ * both go through the exact same guest-identity resolution.
+ */
+export async function resolveGuestCartContext(tenantSlug: string): Promise<GuestCartContext> {
+  const tenantId = await resolveTenantIdBySlug(tenantSlug);
+  if (!tenantId) {
+    throw new Error("Restaurant nicht gefunden.");
+  }
+
+  let token = await readCartToken(tenantSlug);
+  if (!token) {
+    token = createCartToken();
+    await writeCartTokenCookie(tenantSlug, token);
+  }
+
+  const cartId = await getOrCreateCartId(tenantId, hashCartToken(token));
+  return { tenantId, cartId };
 }
 
 export async function getOrCreateCartId(tenantId: string, cartTokenHash: string): Promise<string> {
