@@ -52,10 +52,17 @@ async function seedPublishedMenu(admin: Client, tenantId: string): Promise<Seede
   const cheapOptionId = randomUUID();
   const extraOptionId = randomUUID();
 
-  await admin.query(
-    `insert into menu_versions (id, tenant_id, status, published_at) values ($1, $2, 'published', now())`,
-    [menuVersionId, tenantId],
-  );
+  // Must be seeded as 'draft' first: ensure_menu_version_editable() (see
+  // 20260801110000_restaurant_profile_and_menu_management.sql) blocks writes
+  // to categories/dishes/variants/etc. once their menu version leaves draft
+  // status, with no exemption for privileged connections -- only the
+  // subsequent status flip to 'published' below is exempt (raw admin
+  // connections aren't the 'authenticated'/'anon'/'service_role' app-facing
+  // roles that guard_menu_versions_status_change() restricts).
+  await admin.query(`insert into menu_versions (id, tenant_id, status) values ($1, $2, 'draft')`, [
+    menuVersionId,
+    tenantId,
+  ]);
   await admin.query(
     `insert into categories (id, tenant_id, menu_version_id, name, sort_order) values ($1, $2, $3, 'Pizza', 1)`,
     [categoryId, tenantId, menuVersionId],
@@ -84,6 +91,10 @@ async function seedPublishedMenu(admin: Client, tenantId: string): Promise<Seede
   await admin.query(
     `insert into dish_option_group_assignments (dish_id, option_group_id, tenant_id) values ($1, $2, $3)`,
     [dishId, optionGroupId, tenantId],
+  );
+  await admin.query(
+    `update menu_versions set status = 'published', published_at = now() where id = $1`,
+    [menuVersionId],
   );
 
   return {
