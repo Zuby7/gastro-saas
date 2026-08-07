@@ -155,11 +155,17 @@ describe.skipIf(!dbAvailable)("cart server-side pricing (ticket #20)", () => {
     expect(firstCart.checkoutReady).toBe(true);
     expect(firstCart.items[0].isAvailable).toBe(true);
 
-    // The menu price changes after the item was added (e.g. the restaurant
-    // raises the variant price) -- the *next* read must reflect the new
-    // price, proving the total is never cached/trusted from add-time.
-    await admin.query(`update dish_variants set price_cents = 1500 where id = $1`, [
-      menu.variantId,
+    // The price changes after the item was added (e.g. the restaurant raises
+    // an extra's price) -- the *next* read must reflect the new price,
+    // proving the total is never cached/trusted from add-time. options are
+    // intentionally not menu-version-scoped (shared library across versions,
+    // like ingredients -- see the "Draft/publish write guard" note in
+    // 20260801110000_restaurant_profile_and_menu_management.sql), so this is
+    // the one live-editable price on an otherwise-published menu; dish_variants
+    // itself is content the draft/publish guard locks once published (except
+    // for the is_available toggle -- see the sold-out tests below).
+    await admin.query(`update options set price_delta_cents = 300 where id = $1`, [
+      menu.cheapOptionId,
     ]);
 
     const viewResult = await admin.query(`select get_cart_view($1, $2) as cart`, [
@@ -167,8 +173,8 @@ describe.skipIf(!dbAvailable)("cart server-side pricing (ticket #20)", () => {
       tenantA.tenantId,
     ]);
     const refreshedCart = viewResult.rows[0].cart;
-    // (1500 + 150 + 100) * 2 = 3500
-    expect(refreshedCart.totalCents).toBe(3500);
+    // (1200 variant + 300 + 100 extras) * 2 = 3200
+    expect(refreshedCart.totalCents).toBe(3200);
   });
 
   it("rejects adding an already sold-out/unavailable variant", async () => {
