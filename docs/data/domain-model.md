@@ -45,6 +45,8 @@ Admin UI (added on top of the DB-only foundation above after the epic-3-5-batch 
 
 `carts`, `cart_items`, `cart_item_selections`, `orders`, `order_items`, `order_item_selections`, `order_status_events`.
 
+Ticket #20 (Epic 6) implements the guest cart foundation: `carts`/`cart_items`/`cart_item_selections` (`supabase/migrations/20260803090000_cart_server_side_pricing.sql`) store only line-item _identity_ (dish/variant/option ids, quantity, a display-only name snapshot) -- never a price. Every read/mutation RPC (`get_cart_view`, `add_cart_item`, `update_cart_item_quantity`, `remove_cart_item`) recalculates unit prices, option deltas, and availability from the live `dishes`/`dish_variants`/`options`/`menu_versions` rows at call time and returns a fresh `totalCents` + per-line `isAvailable`/`checkoutReady` signal; this mirrors the pure algorithm unit-tested in `packages/domain/src/cart/pricing.ts`. This is explicitly the foundation `.claude/rules/payments.md` builds on for Epic 7 checkout: "the server always recalculates the complete order total before creating a payment -- a client-submitted total or amount is never trusted" is already true for the cart total today, and the later order-creation step must recalculate again from the same live data rather than trusting the cart's last-read total. Guest identity is an opaque, per-tenant-slug, httpOnly-cookie token (`apps/web/src/lib/cart/token.ts`/`cookie.ts`); only its SHA-256 hash reaches the database, and all cart RPCs are granted to `service_role` only (no `anon` grants), per `docs/security/tenant-isolation.md` Layer 0. Checkout itself (converting a checkout-ready cart into an `orders` row) is out of scope for #20 -- see ticket #21.
+
 ## Payments
 
 `payments`, `refunds`, `payment_webhook_events`.

@@ -1,19 +1,46 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
+import Link from "next/link";
 import { formatPrice } from "@/lib/public-menu/format";
 import type { PublicMenuDish } from "@/lib/public-menu/types";
+import { addToCartAction, type CartActionState } from "./cart/actions";
 
 interface DishDetailProps {
   dish: PublicMenuDish;
+  tenantSlug: string;
 }
 
-export function DishDetail({ dish }: DishDetailProps) {
+const initialCartActionState: CartActionState = {};
+
+export function DishDetail({ dish, tenantSlug }: DishDetailProps) {
   const [selectedVariantId, setSelectedVariantId] = useState(dish.variants[0]?.id ?? "");
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>({});
+  // `tenantSlug` is bound server-side (not read from a client-editable form
+  // field) -- see the doc comment on `addToCartAction` in `./cart/actions.ts`.
+  const boundAddToCartAction = addToCartAction.bind(null, tenantSlug);
+  const [state, formAction, isPending] = useActionState(
+    boundAddToCartAction,
+    initialCartActionState,
+  );
+  // Screen-reader announcement for the cart change (ticket #20's
+  // "Warenkorb-Änderungen werden angesagt" accessibility requirement) --
+  // derived directly from action state during render rather than via a
+  // setState-in-effect (react-hooks/set-state-in-effect).
+  const announcement = state.error
+    ? state.error
+    : state.cart
+      ? `${dish.name} wurde zum Warenkorb hinzugefügt.`
+      : "";
 
   const selectedVariant = dish.variants.find((variant) => variant.id === selectedVariantId);
   const basePrice = selectedVariant?.priceCents ?? dish.priceCents ?? 0;
+
+  const allSelectedOptionIds = useMemo(
+    () => Object.values(selectedOptions).flat(),
+    [selectedOptions],
+  );
+
   const optionTotal = useMemo(
     () =>
       dish.optionGroups.reduce((total, group) => {
@@ -49,7 +76,12 @@ export function DishDetail({ dish }: DishDetailProps) {
         Auswählen
       </summary>
 
-      <div className="mt-4 flex flex-col gap-4">
+      <form action={formAction} className="mt-4 flex flex-col gap-4">
+        <input type="hidden" name="dishId" value={dish.id} />
+        <input type="hidden" name="dishVariantId" value={selectedVariantId} />
+        <input type="hidden" name="quantity" value="1" />
+        <input type="hidden" name="optionIds" value={JSON.stringify(allSelectedOptionIds)} />
+
         {dish.variants.length > 0 ? (
           <fieldset className="flex flex-col gap-2">
             <legend className="font-medium text-foreground">Variante</legend>
@@ -112,14 +144,36 @@ export function DishDetail({ dish }: DishDetailProps) {
           </span>
         </div>
 
+        <p role="status" aria-live="polite" className="sr-only">
+          {announcement}
+        </p>
+
+        {state.error ? (
+          <p
+            role="alert"
+            className="rounded-md border border-danger-500 bg-danger-500/10 px-3 py-2 text-sm text-danger-600"
+          >
+            {state.error}
+          </p>
+        ) : null}
+
+        {state.cart ? (
+          <p className="rounded-md border border-neutral-300 bg-neutral-0 px-3 py-2 text-sm text-foreground">
+            Im Warenkorb: {state.cart.itemCount} Artikel ·{" "}
+            <Link href={`/r/${tenantSlug}/cart`} className="font-medium text-clay-700 underline">
+              Warenkorb ansehen
+            </Link>
+          </p>
+        ) : null}
+
         <button
-          type="button"
-          disabled={!requiredGroupsSatisfied || dish.soldOut}
+          type="submit"
+          disabled={!requiredGroupsSatisfied || dish.soldOut || isPending}
           className="rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60"
         >
-          In den Warenkorb
+          {isPending ? "Wird hinzugefügt..." : "In den Warenkorb"}
         </button>
-      </div>
+      </form>
     </details>
   );
 }
