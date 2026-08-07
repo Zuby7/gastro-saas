@@ -52,12 +52,20 @@ const renderedTextPairs: RenderedTextPair[] = [
 describe("homepage color contrast (WCAG AA)", () => {
   for (const pair of renderedTextPairs) {
     it(`light mode: ${pair.description} passes AA for ${pair.textSize} text`, () => {
-      const result = validateContrastRatio(pair.light.foreground, pair.light.background, pair.textSize);
+      const result = validateContrastRatio(
+        pair.light.foreground,
+        pair.light.background,
+        pair.textSize,
+      );
       expect(result.passesAA).toBe(true);
     });
 
     it(`dark mode: ${pair.description} passes AA for ${pair.textSize} text`, () => {
-      const result = validateContrastRatio(pair.dark.foreground, pair.dark.background, pair.textSize);
+      const result = validateContrastRatio(
+        pair.dark.foreground,
+        pair.dark.background,
+        pair.textSize,
+      );
       expect(result.passesAA).toBe(true);
     });
   }

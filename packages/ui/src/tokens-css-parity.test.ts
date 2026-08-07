@@ -94,8 +94,9 @@ describe("tokens.ts <-> theme.css parity", () => {
       (name) => isCovered(name) && !expectedNames.has(name),
     );
 
-    expect(orphaned, `unexpected CSS vars with no tokens.ts counterpart: ${orphaned.join(", ")}`).toEqual(
-      [],
-    );
+    expect(
+      orphaned,
+      `unexpected CSS vars with no tokens.ts counterpart: ${orphaned.join(", ")}`,
+    ).toEqual([]);
   });
 });
