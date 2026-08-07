@@ -37,15 +37,25 @@ declare
   v_dish_id uuid;
   v_status text;
 begin
-  if tg_table_name = 'dish_variants' and tg_op = 'UPDATE'
-     and new.is_available is distinct from old.is_available
-     and new.name = old.name
-     and new.price_cents = old.price_cents
-     and new.currency = old.currency
-     and new.dish_id = old.dish_id
-     and new.sort_order = old.sort_order
-  then
-    return new;
+  -- Nested (not combined into one flat boolean expression): PL/pgSQL plans
+  -- each IF condition as its own SQL expression against the record type of
+  -- whichever table triggered this invocation. A flat
+  -- `tg_table_name = 'dish_variants' and new.is_available ...` fails for
+  -- every OTHER table this trigger also serves (categories, dishes, ...)
+  -- because their NEW/OLD rows have no is_available column at all -- nesting
+  -- the column comparison inside its own `if tg_table_name = 'dish_variants'`
+  -- block, mirroring the existing `if tg_table_name in (...) then ... else
+  -- ...` split below, defers planning that expression until it actually runs.
+  if tg_table_name = 'dish_variants' and tg_op = 'UPDATE' then
+    if new.is_available is distinct from old.is_available
+       and new.name = old.name
+       and new.price_cents = old.price_cents
+       and new.currency = old.currency
+       and new.dish_id = old.dish_id
+       and new.sort_order = old.sort_order
+    then
+      return new;
+    end if;
   end if;
 
   if tg_table_name in ('categories', 'dishes') then
