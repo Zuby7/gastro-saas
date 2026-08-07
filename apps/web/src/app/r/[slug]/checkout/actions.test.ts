@@ -5,6 +5,15 @@ const markSucceededMock = vi.fn();
 const createOrderFromCartMock = vi.fn();
 const recordOrderAuditEventMock = vi.fn();
 const writeOrderAccessTokenCookieMock = vi.fn();
+const redirectMock = vi.fn((target: string) => {
+  // Next's real redirect() signals control flow via a thrown, special
+  // NEXT_REDIRECT error that Next's own machinery catches further up the
+  // tree -- checkoutAction relies on that (see its own comment about not
+  // letting a generic catch swallow it), so the mock must throw too, not
+  // just record the call, for the action's control flow to behave the same
+  // way it does in production.
+  throw new Error(`NEXT_REDIRECT:${target}`);
+});
 
 vi.mock("@/lib/auth/client-ip", () => ({
   getClientIp: async () => "203.0.113.20",
@@ -46,6 +55,10 @@ vi.mock("next/cache", () => ({
   revalidatePath: () => {},
 }));
 
+vi.mock("next/navigation", () => ({
+  redirect: (target: string) => redirectMock(target),
+}));
+
 function validFormData(): FormData {
   const fd = new FormData();
   fd.set("fulfillmentType", "pickup");
@@ -71,9 +84,13 @@ describe("checkoutAction", () => {
   it("never calls markSucceeded, even on a successful checkout (finding 2: successful checkouts must count toward the limit)", async () => {
     const { checkoutAction } = await import("./actions");
 
-    const result = await checkoutAction("demo", {}, validFormData());
-
-    expect(result.order).toBeDefined();
+    // A successful checkout ends in redirect() -- which throws by design
+    // (see actions.ts's own comment) -- rather than returning state with an
+    // `order` field; CheckoutFormState only ever carries `error`.
+    await expect(checkoutAction("demo", {}, validFormData())).rejects.toThrow("NEXT_REDIRECT:");
+    expect(redirectMock).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/r\/demo\/orders\/raw-token$/),
+    );
     expect(createOrderFromCartMock).toHaveBeenCalledOnce();
     expect(markSucceededMock).not.toHaveBeenCalled();
   });
@@ -101,10 +118,8 @@ describe("checkoutAction", () => {
     reserveAttemptMock.mockResolvedValue({ attemptId: "attempt-9", ipCount: 9, ipEmailCount: 9 });
 
     const { checkoutAction } = await import("./actions");
-    const result = await checkoutAction("demo", {}, validFormData());
 
-    expect(result.error).toBeUndefined();
-    expect(result.order).toBeDefined();
+    await expect(checkoutAction("demo", {}, validFormData())).rejects.toThrow("NEXT_REDIRECT:");
     expect(createOrderFromCartMock).toHaveBeenCalledOnce();
   });
 });
