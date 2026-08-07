@@ -439,13 +439,32 @@ set search_path = ''
 as $$
 declare
   v_current_status text;
+  v_has_prior_event boolean;
 begin
-  select status into v_current_status from public.orders where id = new.order_id;
+  select exists(
+    select 1 from public.order_status_events where order_id = new.order_id
+  ) into v_has_prior_event;
 
-  if new.from_status is distinct from v_current_status then
-    raise exception 'order_status_events.from_status (%) does not match the order''s actual current status (%)',
-      coalesce(new.from_status, '(null)'), coalesce(v_current_status, '(null)')
-      using errcode = 'check_violation';
+  -- orders.status carries a NOT NULL default ('awaiting_payment', set at
+  -- INSERT time by create_order_from_cart() before this, the row's very
+  -- first event, is inserted) purely so the column can stay NOT NULL --
+  -- it does not mean a real transition already happened. The first event
+  -- for any order must therefore always have from_status = null, checked
+  -- against "no prior event exists" rather than against orders.status.
+  if not v_has_prior_event then
+    if new.from_status is not null then
+      raise exception 'order_status_events.from_status (%) must be null for an order''s first event',
+        new.from_status
+        using errcode = 'check_violation';
+    end if;
+  else
+    select status into v_current_status from public.orders where id = new.order_id;
+
+    if new.from_status is distinct from v_current_status then
+      raise exception 'order_status_events.from_status (%) does not match the order''s actual current status (%)',
+        coalesce(new.from_status, '(null)'), coalesce(v_current_status, '(null)')
+        using errcode = 'check_violation';
+    end if;
   end if;
 
   if not public.is_valid_order_status_transition(new.from_status, new.to_status) then
