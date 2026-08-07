@@ -17,11 +17,14 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
 
   return (
     <main className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-300 bg-neutral-0 px-5 py-6">
+      <header className="border-b border-neutral-200 bg-neutral-50 px-5 py-12">
         <div className="mx-auto max-w-4xl">
-          <h1 className="text-3xl font-semibold text-foreground">{menu.tenant.name}</h1>
+          <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+            {menu.tenant.name}
+          </h1>
+          <div aria-hidden="true" className="mt-4 h-1 w-16 rounded-full bg-clay-500" />
           {menu.tenant.description ? (
-            <p className="mt-2 max-w-2xl text-foreground-secondary">{menu.tenant.description}</p>
+            <p className="mt-4 max-w-2xl text-foreground-secondary">{menu.tenant.description}</p>
           ) : null}
         </div>
       </header>
@@ -29,14 +32,14 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
       {menu.categories.length > 0 ? (
         <nav
           aria-label="Kategorien"
-          className="sticky top-0 z-10 border-b border-neutral-300 bg-neutral-0 px-4 py-3"
+          className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-0/95 px-4 py-3 backdrop-blur"
         >
           <div className="mx-auto flex max-w-4xl gap-2 overflow-x-auto">
             {menu.categories.map((category) => (
               <a
                 key={category.id}
                 href={`#category-${category.id}`}
-                className="shrink-0 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-foreground"
+                className="shrink-0 rounded-full border border-neutral-300 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-clay-400 hover:text-clay-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
               >
                 {category.name}
               </a>
@@ -45,7 +48,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
         </nav>
       ) : null}
 
-      <div className="mx-auto flex max-w-4xl flex-col gap-8 px-5 py-8">
+      <div className="mx-auto flex max-w-4xl flex-col gap-10 px-5 py-8">
         {menu.categories.length === 0 ? (
           <p className="rounded-md border border-neutral-300 bg-neutral-0 p-4 text-foreground">
             Diese Speisekarte ist aktuell leer.
@@ -54,12 +57,14 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
 
         {menu.categories.map((category) => (
           <section key={category.id} id={`category-${category.id}`} className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold text-foreground">{category.name}</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+              {category.name}
+            </h2>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
               {category.dishes.map((dish) => (
                 <article
                   key={dish.id}
-                  className="rounded-md border border-neutral-300 bg-neutral-0 p-4"
+                  className="rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm"
                 >
                   {dish.image ? (
                     <div className="mb-3 aspect-[4/3] overflow-hidden rounded-md bg-neutral-100">
@@ -78,7 +83,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
                         <p className="mt-1 text-sm text-foreground-secondary">{dish.description}</p>
                       ) : null}
                     </div>
-                    <p className="font-semibold text-foreground">
+                    <p className="font-display font-semibold text-clay-700">
                       {formatPrice(dish.priceCents, dish.currency)}
                     </p>
                   </div>
@@ -88,7 +93,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
                       {dish.labels.map((label) => (
                         <li
                           key={label}
-                          className="rounded-md border border-neutral-300 px-2 py-1 text-xs text-foreground"
+                          className="rounded-full border border-neutral-300 px-2 py-1 text-xs text-foreground"
                         >
                           {label}
                         </li>
@@ -99,7 +104,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
                   <p className="mt-3 text-xs text-foreground-secondary">{dish.allergenNotice}</p>
 
                   {dish.soldOut ? (
-                    <p className="mt-3 rounded-md border border-danger-500 px-2 py-1 text-sm font-medium text-danger-600">
+                    <p className="mt-3 rounded-md border border-danger-500 bg-danger-500/10 px-2 py-1 text-sm font-medium text-danger-600">
                       Ausverkauft
                     </p>
                   ) : (

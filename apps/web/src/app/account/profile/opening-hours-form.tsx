@@ -26,7 +26,7 @@ export function OpeningHoursForm({ initial }: { initial: OpeningHourInitialValue
   const [state, formAction, isPending] = useActionState(saveOpeningHoursAction, initialState);
 
   return (
-    <section className="flex flex-col gap-4 rounded-md border border-neutral-300 p-4">
+    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Öffnungszeiten</h2>
 
       {state.error ? (
@@ -52,7 +52,7 @@ export function OpeningHoursForm({ initial }: { initial: OpeningHourInitialValue
         {initial.map((row) => (
           <fieldset
             key={row.weekday}
-            className="grid grid-cols-1 items-center gap-2 rounded-md border border-neutral-300 p-3 sm:grid-cols-4"
+            className="grid grid-cols-1 items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-3 sm:grid-cols-4"
           >
             <legend className="sr-only">{WEEKDAY_LABELS[row.weekday]}</legend>
             <span className="font-medium text-foreground">{WEEKDAY_LABELS[row.weekday]}</span>
@@ -106,7 +106,7 @@ export function OpeningHoursForm({ initial }: { initial: OpeningHourInitialValue
         <button
           type="submit"
           disabled={isPending}
-          className="self-start rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 disabled:opacity-60"
+          className="self-start rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60"
         >
           {isPending ? "Wird gespeichert…" : "Öffnungszeiten speichern"}
         </button>

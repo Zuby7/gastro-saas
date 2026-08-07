@@ -44,8 +44,10 @@ export function DishDetail({ dish }: DishDetailProps) {
   }
 
   return (
-    <details className="mt-3 rounded-md border border-neutral-300 p-3">
-      <summary className="cursor-pointer font-medium text-brand-600">Auswählen</summary>
+    <details className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+      <summary className="cursor-pointer font-medium text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+        Auswählen
+      </summary>
 
       <div className="mt-4 flex flex-col gap-4">
         {dish.variants.length > 0 ? (
@@ -113,7 +115,7 @@ export function DishDetail({ dish }: DishDetailProps) {
         <button
           type="button"
           disabled={!requiredGroupsSatisfied || dish.soldOut}
-          className="rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 disabled:opacity-60"
+          className="rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60"
         >
           In den Warenkorb
         </button>

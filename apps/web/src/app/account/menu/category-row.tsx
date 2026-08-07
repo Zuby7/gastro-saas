@@ -19,7 +19,7 @@ export function CategoryRow({ id, name }: { id: string; name: string }) {
   const [archiveState, archiveFormAction] = useActionState(archiveCategoryAction, initialState);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-neutral-300 p-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-2">
       <form action={renameFormAction} className="flex items-center gap-2">
         <input type="hidden" name="categoryId" value={id} />
         <label htmlFor={`category-name-${id}`} className="sr-only">

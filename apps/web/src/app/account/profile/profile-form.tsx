@@ -18,7 +18,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
   const [state, formAction, isPending] = useActionState(saveProfileAction, initialState);
 
   return (
-    <section className="flex flex-col gap-4 rounded-md border border-neutral-300 p-4">
+    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Restaurant-Profil</h2>
 
       {state.error ? (
@@ -146,7 +146,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
         <button
           type="submit"
           disabled={isPending}
-          className="self-start rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 disabled:opacity-60"
+          className="self-start rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60"
         >
           {isPending ? "Wird gespeichert…" : "Profil speichern"}
         </button>
