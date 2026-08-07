@@ -16,9 +16,13 @@
 -- This exemption is narrowly scoped: only dish_variants UPDATEs where
 -- is_available is the *sole* changed column pass through regardless of the
 -- owning menu version's status. Any other column change (name, price,
--- dish_id, sort_order) -- i.e. an actual content edit -- still requires
--- draft status, same as before. INSERT/DELETE on dish_variants are
--- untouched by this migration.
+-- dish_id, sort_order, or any column added to dish_variants in the future)
+-- -- i.e. an actual content edit -- still requires draft status, same as
+-- before. The comparison is column-set agnostic (row-diff via to_jsonb minus
+-- is_available/updated_at) precisely so that a future migration adding a new
+-- dish_variants column doesn't silently fall outside this check and become
+-- editable on a published menu whenever bundled with an is_available flip.
+-- INSERT/DELETE on dish_variants are untouched by this migration.
 --
 -- Rollback for local/throwaway DBs:
 --   Re-apply 20260801110000_restaurant_profile_and_menu_management.sql's
@@ -48,11 +52,7 @@ begin
   -- ...` split below, defers planning that expression until it actually runs.
   if tg_table_name = 'dish_variants' and tg_op = 'UPDATE' then
     if new.is_available is distinct from old.is_available
-       and new.name = old.name
-       and new.price_cents = old.price_cents
-       and new.currency = old.currency
-       and new.dish_id = old.dish_id
-       and new.sort_order = old.sort_order
+       and to_jsonb(new) - 'is_available' - 'updated_at' = to_jsonb(old) - 'is_available' - 'updated_at'
     then
       return new;
     end if;
