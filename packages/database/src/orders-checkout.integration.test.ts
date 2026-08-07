@@ -255,12 +255,11 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
 
     const order = await checkout(admin, cartId, tenantA.tenantId);
 
-    // The restaurant renames the dish, changes the variant price, and
-    // raises the option's price delta *after* the order was created.
-    await admin.query(`update dishes set name = 'Margherita Deluxe' where id = $1`, [menu.dishId]);
-    await admin.query(`update dish_variants set price_cents = 5000 where id = $1`, [
-      menu.variantId,
-    ]);
+    // options are intentionally not menu-version-scoped (see the
+    // cart-pricing integration test's identical rationale) and stay live
+    // editable even once the owning menu version is published -- the
+    // restaurant raises the option's price delta and renames it *after* the
+    // order was created.
     await admin.query(
       `update options set name = 'XL Käse', price_delta_cents = 999 where id = $1`,
       [menu.cheapOptionId],
@@ -284,13 +283,29 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
     expect(selectionsRow.rows[0].option_name_snapshot).toBe("Extra Käse");
     expect(selectionsRow.rows[0].price_delta_cents_snapshot).toBe(150);
 
-    // Even archiving the dish entirely must not touch the historical order.
-    await admin.query(`update dishes set archived_at = now() where id = $1`, [menu.dishId]);
-    const afterArchive = await admin.query(
-      `select unit_price_cents_snapshot from order_items where order_id = $1`,
+    // dishes/dish_variants content (name, price, archival) is locked once
+    // published by ensure_menu_version_editable() (see
+    // 20260801110000_restaurant_profile_and_menu_management.sql) -- a
+    // restaurant can only change it by publishing a new menu version, which
+    // supersedes (archives) the old one without touching its rows. Simulate
+    // that and confirm the historical order's snapshot is still untouched.
+    await expect(
+      admin.query(`update dishes set name = 'Margherita Deluxe' where id = $1`, [menu.dishId]),
+    ).rejects.toThrow(/read-only once its menu version leaves draft status/i);
+
+    await admin.query(`update menu_versions set status = 'archived' where id = $1`, [
+      menu.menuVersionId,
+    ]);
+    await admin.query(
+      `insert into menu_versions (id, tenant_id, status, published_at) values ($1, $2, 'published', now())`,
+      [randomUUID(), tenantA.tenantId],
+    );
+    const afterSupersede = await admin.query(
+      `select dish_name_snapshot, unit_price_cents_snapshot from order_items where order_id = $1`,
       [order.orderId],
     );
-    expect(afterArchive.rows[0].unit_price_cents_snapshot).toBe(1200);
+    expect(afterSupersede.rows[0].dish_name_snapshot).toBe("Margherita");
+    expect(afterSupersede.rows[0].unit_price_cents_snapshot).toBe(1200);
 
     // Direct attempts to mutate the immutable snapshot rows, from an
     // app-facing role, are rejected outright. `order_items`/
