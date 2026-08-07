@@ -17,7 +17,7 @@ export function DishRow({ id, name, priceCents, allergenReviewed }: DishRowProps
   const [state, formAction] = useActionState(archiveDishAction, initialState);
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-300 p-2">
+    <li className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-2">
       <div>
         <Link href={`/account/menu/dishes/${id}`} className="font-medium text-brand-600 underline">
           {name}

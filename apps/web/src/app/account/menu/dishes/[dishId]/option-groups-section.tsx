@@ -54,7 +54,7 @@ export function OptionGroupsSection({
   const unassignedGroups = allOptionGroups.filter((group) => !assignedGroupIds.includes(group.id));
 
   return (
-    <section className="flex flex-col gap-4 rounded-md border border-neutral-300 p-4">
+    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Optionsgruppen &amp; Extras</h2>
 
       <div className="flex flex-col gap-2">

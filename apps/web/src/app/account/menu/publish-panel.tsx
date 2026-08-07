@@ -23,7 +23,7 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
   return (
     <section
       aria-labelledby="publish-heading"
-      className="flex flex-col gap-4 rounded-md border border-neutral-300 p-4"
+      className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm"
     >
       <h2 id="publish-heading" className="text-lg font-semibold text-foreground">
         Vorschau &amp; Veröffentlichen
@@ -38,7 +38,7 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
         <button
           type="submit"
           disabled={isCheckPending}
-          className="rounded-md border border-neutral-300 px-4 py-2 font-medium text-foreground disabled:opacity-60"
+          className="rounded-md border border-neutral-300 px-4 py-2 font-medium text-foreground transition-colors hover:border-brand-500 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:opacity-60"
         >
           {isCheckPending ? "Wird geprüft…" : "Qualitätsprüfung ausführen"}
         </button>
@@ -51,36 +51,42 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
       ) : null}
 
       {hasRunChecks ? (
-        <div className="flex flex-col gap-3" aria-live="polite">
-          <div>
-            <h3 className="font-medium text-foreground">
+        <div className="flex flex-col gap-4" aria-live="polite">
+          <div
+            className={
+              blockers.length > 0
+                ? "rounded-lg border-2 border-danger-500 bg-danger-500/10 p-3"
+                : "rounded-lg border border-neutral-200 p-3"
+            }
+          >
+            <h3 className="font-semibold text-danger-600">
               Blocker {blockers.length > 0 ? `(${blockers.length})` : "(keine)"}
             </h3>
             {blockers.length > 0 ? (
-              <ul className="mt-1 flex flex-col gap-1">
+              <ul className="mt-2 flex flex-col gap-1.5">
                 {blockers.map((check) => (
                   <li
                     key={check.code}
                     role="alert"
-                    className="rounded-md border border-danger-500 bg-danger-500/10 p-2 text-sm text-danger-600"
+                    className="rounded-md border border-danger-500 bg-neutral-0 p-2 text-sm font-medium text-danger-600"
                   >
                     {check.message}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-foreground-secondary">
+              <p className="mt-1 text-sm text-foreground-secondary">
                 Keine Blocker gefunden -- die Speisekarte kann veröffentlicht werden.
               </p>
             )}
           </div>
 
-          <div>
-            <h3 className="font-medium text-foreground">
+          <div className="rounded-lg border border-neutral-200 p-3">
+            <h3 className="font-medium text-warning-600">
               Warnungen {warnings.length > 0 ? `(${warnings.length})` : "(keine)"}
             </h3>
             {warnings.length > 0 ? (
-              <ul className="mt-1 flex flex-col gap-1">
+              <ul className="mt-2 flex flex-col gap-1.5">
                 {warnings.map((check) => (
                   <li
                     key={check.code}
@@ -91,7 +97,7 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-foreground-secondary">Keine Warnungen.</p>
+              <p className="mt-1 text-sm text-foreground-secondary">Keine Warnungen.</p>
             )}
           </div>
         </div>
@@ -103,7 +109,7 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
           type="submit"
           disabled={!canPublish || isPublishPending}
           aria-disabled={!canPublish}
-          className="rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 disabled:opacity-60"
+          className="rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60"
         >
           {isPublishPending ? "Wird veröffentlicht…" : "Veröffentlichen"}
         </button>

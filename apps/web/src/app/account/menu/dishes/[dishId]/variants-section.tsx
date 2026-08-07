@@ -25,7 +25,7 @@ export function VariantsSection({
   const [deleteState, deleteFormAction] = useActionState(deleteVariantAction, initialState);
 
   return (
-    <section className="flex flex-col gap-3 rounded-md border border-neutral-300 p-4">
+    <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Varianten (Größen)</h2>
 
       <ul className="flex flex-col gap-2">

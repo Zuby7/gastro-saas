@@ -49,11 +49,14 @@ export default async function DishPage({ params }: DishPageProps) {
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return (
-        <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 p-8">
+        <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-neutral-50 p-8">
           <p role="alert" className="text-foreground">
             Sie haben nicht die erforderliche Berechtigung, um dieses Gericht zu bearbeiten.
           </p>
-          <Link href="/account/menu" className="text-brand-600 underline">
+          <Link
+            href="/account/menu"
+            className="font-medium text-brand-600 underline hover:text-brand-700"
+          >
             Zurück
           </Link>
         </main>
@@ -205,57 +208,62 @@ export default async function DishPage({ params }: DishPageProps) {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">{dish.name}</h1>
-        <Link href="/account/menu" className="text-sm text-brand-600 underline">
-          Zurück zur Speisekarte
-        </Link>
+    <main className="min-h-screen bg-neutral-50">
+      <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-2xl font-semibold text-foreground">{dish.name}</h1>
+          <Link
+            href="/account/menu"
+            className="text-sm font-medium text-brand-600 underline hover:text-brand-700"
+          >
+            Zurück zur Speisekarte
+          </Link>
+        </div>
+
+        <DishBasicsForm
+          dishId={dish.id}
+          name={dish.name}
+          description={dish.description}
+          priceCents={dish.price_cents}
+          allergenReviewed={dish.allergen_reviewed}
+        />
+
+        <ImageUploadForm
+          dishId={dish.id}
+          currentImageUrl={currentImageUrl}
+          currentAltText={currentAltText}
+        />
+
+        <VariantsSection dishId={dish.id} variants={variants ?? []} />
+
+        <OptionGroupsSection
+          dishId={dish.id}
+          allOptionGroups={allOptionGroups}
+          assignedGroupIds={assignedGroupIds}
+        />
+
+        <AssignableLookupSection
+          dishId={dish.id}
+          entity="allergen"
+          heading="Allergene"
+          newItemLabel="Neues Allergen"
+          items={allergenItems}
+        />
+        <AssignableLookupSection
+          dishId={dish.id}
+          entity="additive"
+          heading="Zusatzstoffe"
+          newItemLabel="Neuer Zusatzstoff"
+          items={additiveItems}
+        />
+        <AssignableLookupSection
+          dishId={dish.id}
+          entity="dietary_label"
+          heading="Ernährungslabels"
+          newItemLabel="Neues Label"
+          items={dietaryLabelItems}
+        />
       </div>
-
-      <DishBasicsForm
-        dishId={dish.id}
-        name={dish.name}
-        description={dish.description}
-        priceCents={dish.price_cents}
-        allergenReviewed={dish.allergen_reviewed}
-      />
-
-      <ImageUploadForm
-        dishId={dish.id}
-        currentImageUrl={currentImageUrl}
-        currentAltText={currentAltText}
-      />
-
-      <VariantsSection dishId={dish.id} variants={variants ?? []} />
-
-      <OptionGroupsSection
-        dishId={dish.id}
-        allOptionGroups={allOptionGroups}
-        assignedGroupIds={assignedGroupIds}
-      />
-
-      <AssignableLookupSection
-        dishId={dish.id}
-        entity="allergen"
-        heading="Allergene"
-        newItemLabel="Neues Allergen"
-        items={allergenItems}
-      />
-      <AssignableLookupSection
-        dishId={dish.id}
-        entity="additive"
-        heading="Zusatzstoffe"
-        newItemLabel="Neuer Zusatzstoff"
-        items={additiveItems}
-      />
-      <AssignableLookupSection
-        dishId={dish.id}
-        entity="dietary_label"
-        heading="Ernährungslabels"
-        newItemLabel="Neues Label"
-        items={dietaryLabelItems}
-      />
     </main>
   );
 }

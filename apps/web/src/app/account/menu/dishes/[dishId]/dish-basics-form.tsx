@@ -27,7 +27,7 @@ export function DishBasicsForm({
   );
 
   return (
-    <section className="flex flex-col gap-4 rounded-md border border-neutral-300 p-4">
+    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Grunddaten</h2>
 
       {state.error ? (

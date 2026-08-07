@@ -16,9 +16,20 @@
   --color-brand-800: #1f4237;
   --color-brand-900: #1a372e;
 
+  --color-clay-50: #fbf1ea;
+  --color-clay-100: #f5ddc9;
+  --color-clay-200: #eabf98;
+  --color-clay-300: #dc9a67;
+  --color-clay-400: #c97a43;
+  --color-clay-500: #b35f2e;
+  --color-clay-600: #954a22;
+  --color-clay-700: #7a3c1e;
+  --color-clay-800: #5e2f19;
+  --color-clay-900: #4a2615;
+
   --color-neutral-0: #ffffff;
-  --color-neutral-50: #f7f7f6;
-  --color-neutral-100: #e7e6e4;
+  --color-neutral-50: #f8f3ea;
+  --color-neutral-100: #efe6d5;
   --color-neutral-200: #d1cfcb;
   --color-neutral-300: #a9a6a0;
   --color-neutral-400: #7d7972;
@@ -62,3 +73,10 @@
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 }
+
+/*
+ * `--font-sans`/`--font-mono`/`--font-display` are intentionally NOT defined
+ * here: they map to the actual `next/font/google` variables, which only
+ * exist once `apps/web/src/app/layout.tsx` has loaded the fonts. See
+ * `apps/web/src/app/globals.css`'s `@theme inline` block for that mapping.
+ */
