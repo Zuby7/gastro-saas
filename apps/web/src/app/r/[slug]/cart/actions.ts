@@ -1,13 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { readCartToken, writeCartTokenCookie } from "@/lib/cart/cookie";
-import { createCartToken, hashCartToken } from "@/lib/cart/token";
+import { readCartToken } from "@/lib/cart/cookie";
+import { hashCartToken } from "@/lib/cart/token";
 import {
   addCartItem,
   getCartView,
   getOrCreateCartId,
   removeCartItem,
+  resolveGuestCartContext,
   resolveTenantIdBySlug,
   updateCartItemQuantity,
 } from "@/lib/cart/service";
@@ -17,29 +18,6 @@ import { AddToCartSchema, RemoveCartItemSchema, UpdateCartItemQuantitySchema } f
 export interface CartActionState {
   error?: string;
   cart?: CartView;
-}
-
-/**
- * Resolves (or creates) the calling guest's cart for `tenantSlug`,
- * server-side: reads the httpOnly cart cookie if present, otherwise mints a
- * fresh opaque token and writes it back. `tenant_id` always comes from this
- * slug lookup, never from a client-supplied value -- see
- * `docs/security/tenant-isolation.md` Layer 0.
- */
-async function resolveGuestCartContext(tenantSlug: string) {
-  const tenantId = await resolveTenantIdBySlug(tenantSlug);
-  if (!tenantId) {
-    throw new Error("Restaurant nicht gefunden.");
-  }
-
-  let token = await readCartToken(tenantSlug);
-  if (!token) {
-    token = createCartToken();
-    await writeCartTokenCookie(tenantSlug, token);
-  }
-
-  const cartId = await getOrCreateCartId(tenantId, hashCartToken(token));
-  return { tenantId, cartId };
 }
 
 /**
