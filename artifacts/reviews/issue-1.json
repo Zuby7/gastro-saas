@@ -1,79 +1,164 @@
 {
   "ticket": "1",
-  "cycle": 1,
-  "note": "Backfilled per-ticket review after cadence reverted to per-ticket-always (2026-08-01); originally only covered by the retired end-of-epic batch mode.",
-  "verdict": "CHANGES_REQUESTED",
-  "acceptance_criteria": [
-    { "criterion": "pnpm install && pnpm dev startet leere Startseite lokal", "status": "PASS" },
-    { "criterion": "pnpm lint und pnpm typecheck laufen fehlerfrei", "status": "PASS" },
+  "cycles": [
     {
-      "criterion": "Ordnerstruktur entspricht docs/architecture/domain-boundaries.md",
-      "status": "PASS"
+      "cycle": 1,
+      "note": "Backfilled per-ticket review after cadence reverted to per-ticket-always (2026-08-01); originally only covered by the retired end-of-epic batch mode.",
+      "verdict": "CHANGES_REQUESTED",
+      "review_findings": [
+        {
+          "severity": "high",
+          "area": "accessibility",
+          "summary": "Dark-mode homepage heading contrast ~1.07:1 (globals.css background #0a0a0a vs. text-neutral-900 #141311) — far below WCAG."
+        },
+        {
+          "severity": "high",
+          "area": "testing",
+          "summary": "Ticket-mandated homepage smoke test never implemented; apps/web has no test script/infra at all."
+        },
+        {
+          "severity": "medium",
+          "area": "maintainability",
+          "summary": "create-next-app leftovers (Arial font-family, raw hex) bypass the token system this ticket introduced."
+        },
+        {
+          "severity": "medium",
+          "area": "maintainability",
+          "summary": "tokens.ts and theme.css duplicate the palette manually with no parity check; already drifted."
+        },
+        {
+          "severity": "low",
+          "area": "CI gates",
+          "summary": "pnpm -r --if-present lint/typecheck/test silently skips packages lacking the script."
+        },
+        {
+          "severity": "low",
+          "area": "i18n",
+          "summary": "html lang=\"en\" hardcoded despite German-market product."
+        }
+      ],
+      "required_actions": [
+        "Add the ticket-mandated homepage smoke test in apps/web, wire an apps/web test script into pnpm test.",
+        "Fix the dark-mode contrast defect in globals.css + page.tsx, cover with a contrast assertion.",
+        "Remove create-next-app leftovers in favour of the token layer.",
+        "Add token parity (tokens.ts <-> theme.css) generation or test.",
+        "Re-run format/lint/typecheck/unit/build after the above."
+      ],
+      "resolved_by": "PR #49 (merged 2026-08-01)"
     },
     {
-      "criterion": "packages/ui Design-Tokens + Kontrast-Validierung mit Unit-Test",
-      "status": "PASS"
-    },
-    { "criterion": "Erforderliche Tests: Smoke-Test 'Startseite rendert'", "status": "FAIL" },
-    { "criterion": "Barrierefreiheit: semantisch korrekte HTML-Struktur", "status": "FAIL" }
-  ],
-  "deterministic_checks": {
-    "format": "PASS",
-    "lint": "PASS",
-    "typecheck": "PASS",
-    "unit_tests": "PASS",
-    "integration_tests": "NOT_RUN",
-    "e2e_tests": "NOT_RUN",
-    "build": "PASS",
-    "security": "NOT_RUN"
-  },
-  "tenant_isolation": "NOT_APPLICABLE",
-  "authorization": "NOT_APPLICABLE",
-  "payment_safety": "NOT_APPLICABLE",
-  "accessibility": "FAIL",
-  "data_integrity": "NOT_APPLICABLE",
-  "maintainability": "PASS",
-  "review_findings": [
-    {
-      "severity": "high",
-      "area": "accessibility",
-      "summary": "Dark-mode homepage heading contrast ~1.07:1 (globals.css background #0a0a0a vs. text-neutral-900 #141311) — far below WCAG."
-    },
-    {
-      "severity": "high",
-      "area": "testing",
-      "summary": "Ticket-mandated homepage smoke test never implemented; apps/web has no test script/infra at all."
-    },
-    {
-      "severity": "medium",
-      "area": "maintainability",
-      "summary": "create-next-app leftovers (Arial font-family, raw hex) bypass the token system this ticket introduced."
-    },
-    {
-      "severity": "medium",
-      "area": "maintainability",
-      "summary": "tokens.ts and theme.css duplicate the palette manually with no parity check; already drifted."
-    },
-    {
-      "severity": "low",
-      "area": "CI gates",
-      "summary": "pnpm -r --if-present lint/typecheck/test silently skips packages lacking the script."
+      "cycle": 2,
+      "note": "Independent re-verification of cycle-1 required_actions on main (4728ee7), post PR #49 and post PR #73 (frontend design polish). Found a real regression: a later Epic 3 commit (d274549) added homepage links using text-brand-600, never covered by the a11y test, which fails WCAG AA in dark mode.",
+      "verdict": "CHANGES_REQUESTED",
+      "review_findings": [
+        {
+          "severity": "high",
+          "area": "accessibility",
+          "reason": "Regression of cycle-1 finding #1: homepage nav links (text-brand-600) fail WCAG AA in dark mode (2.80:1, need 4.5:1), and the a11y test added to prevent this does not cover them."
+        },
+        {
+          "severity": "medium",
+          "area": "maintainability",
+          "reason": "tokens-css-parity.test.ts only asserts CSS var presence, not value equality — cycle-1 finding about value drift not actually closed."
+        },
+        {
+          "severity": "low",
+          "area": "CI gates",
+          "reason": "pnpm -r --if-present still silently skips packages without the script (cycle-1 finding unresolved)."
+        },
+        {
+          "severity": "low",
+          "area": "i18n",
+          "reason": "html lang=\"en\" still hardcoded despite German content (cycle-1 finding unresolved)."
+        },
+        {
+          "severity": "low",
+          "area": "documentation",
+          "reason": "Stale comment in globals.css pointing to page.test.tsx instead of page.a11y.test.ts."
+        },
+        {
+          "severity": "low",
+          "area": "developer experience",
+          "reason": "core.autocrlf=true with no .gitattributes makes local format:check unreproducible against CI."
+        }
+      ],
+      "required_actions": [
+        "Fix dark-mode contrast for the homepage links via a scheme-aware token, and extend page.a11y.test.ts to cover every rendered foreground/background pair in both schemes.",
+        "Upgrade tokens-css-parity.test.ts to compare token values (both directions, incl. fontSize), or generate theme.css from tokens.ts.",
+        "Re-run format/lint/typecheck/unit/build after the above."
+      ],
+      "resolved_by": "PR #74 (branch fix/1-homepage-dark-mode-contrast-regression)"
     },
     {
-      "severity": "low",
-      "area": "i18n",
-      "summary": "html lang=\"en\" hardcoded despite German-market product."
+      "cycle": 3,
+      "pr": "#74",
+      "head_commit": "8909688173367e882fe1e43cfd01ede1fd2aa18e",
+      "verdict": "APPROVED",
+      "cycle_2_required_actions": [
+        {
+          "action": "1. Scheme-aware link color passing WCAG AA in both schemes + a11y test covering every rendered fg/bg pair in both schemes",
+          "status": "PASS",
+          "evidence": "globals.css introduces --link-foreground (:root = --color-brand-600; dark = --color-brand-300). Independently recomputed: link light 6.62:1, link dark 9.10:1, h1 light 18.57:1, h1 dark 16.80:1, p light 6.99:1, p dark 7.65:1 — all pass. Old defect reproduced for confirmation: 2.80:1 fail on the un-fixed pairing."
+        },
+        {
+          "action": "2. Token/CSS parity test must compare VALUES (both directions, incl. fontSize)",
+          "status": "PASS",
+          "evidence": "tokens-css-parity.test.ts now parses theme.css into a name->value map and asserts exact value equality; covers colors + spacing + fontWeight + fontSize (61 properties, zero orphans). Mutation-tested: single hex/value change detected, injected orphan var detected."
+        },
+        {
+          "action": "3. Re-run format/lint/typecheck/unit/build",
+          "status": "PASS",
+          "evidence": "gh run 31215541796 on head sha 8909688, all jobs (Format, Lint, Typecheck, Unit Tests, Build, Secret Scan, Migration Validation) success."
+        }
+      ],
+      "bundled_fixes_verified": [
+        { "item": "layout.tsx lang=\"de\"", "status": "PASS" },
+        { "item": "globals.css stale comment corrected to reference page.a11y.test.ts", "status": "PASS" }
+      ],
+      "scope_check": {
+        "status": "PASS",
+        "evidence": "5 files changed (+149/-43): globals.css, layout.tsx, page.tsx, page.a11y.test.ts, tokens-css-parity.test.ts. No business logic, no migrations, no auth/payment surface."
+      },
+      "deterministic_checks": {
+        "format": "PASS",
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "unit_tests": "PASS",
+        "integration_tests": "NOT_RUN",
+        "e2e_tests": "NOT_RUN",
+        "build": "PASS",
+        "security": "PASS"
+      },
+      "review_findings": [
+        {
+          "severity": "high",
+          "area": "accessibility (pre-existing on main, OUT of this ticket's scope — does not gate this verdict)",
+          "reason": "The same WCAG AA failure (text-brand-600 on dark neutral-900, 2.80:1) remains at 11 other call sites introduced by the Epic 3-5 / frontend-polish work, not touched by PR #74.",
+          "evidence": "apps/web/src/app/login/page.tsx:71, register/page.tsx:138, invite/[token]/page.tsx:30, account/menu/page.tsx:60,112, account/menu/dish-row.tsx:22, account/menu/dishes/[dishId]/page.tsx:58,217, account/profile/page.tsx:56,106, r/[slug]/dish-detail.tsx:48.",
+          "required_correction": "Tracked as a separate follow-up issue; must land before the epic-level Opus batch verdict for the frontend-polish/Epic 3-5 work can be APPROVED.",
+          "acceptance_test": "A contrast test enumerating every text-brand-* usage's dark-mode pair, asserting passesAA."
+        },
+        {
+          "severity": "medium",
+          "area": "testing / maintainability",
+          "reason": "page.a11y.test.ts hand-mirrors the globals.css token mapping instead of parsing globals.css directly — same coupling-by-convention weakness that allowed the cycle-2 defect to slip through originally.",
+          "required_correction": "Non-blocking follow-up: derive test pairs from a parsed globals.css, matching the stronger pattern already used in tokens-css-parity.test.ts."
+        },
+        {
+          "severity": "low",
+          "area": "documentation accuracy",
+          "reason": "Commit message states brand-300/neutral-900 is ~9.9:1; independently recomputed as 9.10:1 (still passes with margin, cosmetic only)."
+        }
+      ],
+      "residual_risks": [
+        "App-wide dark-mode link contrast failure at 11 sites remains on main — PR #74 improves but does not close this class of defect.",
+        "page.a11y.test.ts still mirrors globals.css by hand instead of parsing it.",
+        "No axe/Playwright a11y run exists; coverage is contrast-math + semantic-role assertions only."
+      ],
+      "required_actions": [
+        "None blocking issue #1 / PR #74 — merge unblocked from this ticket's perspective.",
+        "Open a follow-up ticket for the 11 remaining text-brand-600 dark-mode contrast failures; must land before the epic-level Opus verdict for the frontend-polish/Epic 3-5 batch."
+      ]
     }
-  ],
-  "residual_risks": [
-    "Repo-wide pnpm format:check currently fails on 10 files on main (not in ticket #1's own diff, but red today).",
-    "No E2E/Playwright harness exists yet."
-  ],
-  "required_actions": [
-    "Add the ticket-mandated homepage smoke test in apps/web, wire an apps/web test script into pnpm test.",
-    "Fix the dark-mode contrast defect in globals.css + page.tsx, cover with a contrast assertion.",
-    "Remove create-next-app leftovers in favour of the token layer.",
-    "Add token parity (tokens.ts <-> theme.css) generation or test.",
-    "Re-run format/lint/typecheck/unit/build after the above."
   ]
 }
