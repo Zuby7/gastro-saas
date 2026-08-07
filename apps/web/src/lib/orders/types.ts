@@ -1,3 +1,5 @@
+import type { OrderStatus } from "@gastro-saas/domain";
+
 /**
  * The two fulfillment types this ticket supports. `delivery` is a
  * feature-flag placeholder at the database level (see the
@@ -30,4 +32,53 @@ export interface CreateOrderResult {
   status: "awaiting_payment";
   totalCents: number;
   currency: string;
+}
+
+/**
+ * Customer-safe projection of an order, as returned by the
+ * `get_order_status_by_token` RPC (ticket #22, see
+ * `supabase/migrations/20260805090000_order_status_guest_lookup.sql`).
+ * Deliberately excludes every internal/staff-only field (tenant/cart ids,
+ * the guest access token hash itself, `order_status_events.note`/
+ * `actor_user_id`) -- see that migration's header for the full rationale.
+ */
+export interface OrderStatusItemSelectionView {
+  name: string;
+  priceDeltaCents: number;
+}
+
+export interface OrderStatusItemView {
+  dishName: string;
+  variantName: string | null;
+  quantity: number;
+  unitPriceCents: number;
+  selections: OrderStatusItemSelectionView[];
+}
+
+export interface OrderStatusHistoryEntryView {
+  status: OrderStatus;
+  occurredAt: string;
+}
+
+export interface OrderStatusView {
+  orderId: string;
+  /**
+   * Slug of the tenant that owns this order (see
+   * `supabase/migrations/20260808120000_order_status_guest_lookup_tenant_slug.sql`).
+   * Deliberately the slug, never `tenant_id` -- callers use this only to
+   * verify the order matches the route's `[slug]` segment, not as an
+   * identifier to key further lookups off of.
+   */
+  tenantSlug: string | null;
+  status: OrderStatus;
+  fulfillmentType: FulfillmentType;
+  tableIdentifier: string | null;
+  customerName: string;
+  customerNote: string;
+  totalCents: number;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+  items: OrderStatusItemView[];
+  statusHistory: OrderStatusHistoryEntryView[];
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getClientIp } from "@/lib/auth/client-ip";
 import { reserveAndCheckRateLimit } from "@/lib/auth/rate-limit";
 import { createSupabaseRateLimitStore } from "@/lib/auth/supabase-rate-limit-store";
@@ -10,12 +11,10 @@ import { writeOrderAccessTokenCookie } from "@/lib/orders/cookie";
 import { createOrderFromCart } from "@/lib/orders/service";
 import { createOrderAccessToken, hashOrderAccessToken } from "@/lib/orders/token";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import type { CreateOrderResult } from "@/lib/orders/types";
 import { CheckoutSchema } from "./schemas";
 
 export interface CheckoutFormState {
   error?: string;
-  order?: CreateOrderResult;
 }
 
 /**
@@ -43,6 +42,13 @@ export async function checkoutAction(
   const customerPhone = parsed.data.fulfillmentType === "pickup" ? parsed.data.customerPhone : null;
   const tableIdentifier =
     parsed.data.fulfillmentType === "table" ? parsed.data.tableIdentifier : null;
+
+  // `redirectTarget` is set inside the try block on success and the actual
+  // `redirect()` call happens afterwards, outside the try/catch -- `redirect()`
+  // works by throwing a special NEXT_REDIRECT error internally, which a
+  // generic `catch (error)` below would otherwise swallow and misreport as a
+  // normal checkout failure.
+  let redirectTarget: string | null = null;
 
   try {
     const { tenantId, cartId } = await resolveGuestCartContext(tenantSlug);
@@ -114,8 +120,13 @@ export async function checkoutAction(
     revalidatePath(`/r/${tenantSlug}/cart`);
     revalidatePath(`/r/${tenantSlug}/checkout`);
 
-    return { order };
+    // The raw guest access token is embedded in this redirect URL and in the
+    // httpOnly cookie written above -- it is never returned in the action's
+    // state/JSON payload beyond this one-time redirect.
+    redirectTarget = `/r/${tenantSlug}/orders/${guestAccessToken}`;
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unbekannter Fehler." };
   }
+
+  redirect(redirectTarget);
 }

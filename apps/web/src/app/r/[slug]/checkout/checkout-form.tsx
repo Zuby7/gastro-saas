@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { formatPrice } from "@/lib/public-menu/format";
 import { checkoutAction, type CheckoutFormState } from "./actions";
 
 interface CheckoutFormProps {
@@ -19,23 +18,6 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
     initialState,
   );
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "table">("pickup");
-
-  if (state.order) {
-    return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="rounded-lg border border-brand-600 bg-brand-600/10 p-5 text-foreground"
-      >
-        <p className="font-display text-xl font-semibold text-brand-700">Bestellung aufgenommen</p>
-        <p className="mt-2 text-sm">
-          Ihre Bestellung über {formatPrice(state.order.totalCents, state.order.currency)} wurde
-          erfasst und wartet auf die Zahlungsabwicklung. Sie erhalten in Kürze eine Möglichkeit, den
-          Status Ihrer Bestellung einzusehen.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <form action={formAction} className="flex flex-col gap-6" noValidate>
