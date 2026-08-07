@@ -5,12 +5,14 @@
   --background: var(--color-neutral-0);
   --foreground: var(--color-neutral-900);
   --foreground-secondary: var(--color-neutral-500);
+  --link-foreground: var(--color-brand-600);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-foreground-secondary: var(--foreground-secondary);
+  --color-link-foreground: var(--link-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-fraunces);
@@ -20,13 +22,18 @@
  * Dark-mode background/foreground pairs are chosen from packages/ui's
  * token palette so both schemes clear WCAG AA (4.5:1 normal text, 3:1
  * large text) — see packages/ui/src/contrast.test.ts and
- * apps/web/src/app/page.test.tsx for the verified ratios.
+ * apps/web/src/app/page.a11y.test.ts for the verified ratios.
+ *
+ * `--link-foreground` uses `brand-300` (not `brand-600`, which fails AA
+ * against the dark `neutral-900` background at ~2.8:1) so links stay
+ * legible in both color schemes.
  */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: var(--color-neutral-900);
     --foreground: var(--color-neutral-50);
     --foreground-secondary: var(--color-neutral-300);
+    --link-foreground: var(--color-brand-300);
   }
 }
 
