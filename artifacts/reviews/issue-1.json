@@ -113,7 +113,10 @@
       ],
       "bundled_fixes_verified": [
         { "item": "layout.tsx lang=\"de\"", "status": "PASS" },
-        { "item": "globals.css stale comment corrected to reference page.a11y.test.ts", "status": "PASS" }
+        {
+          "item": "globals.css stale comment corrected to reference page.a11y.test.ts",
+          "status": "PASS"
+        }
       ],
       "scope_check": {
         "status": "PASS",
