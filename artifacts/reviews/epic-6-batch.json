@@ -1,0 +1,168 @@
+{
+  "epic": "6",
+  "title": "Warenkorb & Bestellung",
+  "prs": [
+    { "ticket": "20", "pr": 75, "branch": "feat/20-warenkorb-serverseitige-preisberechnung" },
+    { "ticket": "21", "pr": 77, "branch": "feat/21-bestell-zustandsmaschine-checkout-flow" },
+    { "ticket": "22", "pr": 78, "branch": "feat/22-bestellstatus-seite-fuer-kunden" }
+  ],
+  "cycles": [
+    {
+      "cycle": 1,
+      "verdict": "CHANGES_REQUESTED",
+      "review_findings": [
+        {
+          "severity": "high",
+          "area": "data integrity / payment foundation (#21)",
+          "reason": "create_order_from_cart() had no idempotency and no locking, allowing two concurrent/retried checkouts to both create a full order for the same cart before either cleared it."
+        },
+        {
+          "severity": "medium",
+          "area": "rate limiting (#21)",
+          "reason": "markSucceeded() was called on every successful checkout, excluding successful orders from the rate-limit window and allowing unlimited valid-order spam."
+        },
+        {
+          "severity": "medium",
+          "area": "publish write-guard exemption (#20)",
+          "reason": "The dish_variants is_available exemption used an explicit column allow-list that would fail open for any future dish_variants column."
+        },
+        {
+          "severity": "medium",
+          "area": "accessibility (#22)",
+          "reason": "The order-status page's aria-live region was on a fully static server-rendered page with no update mechanism -- decorative, not a real announcement."
+        },
+        {
+          "severity": "medium",
+          "area": "accessibility test coverage (#20/#21/#22)",
+          "reason": "No automated a11y tests existed for the three new customer-facing pages (cart, checkout, order-status)."
+        },
+        {
+          "severity": "medium",
+          "area": "order immutability scope (#21)",
+          "reason": "orders.total_cents/currency/fulfillment_type/guest_access_token_hash/cart_id were freely updatable by service_role with no guard, a payment-safety hazard given Epic 7 will treat total_cents as the charge amount."
+        },
+        {
+          "severity": "low",
+          "area": "tenant isolation test depth (#20/#21/#22)",
+          "reason": "No test asserted the anon/authenticated deny-by-default RLS posture on the seven new tables."
+        },
+        {
+          "severity": "low",
+          "area": "tenant context on the status page (#22)",
+          "reason": "The order-status page never verified the resolved order's tenant matched the route [slug]."
+        },
+        {
+          "severity": "low",
+          "area": "dead code (#22)",
+          "reason": "readOrderAccessToken() was unused and its docstring described unimplemented behavior."
+        }
+      ],
+      "required_actions": [
+        "Fix the duplicate-order race in create_order_from_cart (row lock + idempotency constraint) and add a concurrent-checkout integration test.",
+        "Make the checkout rate limit count successful checkouts.",
+        "Rewrite the dish_variants publish-guard exemption to be column-set agnostic and add the negative test.",
+        "Add axe a11y tests for the cart, checkout and order-status pages; implement a real status-change announcement on the order-status page.",
+        "Guard the immutable columns of orders against app-facing UPDATE.",
+        "Add anon/authenticated deny-by-default assertions for the seven new tables.",
+        "Resolve the low-severity items or record explicit deferrals."
+      ]
+    },
+    {
+      "cycle": 2,
+      "verdict": "APPROVED",
+      "acceptance_criteria": [
+        {
+          "criterion": "Finding 1 (HIGH): duplicate-order race in create_order_from_cart is closed",
+          "status": "PASS",
+          "evidence": "20260804090000_orders_state_machine_and_checkout.sql: `for update` row lock is the first statement on the cart lookup, before readiness checks and the INSERT. Partial unique index orders_one_active_per_cart_idx (cart_id) where cart_id is not null and status <> 'cancelled'. INSERT wrapped in exception handler mapping unique_violation to a clear error. 10-parallel-connection concurrency test (pg Pool, Promise.all) asserts exactly 1 order created, 9 rejections, none leaking a raw duplicate-key message."
+        },
+        {
+          "criterion": "Finding 2 (medium): successful checkouts count toward the rate limit",
+          "status": "PASS",
+          "evidence": "No markSucceeded() call remains in checkout/actions.ts; tests assert it's never called on success and that the limit blocks after accumulated successful attempts."
+        },
+        {
+          "criterion": "Finding 3 (medium): dish_variants publish-guard exemption is column-set agnostic",
+          "status": "PASS",
+          "evidence": "Row-diff via to_jsonb(new) - 'is_available' - 'updated_at' = to_jsonb(old) - ... nested correctly inside the dish_variants/UPDATE-only branch. Negative test proves a bundled content change is still rejected."
+        },
+        {
+          "criterion": "Finding 4 (medium): payment-critical orders columns are immutable for app-facing roles",
+          "status": "PASS",
+          "evidence": "guard_orders_payment_fields_change() locks total_cents/currency/fulfillment_type/guest_access_token_hash/cart_id for authenticated/anon/service_role; customer-detail fields and the sanctioned status flag remain mutable. Test run as service_role proves both the rejection and the still-allowed cases."
+        },
+        {
+          "criterion": "Finding 5 (medium): aria-live region has a real update mechanism",
+          "status": "PASS",
+          "evidence": "order-status-live.tsx client component polls a server action every ~20s, updates only on status change, stops on terminal status, cleans up its interval on unmount. Component test coverage included."
+        },
+        {
+          "criterion": "Finding 6 (medium): automated a11y coverage for cart/checkout/order-status",
+          "status": "PASS",
+          "evidence": "cart-page-design.a11y.test.ts, checkout-page-design.a11y.test.ts, order-status-page-design.a11y.test.ts use real contrast math (incl. alpha-compositing for translucent overlays) plus semantic-structure RTL tests."
+        },
+        {
+          "criterion": "Finding 7 (low): order-status page verifies tenant slug",
+          "status": "PASS",
+          "evidence": "get_order_status_by_token now returns tenantSlug (never tenant_id); page and server action both compare it to the route slug and render the identical generic not-found state on mismatch."
+        },
+        {
+          "criterion": "Finding 8 (low): dead readOrderAccessToken removed",
+          "status": "PASS",
+          "evidence": "Function removed; repo-wide grep confirms zero remaining references."
+        },
+        {
+          "criterion": "Repair commits stayed in scope",
+          "status": "PASS",
+          "evidence": "Four repair commits touch only the files implicated by the eight findings plus their tests; no unrelated refactors."
+        }
+      ],
+      "deterministic_checks": {
+        "format": "PASS",
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "unit_tests": "PASS",
+        "integration_tests": "PASS",
+        "e2e_tests": "NOT_RUN",
+        "build": "PASS",
+        "security": "PASS"
+      },
+      "review_findings": [
+        {
+          "severity": "low",
+          "area": "data_integrity / future maintenance",
+          "reason": "orders.cart_id is ON DELETE SET NULL, but guard_orders_payment_fields_change() rejects any cart_id change for app-facing roles -- a future service_role-initiated cart-pruning DELETE would fail once it touches an order-linked cart. Latent, not currently reachable (no pruning job exists yet).",
+          "required_correction": "When cart pruning/TTL is implemented, exempt the null-transition or run pruning on a non-app-facing connection. Record on the pruning ticket."
+        },
+        {
+          "severity": "low",
+          "area": "error handling",
+          "reason": "The unique_violation handler in create_order_from_cart maps every violation (including a theoretical guest_access_token_hash collision) to the same 'already checked out' message. Not realistically reachable given 256-bit token randomness.",
+          "required_correction": "Optional/deferrable: discriminate on constraint name if tightened later."
+        },
+        {
+          "severity": "low",
+          "area": "frontend robustness",
+          "reason": "OrderStatusLive's polling has no .catch(), so a transient poll failure produces an unhandled promise rejection every ~20s (display stays correct, polling continues).",
+          "required_correction": "Optional/deferrable: add a swallow-and-continue catch."
+        }
+      ],
+      "tenant_isolation": "PASS",
+      "authorization": "PASS",
+      "payment_safety": "PASS",
+      "accessibility": "PASS",
+      "data_integrity": "PASS",
+      "maintainability": "PASS",
+      "residual_risks": [
+        "pollOrderStatus is an unauthenticated, unrate-limited server action -- same exposure as the page GET it mirrors, token is 256-bit random, but worth rate-limiting if the projection grows richer.",
+        "No Playwright/E2E coverage for cart -> checkout -> order-status; a11y coverage is unit-level rather than axe-on-rendered-page (pre-existing repo-wide gap).",
+        "is_valid_order_status_transition() (SQL) and packages/domain/src/orders/state-machine.ts are hand-maintained mirrors with no automated cross-check; Epic 7's webhook-driven transition must touch both.",
+        "orders.tax_rate_snapshot is a hardcoded 0 placeholder; must be resolved before any real (non-test-mode) charge.",
+        "The cart FK / payment-guard interaction above will surface the first time a cart-pruning job is written."
+      ],
+      "required_actions": [],
+      "merge_guidance": "Approved to merge in stacked order: PR #75 -> PR #77 -> PR #78."
+    }
+  ],
+  "final_verdict": "APPROVED"
+}
