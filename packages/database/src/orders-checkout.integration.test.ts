@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Client } from "pg";
+import { Client, Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { seedTwoTenantFixture, type TwoTenantFixture } from "@gastro-saas/testing";
 
@@ -171,9 +171,11 @@ async function checkout(
 describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", () => {
   const admin = new Client({ connectionString: DB_URL });
   let fixture: TwoTenantFixture;
+  let pool: Pool;
 
   beforeAll(async () => {
     await admin.connect();
+    pool = new Pool({ connectionString: DB_URL, max: 10 });
   });
 
   afterEach(async () => {
@@ -194,7 +196,40 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
 
   afterAll(async () => {
     await admin.end();
+    await pool.end();
   });
+
+  /**
+   * Runs `create_order_from_cart` on a connection checked out from `pool`
+   * (not the single shared `admin` client) so concurrent calls genuinely run
+   * on separate physical connections -- required to actually exercise the
+   * `for update` row lock rather than accidentally serializing for free
+   * because everything shares one client/session. Mirrors
+   * `menu-admin-ui-support.integration.test.ts`'s `queryAsUserPooled`
+   * precedent for the analogous `create_initial_draft_menu_version`
+   * concurrency test (ticket #12).
+   */
+  async function checkoutPooled(
+    cartId: string,
+    tenantId: string,
+  ): Promise<
+    { status: "fulfilled"; value: CreatedOrderRow } | { status: "rejected"; reason: unknown }
+  > {
+    const client = await pool.connect();
+    try {
+      const result = await client.query<{ create_order_from_cart: CreatedOrderRow }>(
+        `select create_order_from_cart($1, $2, $3, $4, $5, $6, $7, $8) as create_order_from_cart`,
+        [cartId, tenantId, "pickup", "Max Mustermann", null, null, "", guestAccessTokenHash()],
+      );
+      const row = result.rows[0]?.create_order_from_cart;
+      if (!row) throw new Error("checkout failed in test setup");
+      return { status: "fulfilled", value: row };
+    } catch (reason) {
+      return { status: "rejected", reason };
+    } finally {
+      client.release();
+    }
+  }
 
   it("creates an awaiting_payment order with a snapshot of every cart line, and clears the cart", async () => {
     fixture = await seedTwoTenantFixture(admin);
@@ -519,5 +554,160 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
       [tenantB.tenantId],
     );
     expect(orderCountForB.rows[0].count).toBe(0);
+  });
+
+  it(
+    "is concurrency-safe: N parallel checkout calls for the same cart create exactly one order " +
+      "(Opus epic-6 batch review, finding 1: duplicate-order race condition)",
+    async () => {
+      fixture = await seedTwoTenantFixture(admin);
+      const { tenantA } = fixture;
+      const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+      const cartId = await createCartWithItem(admin, tenantA.tenantId, menu);
+      const concurrency = 10;
+
+      const results = await Promise.all(
+        Array.from({ length: concurrency }, () => checkoutPooled(cartId, tenantA.tenantId)),
+      );
+
+      const fulfilled = results.filter(
+        (r): r is { status: "fulfilled"; value: CreatedOrderRow } => r.status === "fulfilled",
+      );
+      const rejected = results.filter(
+        (r): r is { status: "rejected"; reason: unknown } => r.status === "rejected",
+      );
+
+      // Exactly one caller actually created the order -- the row lock
+      // (`select ... for update`) serializes the rest against the same cart
+      // row. Depending on scheduling, a serialized loser either sees the
+      // cart already emptied by the winner (`Cart is empty`) or -- if it
+      // raced past that check before the winner's commit became visible --
+      // hits the partial unique index guard (`already been checked out`).
+      // Either is an acceptable, clear, non-leaking outcome; a raw Postgres
+      // constraint-violation message (e.g. "duplicate key value") is not.
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(concurrency - 1);
+      for (const r of rejected) {
+        expect(r.reason).toMatchObject({
+          message: expect.stringMatching(/cart is empty|already been checked out/i),
+        });
+        expect(r.reason).not.toMatchObject({
+          message: expect.stringMatching(/duplicate key value/i),
+        });
+      }
+
+      const orderCount = await admin.query(
+        `select count(*)::int as count from orders where cart_id = $1`,
+        [cartId],
+      );
+      expect(orderCount.rows[0].count).toBe(1);
+
+      const orderItemCount = await admin.query(
+        `select count(*)::int as count from order_items where order_id = $1`,
+        [fulfilled[0]!.value.orderId],
+      );
+      expect(orderItemCount.rows[0].count).toBe(1);
+    },
+  );
+
+  it(
+    "rejects a second checkout of the same cart once it already has a non-cancelled order, " +
+      "with a clear error rather than a raw constraint violation " +
+      "(Opus epic-6 batch review, finding 1(b): orders_one_active_per_cart_idx)",
+    async () => {
+      fixture = await seedTwoTenantFixture(admin);
+      const { tenantA } = fixture;
+      const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+      const cartId = await createCartWithItem(admin, tenantA.tenantId, menu);
+
+      const firstOrder = await checkout(admin, cartId, tenantA.tenantId);
+
+      // Re-populate the same (already-checked-out) cart, bypassing the
+      // window where a fresh row lock would otherwise serialize this into
+      // "Cart is empty" -- this isolates and directly exercises the
+      // idempotency guard itself (finding 1(b)), independent of the
+      // concurrency/locking behavior already covered above.
+      await admin.query(`select add_cart_item($1, $2, $3, $4, $5, $6)`, [
+        cartId,
+        tenantA.tenantId,
+        menu.dishId,
+        menu.variantId,
+        1,
+        [],
+      ]);
+
+      await expect(checkout(admin, cartId, tenantA.tenantId)).rejects.toThrow(
+        /already been checked out/i,
+      );
+
+      const orderCount = await admin.query(
+        `select count(*)::int as count from orders where cart_id = $1`,
+        [cartId],
+      );
+      expect(orderCount.rows[0].count).toBe(1);
+
+      const stillHasOnlyFirstOrder = await admin.query(`select id from orders where cart_id = $1`, [
+        cartId,
+      ]);
+      expect(stillHasOnlyFirstOrder.rows[0].id).toBe(firstOrder.orderId);
+    },
+  );
+
+  it("payment-critical/identity order fields are immutable once set (Opus epic-6 batch review, finding 3)", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+    const cartId = await createCartWithItem(admin, tenantA.tenantId, menu);
+    const order = await checkout(admin, cartId, tenantA.tenantId);
+
+    // `orders` grants UPDATE to service_role (needed for
+    // sync_order_status_from_event()'s own sanctioned status write), so
+    // this must run as `service_role` to actually exercise the guard
+    // trigger rather than being exempted as a non-app-facing caller.
+    await admin.query("set role service_role");
+    try {
+      await expect(
+        admin.query(`update orders set total_cents = 1 where id = $1`, [order.orderId]),
+      ).rejects.toThrow(/immutable once set/i);
+      await expect(
+        admin.query(`update orders set currency = 'USD' where id = $1`, [order.orderId]),
+      ).rejects.toThrow(/immutable once set/i);
+      await expect(
+        admin.query(
+          `update orders set fulfillment_type = 'table', table_identifier = '5' where id = $1`,
+          [order.orderId],
+        ),
+      ).rejects.toThrow(/immutable once set/i);
+      await expect(
+        admin.query(`update orders set guest_access_token_hash = $1 where id = $2`, [
+          guestAccessTokenHash(),
+          order.orderId,
+        ]),
+      ).rejects.toThrow(/immutable once set/i);
+      await expect(
+        admin.query(`update orders set cart_id = null where id = $1`, [order.orderId]),
+      ).rejects.toThrow(/immutable once set/i);
+
+      // Correctable customer-provided details remain mutable.
+      await admin.query(`update orders set customer_phone = '+491234567' where id = $1`, [
+        order.orderId,
+      ]);
+      const updatedRow = await admin.query(`select customer_phone from orders where id = $1`, [
+        order.orderId,
+      ]);
+      expect(updatedRow.rows[0].customer_phone).toBe("+491234567");
+
+      // The sanctioned status transition via order_status_events still succeeds.
+      await admin.query(
+        `insert into order_status_events (tenant_id, order_id, from_status, to_status) values ($1, $2, 'awaiting_payment', 'received')`,
+        [tenantA.tenantId, order.orderId],
+      );
+      const statusRow = await admin.query(`select status from orders where id = $1`, [
+        order.orderId,
+      ]);
+      expect(statusRow.rows[0].status).toBe("received");
+    } finally {
+      await admin.query("reset role");
+    }
   });
 });

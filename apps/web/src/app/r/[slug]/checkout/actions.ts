@@ -54,10 +54,27 @@ export async function checkoutAction(
     // the (ip, *) bucket is keyed on the cart id instead -- still meaningful
     // (one guest identity per cart) while the ip-only bucket independently
     // caps any single source regardless of how many carts it cycles through.
+    //
+    // Unlike login/register, `markSucceeded()` is deliberately NEVER called
+    // for this scope (Opus epic-6 batch review, finding 2): the auth flows'
+    // "only failed attempts count" design exists because their abuse case is
+    // credential brute-forcing, where a legitimate successful login should
+    // not count against the limit. Checkout's abuse case is the opposite --
+    // order/spam abuse -- so a *successful* checkout is exactly the thing
+    // that must count toward the limit, otherwise a bot could place
+    // unlimited real orders as long as each one succeeds. Every checkout
+    // attempt therefore counts, success or failure.
+    //
+    // 10 attempts/hour per IP (and per (ip, cart) pair) is generous enough
+    // for a real guest's normal use (at most a handful of orders per visit)
+    // while still bounding automated abuse to a small, easily-noticed volume
+    // per hour -- unlike the login scope's much lower threshold, which is
+    // tuned for credential-guessing rather than "how many genuine orders
+    // could one person place."
     const admin = createSupabaseAdminClient();
     const rateLimitStore = createSupabaseRateLimitStore(admin);
     const ip = await getClientIp();
-    const { limited, attemptId } = await reserveAndCheckRateLimit(rateLimitStore, {
+    const { limited } = await reserveAndCheckRateLimit(rateLimitStore, {
       scope: "checkout",
       ip,
       email: cartId,
@@ -84,7 +101,6 @@ export async function checkoutAction(
       customerNote: parsed.data.customerNote,
     });
 
-    await rateLimitStore.markSucceeded(attemptId);
     await writeOrderAccessTokenCookie(tenantSlug, guestAccessToken);
 
     await recordOrderAuditEvent(admin, {
