@@ -232,6 +232,25 @@ describe.skipIf(!dbAvailable)("cart server-side pricing (ticket #20)", () => {
     expect(cart.checkoutReady).toBe(false);
   });
 
+  it("still rejects a dish_variants content change bundled with an is_available toggle on a published menu (publish-guard exemption is is_available-only)", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+
+    // Only a *pure* is_available toggle is exempt from the draft/publish
+    // write guard (see 20260803100000_dish_variant_availability_toggle_exemption.sql).
+    // Bundling any other column change -- even alongside the toggle -- must
+    // still be rejected; the exemption's row-diff check is column-set
+    // agnostic (to_jsonb(new) minus is_available/updated_at = to_jsonb(old)
+    // minus the same), so this also guards against a future column being
+    // silently added to the allow-list by accident.
+    await expect(
+      admin.query(`update dish_variants set is_available = false, price_cents = 1 where id = $1`, [
+        menu.variantId,
+      ]),
+    ).rejects.toThrow(/read-only/i);
+  });
+
   it("flags a dish removed from the currently published menu version (re-published without it)", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA } = fixture;
@@ -331,5 +350,57 @@ describe.skipIf(!dbAvailable)("cart server-side pricing (ticket #20)", () => {
         [tenantB.tenantId, cartAId, menu.dishId],
       ),
     ).rejects.toThrow(/tenant_id must match/i);
+  });
+
+  it("denies anon and authenticated roles from reading or writing cart tables directly (RLS enabled, no policies, no grants)", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+    const cartId = await createCart(admin, tenantA.tenantId);
+    const cartItemResult = await admin.query(
+      `select add_cart_item($1, $2, $3, $4, $5, $6) as cart`,
+      [cartId, tenantA.tenantId, menu.dishId, menu.variantId, 1, [menu.cheapOptionId]],
+    );
+    const cartItemId = cartItemResult.rows[0].cart.items[0].cartItemId as string;
+
+    for (const role of ["anon", "authenticated"] as const) {
+      await admin.query(`set role ${role}`);
+      try {
+        await expect(admin.query(`select * from carts where id = $1`, [cartId])).rejects.toThrow(
+          /permission denied/i,
+        );
+        await expect(
+          admin.query(`insert into carts (tenant_id, cart_token_hash) values ($1, $2)`, [
+            tenantA.tenantId,
+            hashToken(randomUUID()),
+          ]),
+        ).rejects.toThrow(/permission denied/i);
+
+        await expect(
+          admin.query(`select * from cart_items where cart_id = $1`, [cartId]),
+        ).rejects.toThrow(/permission denied/i);
+        await expect(
+          admin.query(
+            `insert into cart_items (tenant_id, cart_id, dish_id, quantity, dish_name_snapshot)
+             values ($1, $2, $3, 1, 'x')`,
+            [tenantA.tenantId, cartId, menu.dishId],
+          ),
+        ).rejects.toThrow(/permission denied/i);
+
+        await expect(
+          admin.query(`select * from cart_item_selections where cart_item_id = $1`, [cartItemId]),
+        ).rejects.toThrow(/permission denied/i);
+        await expect(
+          admin.query(
+            `insert into cart_item_selections
+               (tenant_id, cart_item_id, option_group_id, option_id, option_name_snapshot, price_delta_cents_snapshot)
+             values ($1, $2, $3, $4, 'x', 0)`,
+            [tenantA.tenantId, cartItemId, menu.optionGroupId, menu.cheapOptionId],
+          ),
+        ).rejects.toThrow(/permission denied/i);
+      } finally {
+        await admin.query("reset role").catch(() => {});
+      }
+    }
   });
 });

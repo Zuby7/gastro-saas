@@ -68,6 +68,9 @@
 --   drop function if exists is_valid_order_status_transition(text, text);
 --   drop trigger if exists orders_guard_status_change on orders;
 --   drop function if exists guard_orders_status_change();
+--   drop trigger if exists orders_guard_payment_fields_change on orders;
+--   drop function if exists guard_orders_payment_fields_change();
+--   drop index if exists orders_one_active_per_cart_idx;
 --   drop trigger if exists order_items_immutable on order_items;
 --   drop trigger if exists order_items_immutable_truncate on order_items;
 --   drop trigger if exists order_item_selections_immutable on order_item_selections;
@@ -154,6 +157,22 @@ create trigger orders_set_updated_at
 create index orders_tenant_id_idx on orders (tenant_id);
 create index orders_tenant_id_status_idx on orders (tenant_id, status);
 create index orders_cart_id_idx on orders (cart_id);
+
+-- Idempotency guard (Opus epic-6 batch review, HIGH/BLOCKING finding 1): a
+-- given cart may produce at most one order that isn't cancelled. Without
+-- this, two concurrent/retried create_order_from_cart() calls for the same
+-- cart (double-click, Server Action retry, flaky network) could both pass
+-- the "cart is ready" check and each create a full order before either
+-- clears the cart -- a payment-safety hazard once Epic 7 treats
+-- orders.total_cents as the amount to charge. Partial (cart_id is not null)
+-- so historical carts pruned to null are never compared against each other,
+-- and excluding 'cancelled' so a guest can retry after an order was
+-- explicitly cancelled. Combined with the `select ... for update` row lock
+-- in create_order_from_cart() below (which serializes concurrent callers
+-- for the same cart), this makes duplicate-order creation impossible even
+-- under concurrent/retried calls.
+create unique index orders_one_active_per_cart_idx on orders (cart_id)
+  where cart_id is not null and status <> 'cancelled';
 
 create table order_items (
   id uuid primary key default gen_random_uuid(),
@@ -400,6 +419,56 @@ create trigger orders_guard_status_change
   execute function guard_orders_status_change();
 
 -- ----------------------------------------------------------------------------
+-- orders payment-critical/identity field guard (Opus epic-6 batch review,
+-- finding 3): `orders` grants UPDATE broadly to service_role (needed for
+-- sync_order_status_from_event()'s own sanctioned status write), which would
+-- otherwise leave total_cents/currency/fulfillment_type/
+-- guest_access_token_hash/cart_id freely mutable by any app code holding the
+-- service-role client, with no guard and no audit trail -- a payment-safety
+-- hazard once Epic 7 treats orders.total_cents as the authoritative charge
+-- amount. Locks exactly those payment-critical/identity columns; leaves
+-- customer_name/customer_phone/table_identifier/customer_note mutable
+-- (e.g. staff correcting a typo'd phone number is a legitimate future
+-- need), and always allows status (already guarded above) and updated_at to
+-- change. Mirrors guard_orders_status_change()'s app-facing-role check.
+-- ----------------------------------------------------------------------------
+create or replace function guard_orders_payment_fields_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_caller_role text := current_setting('role', true);
+  v_is_app_facing_role boolean := v_caller_role in ('authenticated', 'anon', 'service_role');
+begin
+  if v_is_app_facing_role
+     and (
+       new.total_cents is distinct from old.total_cents
+       or new.currency is distinct from old.currency
+       or new.fulfillment_type is distinct from old.fulfillment_type
+       or new.guest_access_token_hash is distinct from old.guest_access_token_hash
+       or new.cart_id is distinct from old.cart_id
+     )
+  then
+    raise exception
+      'orders.total_cents/currency/fulfillment_type/guest_access_token_hash/cart_id are immutable once set'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  return new;
+end;
+$$;
+
+comment on function guard_orders_payment_fields_change() is
+  'Rejects changes to orders.total_cents/currency/fulfillment_type/guest_access_token_hash/cart_id from app-facing roles (authenticated/anon/service_role) -- these are payment-critical/identity fields fixed at checkout time (Opus epic-6 batch review, finding 3). customer_name/customer_phone/table_identifier/customer_note remain mutable.';
+
+create trigger orders_guard_payment_fields_change
+  before update on orders
+  for each row
+  execute function guard_orders_payment_fields_change();
+
+-- ----------------------------------------------------------------------------
 -- is_valid_order_status_transition -- the DB-level mirror of
 -- packages/domain/src/orders/state-machine.ts's ORDER_STATUS_TRANSITIONS.
 -- Keep both in sync by hand if this table ever changes; there is no
@@ -565,7 +634,13 @@ declare
   v_item jsonb;
   v_selection jsonb;
 begin
-  perform 1 from public.carts where id = p_cart_id and tenant_id = p_tenant_id;
+  -- `for update`: acquires an exclusive row lock on the cart for the
+  -- remainder of this transaction, serializing concurrent
+  -- create_order_from_cart() calls for the same cart (Opus epic-6 batch
+  -- review, finding 1) -- the second concurrent caller blocks here until the
+  -- first either commits (after which the unique index below rejects it) or
+  -- rolls back.
+  perform 1 from public.carts where id = p_cart_id and tenant_id = p_tenant_id for update;
   if not found then
     raise exception 'Cart not found' using errcode = 'invalid_parameter_value';
   end if;
@@ -605,22 +680,32 @@ begin
 
   v_currency := v_cart_view ->> 'currency';
 
-  insert into public.orders (
-    tenant_id, cart_id, guest_access_token_hash, fulfillment_type,
-    customer_name, customer_phone, table_identifier, customer_note,
-    currency, total_cents, status
-  )
-  values (
-    p_tenant_id, p_cart_id, p_guest_access_token_hash, p_fulfillment_type,
-    btrim(p_customer_name),
-    nullif(btrim(coalesce(p_customer_phone, '')), ''),
-    nullif(btrim(coalesce(p_table_identifier, '')), ''),
-    coalesce(btrim(p_customer_note), ''),
-    v_currency,
-    (v_cart_view ->> 'totalCents')::int,
-    'awaiting_payment'
-  )
-  returning id into v_order_id;
+  begin
+    insert into public.orders (
+      tenant_id, cart_id, guest_access_token_hash, fulfillment_type,
+      customer_name, customer_phone, table_identifier, customer_note,
+      currency, total_cents, status
+    )
+    values (
+      p_tenant_id, p_cart_id, p_guest_access_token_hash, p_fulfillment_type,
+      btrim(p_customer_name),
+      nullif(btrim(coalesce(p_customer_phone, '')), ''),
+      nullif(btrim(coalesce(p_table_identifier, '')), ''),
+      coalesce(btrim(p_customer_note), ''),
+      v_currency,
+      (v_cart_view ->> 'totalCents')::int,
+      'awaiting_payment'
+    )
+    returning id into v_order_id;
+  exception
+    when unique_violation then
+      -- Belt-and-suspenders alongside the `for update` lock above: the
+      -- orders_one_active_per_cart_idx partial unique index rejects a second
+      -- non-cancelled order for the same cart outright. Surface a clear,
+      -- expected error rather than letting a raw constraint-violation leak
+      -- to the client (Opus epic-6 batch review, finding 1).
+      raise exception 'This cart has already been checked out.' using errcode = 'unique_violation';
+  end;
 
   -- Initial status event: orders.status is already 'awaiting_payment' from
   -- the insert default above (no UPDATE, so the orders_guard_status_change
