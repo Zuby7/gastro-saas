@@ -1,0 +1,101 @@
+{
+  "ticket": "PR #73 (standalone chore, no ticket number)",
+  "verdict": "APPROVED",
+  "acceptance_criteria": [
+    {
+      "criterion": "1. Scope discipline: presentation-only, no server-action/permission/RLS/business logic touched",
+      "status": "PASS",
+      "evidence": "Filtered every changed line that is not a className/CSS/comment line across all 24 files: the residue is exclusively JSX re-indentation and one added wrapper <div> in dishes/[dishId]/page.tsx. Keyword scan for `use server|supabase|createClient|auth\\.|getUser|session|tenant|role|permission|rpc\\(|from\\(|insert|update|delete|select\\(|await|async function` over the diff returned zero logic hits (only 5 className/comment false positives). No migrations, no server actions, no lib/ files, no API routes in the diff. The PermissionDeniedError branch in apps/web/src/app/account/menu/dishes/[dishId]/page.tsx is touched only on the <main> className; the `if (error instanceof PermissionDeniedError)` guard is byte-identical."
+    },
+    {
+      "criterion": "2a. New a11y test genuinely exercises new color pairs with real WCAG AA math (not tautological)",
+      "status": "PASS",
+      "evidence": "public-menu-design.a11y.test.ts calls validateContrastRatio() from packages/ui/src/contrast.ts, which implements real sRGB linearization + relative luminance + (L1+0.05)/(L2+0.05). Independently re-implemented WCAG and reproduced every asserted pair: clay-700/neutral-0 = 8.42, clay-500/neutral-50 = 4.14 (vs 3:1 graphic threshold), neutral-900/neutral-50 = 16.80, neutral-500/neutral-50 = 6.32. All genuinely pass, none by a trivial margin artifact. Test would fail if the tokens regressed."
+    },
+    {
+      "criterion": "2b. Existing tokens-css-parity test still passes given token changes",
+      "status": "PASS",
+      "evidence": "tokens-css-parity.test.ts iterates every color family x shade and requires a matching --color-* var in theme.css. All 10 new clay shades are present in theme.css with values byte-identical to tokens.ts. The parity test covers colors/spacing/fontWeight only, so the new typography.fontFamily.display token is out of its scope; theme.css adds an explicit comment explaining why --font-display is defined in globals.css @theme inline instead. Consistent, not drift."
+    },
+    {
+      "criterion": "3. Design plausibly avoids generic templated look; admin restrained vs public menu fuller",
+      "status": "PASS",
+      "evidence": "Public menu gets the stated signature element: Fraunces 4xl/5xl restaurant name + a short clay-500 rule (aria-hidden, decorative) on warm paper, category headings reusing the display face at 2xl with no second accent. Admin UI receives no clay accent and no hero/rule at all - only card normalization (rounded-lg/shadow-sm/neutral-0-on-neutral-50), hover/focus-visible affordances, and blocker-vs-warning weighting. The restraint asymmetry matches the documented plan. Rationale is documented as a plan/self-critique comment in packages/ui/src/tokens.ts."
+    },
+    {
+      "criterion": "4a. Fraunces font loading does not break existing pages / layout shift",
+      "status": "PASS",
+      "evidence": "layout.tsx uses next/font/google Fraunces with subsets:['latin'] and a CSS variable, self-hosted at build time (no runtime external request), default display:'swap' with Next's auto-generated size-adjust fallback metrics, so CLS risk is minimal. Variable added to <html> alongside existing geistSans/geistMono without altering them. Build check green."
+    },
+    {
+      "criterion": "4b. neutral-50/100 retune does not regress contrast elsewhere (incl. untouched pages)",
+      "status": "PASS",
+      "evidence": "Enumerated every neutral-50/neutral-100 usage repo-wide, including files NOT in this PR (register/page.tsx, invite/[token]/page.tsx, invite-member-form.tsx) and the dark-mode `--foreground: var(--color-neutral-50)` in globals.css. Recomputed all: neutral-900/neutral-100 14.99, neutral-500/neutral-100 5.64 (up from 5.60 - neutral-100 got lighter, so contrast improved), dark-mode neutral-50 on neutral-900 16.80 (was 17.32, still far above AA). No pair crosses a threshold in either direction."
+    },
+    {
+      "criterion": "4c. No snapshot/visual test broken by the restyle",
+      "status": "PASS",
+      "evidence": "No DOM/snapshot test in apps/web asserts on className strings; the only tests referencing styling tokens are the two token-value a11y tests, both of which read colors.* dynamically rather than hardcoding hex. CI Unit Tests green."
+    },
+    {
+      "criterion": "5. not-found.tsx change is a genuine encoding fix, no behavior slipped in",
+      "status": "PASS",
+      "evidence": "Diffed branch vs main byte-for-byte: only mojibake repair (verfügbar/veröffentlicht/ungültig) plus bg-neutral-50 and font-display classNames. Component structure, exports, and rendered strings otherwise identical. No behavior change."
+    },
+    {
+      "criterion": "6. General code quality: no half-finished work, no unnecessary abstraction, tests passing",
+      "status": "PASS",
+      "evidence": "No new abstractions introduced (no component/util layer added for a styling pass - correct call). No TODO/FIXME/commented-out code in the diff. All 7 CI checks green (Format, Lint, Typecheck, Unit Tests, Build, Secret Scan, Migration Validation). Focus-visible affordances were added consistently rather than partially."
+    }
+  ],
+  "deterministic_checks": {
+    "format": "PASS",
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "unit_tests": "PASS",
+    "integration_tests": "NOT_RUN",
+    "e2e_tests": "NOT_RUN",
+    "build": "PASS",
+    "security": "PASS"
+  },
+  "review_findings": [
+    {
+      "severity": "low",
+      "area": "UI semantics / admin polish",
+      "reason": "In publish-panel.tsx the status headings now carry semantic status colors unconditionally, including in the empty/success state, which slightly undercuts the very blocker-vs-warning urgency gradient this change set out to strengthen.",
+      "evidence": "apps/web/src/app/account/menu/publish-panel.tsx: heading renders red even at zero blockers ('Blocker (keine)'); likewise the warnings heading stays amber at zero warnings. Only the surrounding container is conditionally styled.",
+      "required_correction": "Not required for merge. Suggested follow-up: make the heading color conditional on count > 0 (e.g. text-danger-600 when blockers exist, text-foreground otherwise).",
+      "acceptance_test": "Render PublishPanel with zero blockers and zero warnings after a completed check; assert the 'Blocker (keine)' heading does not use the danger color class."
+    },
+    {
+      "severity": "low",
+      "area": "Test quality",
+      "reason": "Two of the five new a11y test cases assert the identical expression, so the suite has one fewer real assertion than its case count suggests.",
+      "evidence": "apps/web/src/app/r/[slug]/public-menu-design.a11y.test.ts: both the 'dish price' and 'category nav hover/focus text' cases evaluate validateContrastRatio(colors.clay[700], colors.neutral[0]).",
+      "required_correction": "Not required for merge. Optional: merge the duplicates, or make the nav case reflect its actual blended background.",
+      "acceptance_test": "n/a - maintainability nit."
+    },
+    {
+      "severity": "low",
+      "area": "Test precision",
+      "reason": "The nav test models the sticky nav background as opaque neutral-0, but the element actually renders bg-neutral-0/95 over the warm paper background. No practical risk, since clay-700 clears AA against both endpoints (8.42 on neutral-0, 7.62 on neutral-50), but the comment overstates the test's precision.",
+      "evidence": "apps/web/src/app/r/[slug]/page.tsx nav uses bg-neutral-0/95 with backdrop-blur; the test comment says 'on the near-white sticky nav background'.",
+      "required_correction": "None required.",
+      "acceptance_test": "n/a."
+    }
+  ],
+  "tenant_isolation": "NOT_APPLICABLE",
+  "authorization": "PASS",
+  "payment_safety": "NOT_APPLICABLE",
+  "accessibility": "PASS",
+  "data_integrity": "NOT_APPLICABLE",
+  "maintainability": "PASS",
+  "residual_risks": [
+    "Deterministic checks were verified from CI on commit d223fe2 rather than re-run locally (pnpm is not on PATH in this shell, a documented environment quirk in docs/decisions/assumptions.md). Mitigated: contrast assertions in the new and existing a11y tests were independently recomputed with an independent WCAG implementation and reproduced the passing results, and tokens.ts/theme.css parity was verified by direct comparison.",
+    "The PR body notes an accidental repo-wide `pnpm format` run whose EOL-only diffs were deliberately left uncommitted in the working directory. The committed diff is clean and Format Check is green, but that dirty working tree is a housekeeping hazard for the next branch operation and repo-wide EOL normalization remains an open separate concern.",
+    "Fraunces is an additional variable font family (latin subset) added to the global layout, so it is downloaded on every route including admin pages where it is used only for h1s. Minor payload cost, not measured in this PR.",
+    "border-neutral-300 against neutral-0 sits at 2.43:1, below the 3:1 WCAG 1.4.11 non-text threshold, on the category nav pills. This is a pre-existing token relationship not introduced by this PR, and the pills carry visible text labels so the border is not the sole affordance. Worth picking up in a future a11y sweep.",
+    "No visual-regression/e2e coverage exists for these pages, so the redesign's rendered output is verified only by token-level contrast math and human-readable diff review."
+  ],
+  "required_actions": []
+}
