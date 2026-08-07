@@ -3,8 +3,9 @@ import { formatPrice } from "@/lib/public-menu/format";
 import { getPublicMenu } from "@/lib/public-menu/fetch";
 import { formatOrderTimestamp } from "@/lib/orders/format";
 import { getOrderStatusByToken } from "@/lib/orders/service";
-import { orderStatusDescription, orderStatusLabel } from "@/lib/orders/status-labels";
+import { orderStatusLabel } from "@/lib/orders/status-labels";
 import { hashOrderAccessToken } from "@/lib/orders/token";
+import { OrderStatusLive } from "./order-status-live";
 
 interface OrderStatusPageProps {
   params: Promise<{ slug: string; token: string }>;
@@ -23,6 +24,17 @@ interface OrderStatusPageProps {
  * A wrong/guessed token renders the exact same generic "not found" state
  * as any other lookup miss (acceptance criterion 1) -- this route never
  * reveals whether any order exists for a given token.
+ *
+ * `order.tenantSlug` (returned by the RPC, see
+ * `supabase/migrations/20260808120000_order_status_guest_lookup_tenant_slug.sql`)
+ * is additionally compared against this route's `[slug]` segment below --
+ * a token that resolves to a *different* tenant than the one in the URL
+ * renders the exact same generic "not found" state as an invalid token
+ * (never a distinguishable "wrong restaurant" message), so this can't be
+ * used to probe which other tenant a token belongs to. This isn't a
+ * cross-tenant data leak (holding the valid token is already the
+ * authorization boundary) -- it only prevents a confusing/spoofable
+ * presentation of restaurant A's order under restaurant B's page chrome.
  */
 export default async function OrderStatusPage({ params }: OrderStatusPageProps) {
   const { slug, token } = await params;
@@ -31,7 +43,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
     getOrderStatusByToken(hashOrderAccessToken(token)),
   ]);
 
-  if (!order) {
+  if (!order || order.tenantSlug !== slug) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-3 bg-neutral-50 p-8">
         <h1 className="font-display text-2xl font-semibold text-foreground">
@@ -67,18 +79,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
       </header>
 
       <div className="mx-auto flex max-w-2xl flex-col gap-6 px-5 py-8">
-        <section
-          aria-live="polite"
-          className="rounded-lg border border-clay-300 bg-neutral-0 p-5 shadow-sm"
-        >
-          <p className="text-sm font-medium text-foreground-secondary">Aktueller Status</p>
-          <p className="mt-1 font-display text-2xl font-semibold text-clay-700">
-            {orderStatusLabel(order.status)}
-          </p>
-          <p className="mt-2 text-sm text-foreground-secondary">
-            {orderStatusDescription(order.status)}
-          </p>
-        </section>
+        <OrderStatusLive tenantSlug={slug} token={token} initialStatus={order.status} />
 
         <section className="rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground">Details</h2>

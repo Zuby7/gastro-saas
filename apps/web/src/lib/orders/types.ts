@@ -62,6 +62,14 @@ export interface OrderStatusHistoryEntryView {
 
 export interface OrderStatusView {
   orderId: string;
+  /**
+   * Slug of the tenant that owns this order (see
+   * `supabase/migrations/20260808120000_order_status_guest_lookup_tenant_slug.sql`).
+   * Deliberately the slug, never `tenant_id` -- callers use this only to
+   * verify the order matches the route's `[slug]` segment, not as an
+   * identifier to key further lookups off of.
+   */
+  tenantSlug: string | null;
   status: OrderStatus;
   fulfillmentType: FulfillmentType;
   tableIdentifier: string | null;

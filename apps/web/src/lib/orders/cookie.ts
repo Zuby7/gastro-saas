@@ -5,21 +5,17 @@ const ORDER_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 3; // 3 days
 /**
  * One order-access cookie per tenant slug, mirroring
  * `apps/web/src/lib/cart/cookie.ts`'s per-tenant-slug namespacing rationale.
- * Stores only the raw guest order-access token (ticket #21) -- ticket #22's
- * status page reads this cookie to resolve the guest's most recent order
- * without requiring a URL-embedded token. The slug is only used to namespace
- * the *cookie name*; tenant_id is always re-resolved server-side from the
- * route slug, never trusted from this cookie.
+ * Stores only the raw guest order-access token (ticket #21), written after a
+ * successful checkout for a possible future convenience feature (e.g. an
+ * "your recent orders" list that doesn't require the guest to keep the
+ * URL). The shipped ticket #22 status page does not read this cookie --
+ * it resolves the token purely from the `[token]` URL segment. The slug is
+ * only used to namespace the *cookie name*; tenant_id is always re-resolved
+ * server-side from the route slug, never trusted from this cookie.
  */
 function orderCookieName(tenantSlug: string): string {
   const safeSlug = tenantSlug.replace(/[^a-z0-9-]/g, "");
   return `gastro_order_${safeSlug}`;
-}
-
-/** Reads the raw order-access token for this tenant slug from the request's cookies, if any. */
-export async function readOrderAccessToken(tenantSlug: string): Promise<string | null> {
-  const cookieStore = await cookies();
-  return cookieStore.get(orderCookieName(tenantSlug))?.value ?? null;
 }
 
 /**

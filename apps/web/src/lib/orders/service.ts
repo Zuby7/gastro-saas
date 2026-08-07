@@ -65,14 +65,18 @@ export async function createOrderFromCart(
 /**
  * Looks up an order's customer-safe status view purely by its guest access
  * token hash, via the `get_order_status_by_token` RPC (see
- * `supabase/migrations/20260805090000_order_status_guest_lookup.sql`).
+ * `supabase/migrations/20260805090000_order_status_guest_lookup.sql` and
+ * `supabase/migrations/20260808120000_order_status_guest_lookup_tenant_slug.sql`).
  * `tenant_id`/`order_id` are resolved entirely inside the RPC from the hash
  * itself -- this function never passes, and the RPC never accepts, a
  * client-supplied tenant/order id (docs/security/tenant-isolation.md Layer
  * 0). Returns `null` for a wrong/guessed token -- the same, non-distinguishable
  * response as any other lookup miss (ticket #22 acceptance criterion 1);
  * callers must render a generic "not found" state, never a different error
- * for "token malformed" vs. "no such order".
+ * for "token malformed" vs. "no such order". The returned view's
+ * `tenantSlug` must also be checked by callers against the route's `[slug]`
+ * segment (same generic "not found" state on mismatch) -- see the page
+ * component for that check.
  */
 export async function getOrderStatusByToken(
   guestAccessTokenHash: string,
