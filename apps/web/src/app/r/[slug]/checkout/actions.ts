@@ -41,7 +41,8 @@ export async function checkoutAction(
   }
 
   const customerPhone = parsed.data.fulfillmentType === "pickup" ? parsed.data.customerPhone : null;
-  const tableIdentifier = parsed.data.fulfillmentType === "table" ? parsed.data.tableIdentifier : null;
+  const tableIdentifier =
+    parsed.data.fulfillmentType === "table" ? parsed.data.tableIdentifier : null;
 
   try {
     const { tenantId, cartId } = await resolveGuestCartContext(tenantSlug);

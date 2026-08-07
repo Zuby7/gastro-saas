@@ -40,7 +40,9 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
   return (
     <form action={formAction} className="flex flex-col gap-6" noValidate>
       <fieldset className="flex flex-col gap-3">
-        <legend className="text-sm font-semibold text-foreground">Wie möchten Sie bestellen?</legend>
+        <legend className="text-sm font-semibold text-foreground">
+          Wie möchten Sie bestellen?
+        </legend>
         <label className="flex items-center gap-2 text-foreground">
           <input
             type="radio"

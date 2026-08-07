@@ -73,7 +73,13 @@ describe("order status state machine", () => {
   it("identifies completed/cancelled as terminal, everything else as non-terminal", () => {
     expect(isTerminalOrderStatus("completed")).toBe(true);
     expect(isTerminalOrderStatus("cancelled")).toBe(true);
-    for (const status of ["awaiting_payment", "received", "accepted", "preparing", "ready"] as const) {
+    for (const status of [
+      "awaiting_payment",
+      "received",
+      "accepted",
+      "preparing",
+      "ready",
+    ] as const) {
       expect(isTerminalOrderStatus(status)).toBe(false);
     }
   });

@@ -65,10 +65,7 @@ export function isTerminalOrderStatus(status: OrderStatus): boolean {
  * `from === null` represents the initial creation of an order (no prior
  * status yet) -- the only valid target is `awaiting_payment`.
  */
-export function isValidOrderStatusTransition(
-  from: OrderStatus | null,
-  to: OrderStatus,
-): boolean {
+export function isValidOrderStatusTransition(from: OrderStatus | null, to: OrderStatus): boolean {
   if (from === null) {
     return to === "awaiting_payment";
   }

@@ -28,7 +28,10 @@ export async function readOrderAccessToken(tenantSlug: string): Promise<string |
  * cookies during a Server Component render) -- httpOnly, so the token is
  * never readable/tamperable from browser JS.
  */
-export async function writeOrderAccessTokenCookie(tenantSlug: string, token: string): Promise<void> {
+export async function writeOrderAccessTokenCookie(
+  tenantSlug: string,
+  token: string,
+): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(orderCookieName(tenantSlug), token, {
     httpOnly: true,

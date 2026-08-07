@@ -208,9 +208,10 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
     // (1200 variant + 150 extra) * 2 = 2700
     expect(order.totalCents).toBe(2700);
 
-    const orderRow = await admin.query(`select status, total_cents, fulfillment_type from orders where id = $1`, [
-      order.orderId,
-    ]);
+    const orderRow = await admin.query(
+      `select status, total_cents, fulfillment_type from orders where id = $1`,
+      [order.orderId],
+    );
     expect(orderRow.rows[0].status).toBe("awaiting_payment");
     expect(orderRow.rows[0].total_cents).toBe(2700);
     expect(orderRow.rows[0].fulfillment_type).toBe("pickup");
@@ -240,7 +241,9 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
     expect(initialEvent.rows[0].from_status).toBeNull();
     expect(initialEvent.rows[0].to_status).toBe("awaiting_payment");
 
-    const cartItemsRow = await admin.query(`select id from cart_items where cart_id = $1`, [cartId]);
+    const cartItemsRow = await admin.query(`select id from cart_items where cart_id = $1`, [
+      cartId,
+    ]);
     expect(cartItemsRow.rows).toHaveLength(0);
   });
 
@@ -255,12 +258,17 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
     // The restaurant renames the dish, changes the variant price, and
     // raises the option's price delta *after* the order was created.
     await admin.query(`update dishes set name = 'Margherita Deluxe' where id = $1`, [menu.dishId]);
-    await admin.query(`update dish_variants set price_cents = 5000 where id = $1`, [menu.variantId]);
-    await admin.query(`update options set name = 'XL Käse', price_delta_cents = 999 where id = $1`, [
-      menu.cheapOptionId,
+    await admin.query(`update dish_variants set price_cents = 5000 where id = $1`, [
+      menu.variantId,
     ]);
+    await admin.query(
+      `update options set name = 'XL Käse', price_delta_cents = 999 where id = $1`,
+      [menu.cheapOptionId],
+    );
 
-    const orderRow = await admin.query(`select total_cents from orders where id = $1`, [order.orderId]);
+    const orderRow = await admin.query(`select total_cents from orders where id = $1`, [
+      order.orderId,
+    ]);
     expect(orderRow.rows[0].total_cents).toBe(2700);
 
     const itemsRow = await admin.query(
@@ -329,7 +337,9 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
     await expect(checkout(admin, emptyCartId!, tenantA.tenantId)).rejects.toThrow(/cart is empty/i);
 
     const unavailableCartId = await createCartWithItem(admin, tenantA.tenantId, menu);
-    await admin.query(`update dish_variants set is_available = false where id = $1`, [menu.variantId]);
+    await admin.query(`update dish_variants set is_available = false where id = $1`, [
+      menu.variantId,
+    ]);
 
     await expect(checkout(admin, unavailableCartId, tenantA.tenantId)).rejects.toThrow(
       /not ready for checkout/i,
@@ -406,7 +416,9 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
         `insert into order_status_events (tenant_id, order_id, from_status, to_status) values ($1, $2, $3, $4)`,
         [tenantA.tenantId, order.orderId, from, to],
       );
-      const statusRow = await admin.query(`select status from orders where id = $1`, [order.orderId]);
+      const statusRow = await admin.query(`select status from orders where id = $1`, [
+        order.orderId,
+      ]);
       expect(statusRow.rows[0].status).toBe(to);
     }
 
@@ -487,9 +499,10 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
     ).rejects.toThrow(/tenant_id must match/i);
 
     // A guest access token hash bound to tenant A's order can never collide/leak into tenant B's data.
-    const orderCountForB = await admin.query(`select count(*)::int as count from orders where tenant_id = $1`, [
-      tenantB.tenantId,
-    ]);
+    const orderCountForB = await admin.query(
+      `select count(*)::int as count from orders where tenant_id = $1`,
+      [tenantB.tenantId],
+    );
     expect(orderCountForB.rows[0].count).toBe(0);
   });
 });

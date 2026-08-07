@@ -15,7 +15,9 @@ import type { CreateOrderFromCartInput, CreateOrderResult } from "./types";
  * `.claude/rules/backend-api.md` ("never leak raw database errors ... to
  * the client").
  */
-export async function createOrderFromCart(input: CreateOrderFromCartInput): Promise<CreateOrderResult> {
+export async function createOrderFromCart(
+  input: CreateOrderFromCartInput,
+): Promise<CreateOrderResult> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.rpc("create_order_from_cart", {
     p_cart_id: input.cartId,
@@ -52,7 +54,9 @@ export async function createOrderFromCart(input: CreateOrderFromCartInput): Prom
       throw new Error("Bitte geben Sie Ihren Namen an.");
     }
 
-    throw new Error("Die Bestellung konnte nicht aufgegeben werden. Bitte versuchen Sie es erneut.");
+    throw new Error(
+      "Die Bestellung konnte nicht aufgegeben werden. Bitte versuchen Sie es erneut.",
+    );
   }
 
   return data as CreateOrderResult;
