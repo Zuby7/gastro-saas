@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatPrice } from "@/lib/public-menu/format";
 import { getPublicMenu } from "@/lib/public-menu/fetch";
+import { loadCartViewForDisplay } from "./cart/actions";
 import { DishDetail } from "./dish-detail";
 
 interface PublicMenuPageProps {
@@ -15,17 +17,27 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
     notFound();
   }
 
+  const cart = await loadCartViewForDisplay(slug);
+
   return (
     <main className="min-h-screen bg-neutral-50">
       <header className="border-b border-neutral-200 bg-neutral-50 px-5 py-12">
-        <div className="mx-auto max-w-4xl">
-          <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            {menu.tenant.name}
-          </h1>
-          <div aria-hidden="true" className="mt-4 h-1 w-16 rounded-full bg-clay-500" />
-          {menu.tenant.description ? (
-            <p className="mt-4 max-w-2xl text-foreground-secondary">{menu.tenant.description}</p>
-          ) : null}
+        <div className="mx-auto flex max-w-4xl items-start justify-between gap-4">
+          <div>
+            <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+              {menu.tenant.name}
+            </h1>
+            <div aria-hidden="true" className="mt-4 h-1 w-16 rounded-full bg-clay-500" />
+            {menu.tenant.description ? (
+              <p className="mt-4 max-w-2xl text-foreground-secondary">{menu.tenant.description}</p>
+            ) : null}
+          </div>
+          <Link
+            href={`/r/${slug}/cart`}
+            className="shrink-0 rounded-full border border-neutral-300 bg-neutral-0 px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-clay-400 hover:text-clay-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+          >
+            Warenkorb{cart && cart.itemCount > 0 ? ` (${cart.itemCount})` : ""}
+          </Link>
         </div>
       </header>
 
@@ -108,7 +120,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
                       Ausverkauft
                     </p>
                   ) : (
-                    <DishDetail dish={dish} />
+                    <DishDetail dish={dish} tenantSlug={slug} />
                   )}
                 </article>
               ))}
