@@ -5,6 +5,8 @@ const markSucceededMock = vi.fn();
 const createOrderFromCartMock = vi.fn();
 const recordOrderAuditEventMock = vi.fn();
 const writeOrderAccessTokenCookieMock = vi.fn();
+const isTenantChargeReadyMock = vi.fn();
+const createCheckoutSessionForOrderMock = vi.fn();
 const redirectMock = vi.fn((target: string) => {
   // Next's real redirect() signals control flow via a thrown, special
   // NEXT_REDIRECT error that Next's own machinery catches further up the
@@ -51,6 +53,11 @@ vi.mock("@/lib/audit/record-order-audit-event", () => ({
   recordOrderAuditEvent: (...args: unknown[]) => recordOrderAuditEventMock(...args),
 }));
 
+vi.mock("@/lib/payments/service", () => ({
+  isTenantChargeReady: (...args: unknown[]) => isTenantChargeReadyMock(...args),
+  createCheckoutSessionForOrder: (...args: unknown[]) => createCheckoutSessionForOrderMock(...args),
+}));
+
 vi.mock("next/cache", () => ({
   revalidatePath: () => {},
 }));
@@ -78,6 +85,10 @@ beforeEach(() => {
     totalCents: 1000,
     currency: "EUR",
   });
+  isTenantChargeReadyMock.mockResolvedValue(true);
+  createCheckoutSessionForOrderMock.mockResolvedValue({
+    checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_123",
+  });
 });
 
 describe("checkoutAction", () => {
@@ -86,13 +97,41 @@ describe("checkoutAction", () => {
 
     // A successful checkout ends in redirect() -- which throws by design
     // (see actions.ts's own comment) -- rather than returning state with an
-    // `order` field; CheckoutFormState only ever carries `error`.
+    // `order` field; CheckoutFormState only ever carries `error`. The
+    // redirect target is Stripe's own hosted checkout URL, never the
+    // order-status page directly (ticket #24) -- reaching Stripe is not
+    // proof of payment either way.
     await expect(checkoutAction("demo", {}, validFormData())).rejects.toThrow("NEXT_REDIRECT:");
-    expect(redirectMock).toHaveBeenCalledWith(
-      expect.stringMatching(/^\/r\/demo\/orders\/raw-token$/),
-    );
+    expect(redirectMock).toHaveBeenCalledWith("https://checkout.stripe.com/c/pay/cs_test_123");
     expect(createOrderFromCartMock).toHaveBeenCalledOnce();
+    expect(createCheckoutSessionForOrderMock).toHaveBeenCalledWith({
+      tenantId: "tenant-1",
+      tenantSlug: "demo",
+      orderId: "order-1",
+      guestAccessToken: "raw-token",
+    });
     expect(markSucceededMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects checkout up front, without creating an order, when the tenant's Stripe Connect account isn't charge-ready", async () => {
+    isTenantChargeReadyMock.mockResolvedValue(false);
+
+    const { checkoutAction } = await import("./actions");
+    const result = await checkoutAction("demo", {}, validFormData());
+
+    expect(result.error).toContain("keine Kartenzahlungen entgegennehmen");
+    expect(createOrderFromCartMock).not.toHaveBeenCalled();
+    expect(createCheckoutSessionForOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a generic error and never redirects if payment-session creation fails after order creation", async () => {
+    createCheckoutSessionForOrderMock.mockRejectedValue(new Error("boom"));
+
+    const { checkoutAction } = await import("./actions");
+    const result = await checkoutAction("demo", {}, validFormData());
+
+    expect(result.error).toBe("boom");
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 
   it("blocks further checkout attempts once the per-IP window is exhausted by prior *successful* checkouts", async () => {
