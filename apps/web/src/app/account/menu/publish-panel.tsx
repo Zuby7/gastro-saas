@@ -61,7 +61,9 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
           >
             <h3
               className={
-                blockers.length > 0 ? "font-semibold text-danger-600" : "font-semibold text-foreground"
+                blockers.length > 0
+                  ? "font-semibold text-danger-600"
+                  : "font-semibold text-foreground"
               }
             >
               Blocker {blockers.length > 0 ? `(${blockers.length})` : "(keine)"}

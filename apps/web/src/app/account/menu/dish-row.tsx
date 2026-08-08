@@ -19,7 +19,10 @@ export function DishRow({ id, name, priceCents, allergenReviewed }: DishRowProps
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-2">
       <div>
-        <Link href={`/account/menu/dishes/${id}`} className="font-medium text-link-foreground underline">
+        <Link
+          href={`/account/menu/dishes/${id}`}
+          className="font-medium text-link-foreground underline"
+        >
           {name}
         </Link>
         <span className="ml-2 text-sm text-foreground-secondary">
