@@ -67,12 +67,14 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
 
   return (
     <main className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-200 bg-neutral-50 px-5 py-10">
+      {/*
+        Same quieter hero-gradient treatment as `../../cart/page.tsx` -- see
+        that file's comment for rationale.
+      */}
+      <header className="bg-gradient-to-br from-[#2b1c14] to-[#4a2e1c] px-5 py-8">
         <div className="mx-auto flex max-w-2xl flex-col gap-1">
-          <p className="text-sm text-foreground-secondary">
-            {menu?.tenant.name ?? "Ihre Bestellung"}
-          </p>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
+          <p className="text-sm text-white/80">{menu?.tenant.name ?? "Ihre Bestellung"}</p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-white">
             Bestellstatus
           </h1>
         </div>

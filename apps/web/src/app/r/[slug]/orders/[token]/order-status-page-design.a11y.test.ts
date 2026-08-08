@@ -1,4 +1,4 @@
-import { colors, validateContrastRatio } from "@gastro-saas/ui";
+import { colors, parseHexColor, validateContrastRatio } from "@gastro-saas/ui";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -7,6 +7,43 @@ import { describe, expect, it } from "vitest";
  * "order not found" state, meet WCAG 2.1 AA contrast. Added for the epic-6
  * batch review's finding 2.
  */
+
+function compositeOverBackground(
+  foregroundHex: string,
+  alpha: number,
+  backgroundHex: string,
+): string {
+  const fg = parseHexColor(foregroundHex);
+  const bg = parseHexColor(backgroundHex);
+  const blend = (fgChannel: number, bgChannel: number) =>
+    Math.round(alpha * fgChannel + (1 - alpha) * bgChannel);
+  const toHexChannel = (value: number) => value.toString(16).padStart(2, "0");
+
+  return `#${toHexChannel(blend(fg.r, bg.r))}${toHexChannel(blend(fg.g, bg.g))}${toHexChannel(blend(fg.b, bg.b))}`;
+}
+
+/**
+ * The (found-order) header now uses the same quiet hero-gradient treatment
+ * as the public menu page (see `../../public-menu-design.a11y.test.ts` and
+ * `../../page.tsx`'s header comment) -- checked against the darker of the
+ * two gradient stops. The "not found" state's `<main>` is untouched by this
+ * pass and keeps its own `neutral-50` background, covered further below.
+ */
+const HERO_DARK_STOP = "#2b1c14";
+
+describe("order-status page header color contrast (WCAG AA)", () => {
+  it("'Bestellstatus' heading (white, large text) on the header's darkest gradient stop passes AA", () => {
+    const result = validateContrastRatio("#ffffff", HERO_DARK_STOP, "large");
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("tenant name subtext (white/80 over the header background) on the darkest gradient stop passes AA", () => {
+    const composited = compositeOverBackground("#ffffff", 0.8, HERO_DARK_STOP);
+    const result = validateContrastRatio(composited, HERO_DARK_STOP);
+    expect(result.passesAA).toBe(true);
+  });
+});
+
 describe("order-status page color contrast (WCAG AA)", () => {
   it("live status label (ember-700) on the status card background (neutral-0) passes AA", () => {
     const result = validateContrastRatio(colors.ember[700], colors.neutral[0]);
