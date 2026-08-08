@@ -12,6 +12,13 @@ interface OrderStatusLiveProps {
   tenantSlug: string;
   token: string;
   initialStatus: OrderStatus;
+  /**
+   * Full order id (UUID). Only ever used here to derive a short, display-only
+   * order token (first 8 chars, uppercased) shown in the ticket-stamp badge
+   * -- purely presentational, never used for lookups/authorization (those
+   * stay keyed off the guest access `token`, see `./actions.ts`).
+   */
+  orderId: string;
 }
 
 /**
@@ -35,7 +42,13 @@ interface OrderStatusLiveProps {
  * fetch) so the first paint -- and the no-JS fallback -- always shows the
  * correct status; polling is a progressive enhancement layered on top.
  */
-export function OrderStatusLive({ tenantSlug, token, initialStatus }: OrderStatusLiveProps) {
+export function OrderStatusLive({
+  tenantSlug,
+  token,
+  initialStatus,
+  orderId,
+}: OrderStatusLiveProps) {
+  const orderToken = orderId.replace(/-/g, "").slice(0, 8).toUpperCase();
   const [status, setStatus] = useState<OrderStatus>(initialStatus);
   const statusRef = useRef(status);
 
@@ -71,12 +84,24 @@ export function OrderStatusLive({ tenantSlug, token, initialStatus }: OrderStatu
   }, [tenantSlug, token, initialStatus]);
 
   return (
+    // The order-status page's strongest candidate for the full ticket
+    // treatment (see packages/ui/src/tokens.ts's design plan) -- this card
+    // IS literally the customer's order ticket, so both the torn-edge motif
+    // and the stamped order-number badge are functionally motivated here.
     <section
       aria-live="polite"
-      className="rounded-lg border border-clay-300 bg-neutral-0 p-5 shadow-sm"
+      className="ticket-edge rounded-t-lg border border-b-0 border-ember-300 bg-neutral-0 p-5 shadow-sm"
     >
-      <p className="text-sm font-medium text-foreground-secondary">Aktueller Status</p>
-      <p className="mt-1 font-display text-2xl font-semibold text-clay-700">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-foreground-secondary">Aktueller Status</p>
+        <span
+          className="ticket-stamp px-2 py-0.5 font-mono text-xs font-bold tracking-widest"
+          aria-label={`Bestellnummer ${orderToken}`}
+        >
+          #{orderToken}
+        </span>
+      </div>
+      <p className="mt-1 font-display text-2xl font-semibold text-ember-700">
         {orderStatusLabel(status)}
       </p>
       <p className="mt-2 text-sm text-foreground-secondary">{orderStatusDescription(status)}</p>

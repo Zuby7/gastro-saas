@@ -55,7 +55,7 @@ export default async function DishPage({ params }: DishPageProps) {
           </p>
           <Link
             href="/account/menu"
-            className="font-medium text-brand-600 underline hover:text-brand-700"
+            className="font-medium text-link-foreground underline hover:text-brand-700"
           >
             Zurück
           </Link>
@@ -214,7 +214,7 @@ export default async function DishPage({ params }: DishPageProps) {
           <h1 className="font-display text-2xl font-semibold text-foreground">{dish.name}</h1>
           <Link
             href="/account/menu"
-            className="text-sm font-medium text-brand-600 underline hover:text-brand-700"
+            className="text-sm font-medium text-link-foreground underline hover:text-brand-700"
           >
             Zurück zur Speisekarte
           </Link>
