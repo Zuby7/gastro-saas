@@ -31,7 +31,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
         `public-menu-design.a11y.test.ts` (contrast measured against the
         darker of the two stops, the worst case).
       */}
-      <header className="bg-gradient-to-br from-[#2b1c14] to-[#4a2e1c] px-5 pt-8 pb-6 sm:px-12 sm:pt-14 sm:pb-11">
+      <header className="bg-gradient-to-br from-espresso-900 to-espresso-800 px-5 pt-8 pb-6 sm:px-12 sm:pt-14 sm:pb-11">
         <div className="mx-auto flex max-w-5xl flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="max-w-xl">
             <h1 className="font-display text-3xl font-semibold tracking-tight text-white sm:text-[2.5rem]">

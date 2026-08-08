@@ -29,7 +29,7 @@ export default async function CartPage({ params }: CartPageProps) {
         chrome are unified here; the ticket-edge cart summary below is
         untouched.
       */}
-      <header className="bg-gradient-to-br from-[#2b1c14] to-[#4a2e1c] px-5 py-8">
+      <header className="bg-gradient-to-br from-espresso-900 to-espresso-800 px-5 py-8">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
           <div>
             <h1 className="font-display text-3xl font-semibold tracking-tight text-white">

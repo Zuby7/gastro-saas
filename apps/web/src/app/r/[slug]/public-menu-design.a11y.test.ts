@@ -7,13 +7,13 @@ import { describe, expect, it } from "vitest";
  * meet WCAG 2.1 AA contrast wherever they're actually rendered on the
  * public menu (`apps/web/src/app/r/[slug]/page.tsx`).
  *
- * The hero is a diagonal `linear-gradient` from `#2b1c14` (deep espresso,
- * the darker stop) to `#4a2e1c` (warmer brown). Every hero text/UI-element
- * pair below is checked against the DARKER stop, per this ticket's explicit
- * instruction to treat the worst case as if the whole background were the
- * darkest point of the gradient.
+ * The hero is a diagonal `linear-gradient` from `colors.espresso[900]` (deep
+ * espresso, the darker stop) to `colors.espresso[800]` (warmer brown). Every
+ * hero text/UI-element pair below is checked against the DARKER stop, per
+ * this ticket's explicit instruction to treat the worst case as if the whole
+ * background were the darkest point of the gradient.
  */
-const HERO_DARK_STOP = "#2b1c14";
+const HERO_DARK_STOP = colors.espresso[900];
 
 function compositeOverBackground(
   foregroundHex: string,

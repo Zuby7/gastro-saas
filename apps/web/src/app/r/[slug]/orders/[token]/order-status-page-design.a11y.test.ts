@@ -29,7 +29,7 @@ function compositeOverBackground(
  * two gradient stops. The "not found" state's `<main>` is untouched by this
  * pass and keeps its own `neutral-50` background, covered further below.
  */
-const HERO_DARK_STOP = "#2b1c14";
+const HERO_DARK_STOP = colors.espresso[900];
 
 describe("order-status page header color contrast (WCAG AA)", () => {
   it("'Bestellstatus' heading (white, large text) on the header's darkest gradient stop passes AA", () => {

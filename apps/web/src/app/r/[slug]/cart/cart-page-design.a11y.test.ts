@@ -34,7 +34,7 @@ function compositeOverBackground(
  * menu page (see `../public-menu-design.a11y.test.ts` and `../page.tsx`'s
  * header comment) -- checked against the darker of the two gradient stops.
  */
-const HERO_DARK_STOP = "#2b1c14";
+const HERO_DARK_STOP = colors.espresso[900];
 
 describe("cart page header color contrast (WCAG AA)", () => {
   it("'Warenkorb' heading (white, large text) on the header's darkest gradient stop passes AA", () => {

@@ -224,6 +224,14 @@ export const colors = {
     800: "#211f1c",
     900: "#141311",
   },
+  // `espresso` -- the hero gradient's dark backdrop (public menu / cart /
+  // checkout / order-status headers). Not part of the interactive/semantic
+  // palette above; it exists solely so the gradient stops are real tokens
+  // instead of ad-hoc hex literals, per `.claude/rules/frontend.md`.
+  espresso: {
+    800: "#4a2e1c",
+    900: "#2b1c14",
+  },
   danger: {
     500: "#c21f4b",
     600: "#9c1a3d",

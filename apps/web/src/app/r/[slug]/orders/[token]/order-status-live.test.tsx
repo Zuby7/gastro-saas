@@ -27,6 +27,20 @@ afterEach(() => {
  * announcements) when it doesn't.
  */
 describe("OrderStatusLive", () => {
+  it("renders the ticket-stamp order-number badge derived from the order id, with a matching aria-label", () => {
+    render(
+      <OrderStatusLive
+        tenantSlug="demo"
+        token="raw-token"
+        initialStatus="received"
+        orderId="11112222-3333-4444-5555-666677778888"
+      />,
+    );
+
+    const badge = screen.getByLabelText("Bestellnummer 11112222");
+    expect(badge).toHaveTextContent("#11112222");
+  });
+
   it("renders the initial status inside a polite live region without waiting for any poll", () => {
     render(
       <OrderStatusLive

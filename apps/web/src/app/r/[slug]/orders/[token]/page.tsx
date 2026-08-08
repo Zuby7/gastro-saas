@@ -71,7 +71,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
         Same quieter hero-gradient treatment as `../../cart/page.tsx` -- see
         that file's comment for rationale.
       */}
-      <header className="bg-gradient-to-br from-[#2b1c14] to-[#4a2e1c] px-5 py-8">
+      <header className="bg-gradient-to-br from-espresso-900 to-espresso-800 px-5 py-8">
         <div className="mx-auto flex max-w-2xl flex-col gap-1">
           <p className="text-sm text-white/80">{menu?.tenant.name ?? "Ihre Bestellung"}</p>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-white">
