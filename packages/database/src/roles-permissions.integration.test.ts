@@ -101,6 +101,7 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
       "menu.read",
       "menu.write",
       "orders.cancel",
+      "payments.read",
       "payments.refund",
       "roles.manage",
       "tenant.settings.write",
