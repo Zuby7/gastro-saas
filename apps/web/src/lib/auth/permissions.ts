@@ -8,6 +8,7 @@ export type PermissionKey =
   | "menu.write"
   | "menu.publish"
   | "orders.cancel"
+  | "payments.read"
   | "payments.refund"
   | "analytics.read"
   | "audit.read";
