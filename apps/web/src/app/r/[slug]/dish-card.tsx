@@ -1,7 +1,11 @@
 import { Plus } from "lucide-react";
 import { formatPrice } from "@/lib/public-menu/format";
 import type { PublicMenuDish } from "@/lib/public-menu/types";
-import { ADD_BUTTON_INTERACTIVE_CLASSNAME, ADD_BUTTON_VISUAL_CLASSNAME, isSimpleDish } from "./dish-add-button";
+import {
+  ADD_BUTTON_INTERACTIVE_CLASSNAME,
+  ADD_BUTTON_VISUAL_CLASSNAME,
+  isSimpleDish,
+} from "./dish-add-button";
 import { DishOptionChooser, SimpleAddButton } from "./dish-detail";
 import { DishPlaceholderIcon } from "./dish-visual";
 
