@@ -19,23 +19,20 @@
 }
 
 /*
- * Dark-mode background/foreground pairs are chosen from packages/ui's
- * token palette so both schemes clear WCAG AA (4.5:1 normal text, 3:1
- * large text) — see packages/ui/src/contrast.test.ts and
- * apps/web/src/app/page.a11y.test.ts for the verified ratios.
- *
- * `--link-foreground` uses `brand-300` (not `brand-600`, which fails AA
- * against the dark `neutral-900` background at ~2.8:1) so links stay
- * legible in both color schemes.
+ * Automatic OS-driven dark mode is intentionally OFF for now (previously
+ * auto-switched via `@media (prefers-color-scheme: dark)`). Only the root
+ * `--background`/`--foreground` CSS variables ever flipped for dark mode;
+ * nearly every card/section throughout the app hardcodes light-mode utility
+ * classes directly (`bg-neutral-0`, `bg-neutral-50`, etc.) instead of the
+ * `--background`/`--foreground` variables, so a user with an OS-level dark
+ * preference got near-white text over a still-hardcoded-white card
+ * background — invisible content, not a real dark theme. A real dark mode
+ * needs every surface audited to use the semantic background/foreground
+ * tokens consistently, not just the two root variables; until that's done
+ * as its own deliberate pass, shipping "automatic" dark mode does more harm
+ * than good. Tracked as a follow-up; do not re-enable this media query
+ * without first auditing every `bg-neutral-0`/`bg-neutral-50` usage.
  */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: var(--color-neutral-900);
-    --foreground: var(--color-neutral-50);
-    --foreground-secondary: var(--color-neutral-300);
-    --link-foreground: var(--color-brand-300);
-  }
-}
 
 body {
   background: var(--background);
