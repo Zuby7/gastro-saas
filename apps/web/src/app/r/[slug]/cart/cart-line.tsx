@@ -98,7 +98,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
           <button
             type="submit"
             disabled={isUpdating}
-            className="rounded-md border border-neutral-300 px-3 py-1 text-sm font-medium text-foreground hover:border-clay-400 hover:text-clay-700 disabled:opacity-60"
+            className="rounded-md border border-neutral-300 px-3 py-1 text-sm font-medium text-foreground hover:border-ember-400 hover:text-ember-700 disabled:opacity-60"
           >
             Aktualisieren
           </button>

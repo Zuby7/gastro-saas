@@ -16,20 +16,31 @@
   --color-brand-800: #1f4237;
   --color-brand-900: #1a372e;
 
-  --color-clay-50: #fbf1ea;
-  --color-clay-100: #f5ddc9;
-  --color-clay-200: #eabf98;
-  --color-clay-300: #dc9a67;
-  --color-clay-400: #c97a43;
-  --color-clay-500: #b35f2e;
-  --color-clay-600: #954a22;
-  --color-clay-700: #7a3c1e;
-  --color-clay-800: #5e2f19;
-  --color-clay-900: #4a2615;
+  --color-ember-50: #fdeee8;
+  --color-ember-100: #fad6c5;
+  --color-ember-200: #f3ad8c;
+  --color-ember-300: #e97f54;
+  --color-ember-400: #d65a2e;
+  --color-ember-500: #be3d18;
+  --color-ember-600: #9c3113;
+  --color-ember-700: #7a260f;
+  --color-ember-800: #591b0a;
+  --color-ember-900: #3b1207;
+
+  --color-gold-50: #faf3e1;
+  --color-gold-100: #f1dfaf;
+  --color-gold-200: #e3c077;
+  --color-gold-300: #d0a24c;
+  --color-gold-400: #b4872e;
+  --color-gold-500: #9c721b;
+  --color-gold-600: #7d5b15;
+  --color-gold-700: #614611;
+  --color-gold-800: #45320c;
+  --color-gold-900: #2d2007;
 
   --color-neutral-0: #ffffff;
-  --color-neutral-50: #f8f3ea;
-  --color-neutral-100: #efe6d5;
+  --color-neutral-50: #f7f5f2;
+  --color-neutral-100: #edeae4;
   --color-neutral-200: #d1cfcb;
   --color-neutral-300: #a9a6a0;
   --color-neutral-400: #7d7972;
@@ -39,12 +50,12 @@
   --color-neutral-800: #211f1c;
   --color-neutral-900: #141311;
 
-  --color-danger-500: #c0362c;
-  --color-danger-600: #9c2c24;
+  --color-danger-500: #c21f4b;
+  --color-danger-600: #9c1a3d;
   --color-success-500: #2f7d4f;
   --color-success-600: #256440;
-  --color-warning-500: #b8791a;
-  --color-warning-600: #966215;
+  --color-warning-500: #9c721b;
+  --color-warning-600: #7d5b15;
 
   --spacing-0: 0px;
   --spacing-1: 0.25rem;

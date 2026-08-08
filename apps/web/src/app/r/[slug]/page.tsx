@@ -27,14 +27,13 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
             <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
               {menu.tenant.name}
             </h1>
-            <div aria-hidden="true" className="mt-4 h-1 w-16 rounded-full bg-clay-500" />
             {menu.tenant.description ? (
               <p className="mt-4 max-w-2xl text-foreground-secondary">{menu.tenant.description}</p>
             ) : null}
           </div>
           <Link
             href={`/r/${slug}/cart`}
-            className="shrink-0 rounded-full border border-neutral-300 bg-neutral-0 px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-clay-400 hover:text-clay-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+            className="shrink-0 rounded-full border border-neutral-300 bg-neutral-0 px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-ember-400 hover:text-ember-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
           >
             Warenkorb{cart && cart.itemCount > 0 ? ` (${cart.itemCount})` : ""}
           </Link>
@@ -51,7 +50,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
               <a
                 key={category.id}
                 href={`#category-${category.id}`}
-                className="shrink-0 rounded-full border border-neutral-300 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-clay-400 hover:text-clay-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+                className="shrink-0 rounded-full border border-neutral-300 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-ember-400 hover:text-ember-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
               >
                 {category.name}
               </a>
@@ -95,7 +94,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
                         <p className="mt-1 text-sm text-foreground-secondary">{dish.description}</p>
                       ) : null}
                     </div>
-                    <p className="font-display font-semibold text-clay-700">
+                    <p className="font-display font-semibold text-ember-700">
                       {formatPrice(dish.priceCents, dish.currency)}
                     </p>
                   </div>

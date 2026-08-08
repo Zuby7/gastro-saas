@@ -8,13 +8,18 @@ import { describe, expect, it } from "vitest";
  * batch review's finding 2.
  */
 describe("order-status page color contrast (WCAG AA)", () => {
-  it("live status label (clay-700) on the status card background (neutral-0) passes AA", () => {
-    const result = validateContrastRatio(colors.clay[700], colors.neutral[0]);
+  it("live status label (ember-700) on the status card background (neutral-0) passes AA", () => {
+    const result = validateContrastRatio(colors.ember[700], colors.neutral[0]);
     expect(result.passesAA).toBe(true);
   });
 
-  it("total-sum price (clay-700) on the order-items card background (neutral-0) passes AA", () => {
-    const result = validateContrastRatio(colors.clay[700], colors.neutral[0]);
+  it("total-sum price (ember-700) on the order-items card background (neutral-0) passes AA", () => {
+    const result = validateContrastRatio(colors.ember[700], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("ticket-stamp order number badge text (gold-800) on its gold-50 background passes AA", () => {
+    const result = validateContrastRatio(colors.gold[800], colors.gold[50]);
     expect(result.passesAA).toBe(true);
   });
 
@@ -25,8 +30,8 @@ describe("order-status page color contrast (WCAG AA)", () => {
     expect(body.passesAA).toBe(true);
   });
 
-  it("'back to menu' link text (clay-700) on the page background (neutral-50) passes AA", () => {
-    const result = validateContrastRatio(colors.clay[700], colors.neutral[50]);
+  it("'back to menu' link text (ember-700) on the page background (neutral-50) passes AA", () => {
+    const result = validateContrastRatio(colors.ember[700], colors.neutral[50]);
     expect(result.passesAA).toBe(true);
   });
 });

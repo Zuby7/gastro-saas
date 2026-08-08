@@ -26,8 +26,8 @@ function compositeOverBackground(
 }
 
 describe("checkout page color contrast (WCAG AA)", () => {
-  it("total-sum price (clay-700) on the summary bar background (neutral-0) passes AA", () => {
-    const result = validateContrastRatio(colors.clay[700], colors.neutral[0]);
+  it("total-sum price (ember-700) on the summary bar background (neutral-0) passes AA", () => {
+    const result = validateContrastRatio(colors.ember[700], colors.neutral[0]);
     expect(result.passesAA).toBe(true);
   });
 

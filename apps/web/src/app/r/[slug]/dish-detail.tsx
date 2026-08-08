@@ -72,7 +72,7 @@ export function DishDetail({ dish, tenantSlug }: DishDetailProps) {
 
   return (
     <details className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
-      <summary className="cursor-pointer font-medium text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+      <summary className="cursor-pointer font-medium text-link-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
         Auswählen
       </summary>
 
@@ -160,7 +160,7 @@ export function DishDetail({ dish, tenantSlug }: DishDetailProps) {
         {state.cart ? (
           <p className="rounded-md border border-neutral-300 bg-neutral-0 px-3 py-2 text-sm text-foreground">
             Im Warenkorb: {state.cart.itemCount} Artikel ·{" "}
-            <Link href={`/r/${tenantSlug}/cart`} className="font-medium text-clay-700 underline">
+            <Link href={`/r/${tenantSlug}/cart`} className="font-medium text-ember-700 underline">
               Warenkorb ansehen
             </Link>
           </p>

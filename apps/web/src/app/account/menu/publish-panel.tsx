@@ -59,7 +59,11 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
                 : "rounded-lg border border-neutral-200 p-3"
             }
           >
-            <h3 className="font-semibold text-danger-600">
+            <h3
+              className={
+                blockers.length > 0 ? "font-semibold text-danger-600" : "font-semibold text-foreground"
+              }
+            >
               Blocker {blockers.length > 0 ? `(${blockers.length})` : "(keine)"}
             </h3>
             {blockers.length > 0 ? (
@@ -82,7 +86,11 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
           </div>
 
           <div className="rounded-lg border border-neutral-200 p-3">
-            <h3 className="font-medium text-warning-600">
+            <h3
+              className={
+                warnings.length > 0 ? "font-medium text-warning-600" : "font-medium text-foreground"
+              }
+            >
               Warnungen {warnings.length > 0 ? `(${warnings.length})` : "(keine)"}
             </h3>
             {warnings.length > 0 ? (

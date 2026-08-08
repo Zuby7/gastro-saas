@@ -32,7 +32,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
           </div>
           <Link
             href={`/r/${slug}/cart`}
-            className="shrink-0 rounded-full border border-neutral-300 bg-neutral-0 px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-clay-400 hover:text-clay-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+            className="shrink-0 rounded-full border border-neutral-300 bg-neutral-0 px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-ember-400 hover:text-ember-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
           >
             Zurück zum Warenkorb
           </Link>
@@ -43,17 +43,26 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
         {!cart || cart.items.length === 0 ? (
           <p className="rounded-md border border-neutral-300 bg-neutral-0 p-4 text-foreground">
             Ihr Warenkorb ist leer.{" "}
-            <Link href={`/r/${slug}`} className="font-medium text-clay-700 underline">
+            <Link href={`/r/${slug}`} className="font-medium text-ember-700 underline">
               Zurück zur Speisekarte
             </Link>
           </p>
         ) : (
           <>
-            <div className="flex items-center justify-between rounded-md border border-neutral-300 bg-neutral-0 px-4 py-3">
-              <span className="font-medium text-foreground">Gesamtsumme</span>
-              <span className="font-display text-xl font-semibold text-clay-700">
-                {formatPrice(cart.totalCents, cart.currency)}
-              </span>
+            {/*
+              The pre-submit order summary is the checkout page's "order
+              confirmation moment" (see packages/ui/src/tokens.ts's design
+              plan) -- it gets the same ticket-edge treatment as the cart
+              summary and the order-status card, since all three literally
+              represent the customer's order.
+            */}
+            <div className="ticket-edge rounded-t-lg border border-b-0 border-neutral-300 bg-neutral-0 px-4 pt-3 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-foreground">Gesamtsumme</span>
+                <span className="font-display text-xl font-semibold text-ember-700">
+                  {formatPrice(cart.totalCents, cart.currency)}
+                </span>
+              </div>
             </div>
 
             <CheckoutForm tenantSlug={slug} checkoutReady={checkoutReady} />

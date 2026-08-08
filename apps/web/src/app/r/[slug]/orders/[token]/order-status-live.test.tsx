@@ -28,7 +28,7 @@ afterEach(() => {
  */
 describe("OrderStatusLive", () => {
   it("renders the initial status inside a polite live region without waiting for any poll", () => {
-    render(<OrderStatusLive tenantSlug="demo" token="raw-token" initialStatus="received" />);
+    render(<OrderStatusLive tenantSlug="demo" token="raw-token" initialStatus="received" orderId="11112222-3333-4444-5555-666677778888" />);
 
     const region = screen.getByText("Aktueller Status").closest("section");
     expect(region).toHaveAttribute("aria-live", "polite");
@@ -38,7 +38,7 @@ describe("OrderStatusLive", () => {
 
   it("updates the announced status text once the poll reports a status change", async () => {
     pollOrderStatusMock.mockResolvedValue({ status: "preparing" });
-    render(<OrderStatusLive tenantSlug="demo" token="raw-token" initialStatus="received" />);
+    render(<OrderStatusLive tenantSlug="demo" token="raw-token" initialStatus="received" orderId="11112222-3333-4444-5555-666677778888" />);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(20_000);
@@ -51,7 +51,7 @@ describe("OrderStatusLive", () => {
 
   it("does not re-render/re-announce when the polled status is unchanged", async () => {
     pollOrderStatusMock.mockResolvedValue({ status: "received" });
-    render(<OrderStatusLive tenantSlug="demo" token="raw-token" initialStatus="received" />);
+    render(<OrderStatusLive tenantSlug="demo" token="raw-token" initialStatus="received" orderId="11112222-3333-4444-5555-666677778888" />);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(20_000);
@@ -62,7 +62,7 @@ describe("OrderStatusLive", () => {
   });
 
   it("stops polling once a terminal status is reached", async () => {
-    render(<OrderStatusLive tenantSlug="demo" token="raw-token" initialStatus="completed" />);
+    render(<OrderStatusLive tenantSlug="demo" token="raw-token" initialStatus="completed" orderId="11112222-3333-4444-5555-666677778888" />);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
@@ -73,7 +73,7 @@ describe("OrderStatusLive", () => {
 
   it("treats a null poll result (token no longer resolvable, e.g. tenant/slug mismatch) as a no-op rather than clearing the status", async () => {
     pollOrderStatusMock.mockResolvedValue(null);
-    render(<OrderStatusLive tenantSlug="demo" token="raw-token" initialStatus="received" />);
+    render(<OrderStatusLive tenantSlug="demo" token="raw-token" initialStatus="received" orderId="11112222-3333-4444-5555-666677778888" />);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(20_000);
