@@ -25,6 +25,26 @@ const multiVariantDish: PublicMenuDish = {
   allergenNotice: "",
 };
 
+const soldOutSimpleDish: PublicMenuDish = {
+  id: "dish-2",
+  name: "Spaghetti Carbonara",
+  description: "Ei, Speck, Parmesan",
+  priceCents: 1290,
+  currency: "EUR",
+  soldOut: true,
+  image: null,
+  variants: [],
+  optionGroups: [],
+  labels: [],
+  allergenNotice: "Enthält Ei, Milch",
+};
+
+const soldOutMultiVariantDish: PublicMenuDish = {
+  ...multiVariantDish,
+  id: "dish-3",
+  soldOut: true,
+};
+
 /**
  * Fix for Opus review finding 2 on PR #80: the multi-variant dish card's
  * `<summary>` disclosure trigger must announce the starting price (not just
@@ -54,5 +74,56 @@ describe("DishCard multi-variant disclosure trigger accessibility", () => {
     const decorativeIcon = trigger!.querySelector('[aria-hidden="true"]');
     expect(decorativeIcon).not.toBeNull();
     expect(decorativeIcon).not.toHaveClass("focus-visible:outline");
+  });
+});
+
+/**
+ * Fixes for Opus review findings 1 and 2 on PR #80's final repair cycle:
+ * (1) sold-out dishes must not have their text content (in particular the
+ * legally-motivated allergen notice) dimmed via `opacity`, which failed
+ * WCAG AA contrast; (2) sold-out dishes must still show their price -- only
+ * the add-to-cart affordance is suppressed.
+ */
+describe("DishCard sold-out state", () => {
+  it("does not apply an opacity class to the allergen-notice element for a sold-out simple dish", () => {
+    const { container } = render(<DishCard dish={soldOutSimpleDish} tenantSlug="demo" />);
+
+    const allergenNotice = Array.from(container.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("Enthält Ei, Milch"),
+    );
+    expect(allergenNotice).not.toBeUndefined();
+    expect(allergenNotice!.className).not.toMatch(/opacity-/);
+    expect(allergenNotice!.closest('[class*="opacity-"]')).toBeNull();
+  });
+
+  it("does not apply an opacity class to the description element for a sold-out simple dish", () => {
+    const { container } = render(<DishCard dish={soldOutSimpleDish} tenantSlug="demo" />);
+
+    const description = Array.from(container.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("Ei, Speck, Parmesan"),
+    );
+    expect(description).not.toBeUndefined();
+    expect(description!.className).not.toMatch(/opacity-/);
+    expect(description!.closest('[class*="opacity-"]')).toBeNull();
+  });
+
+  it("still renders the formatted price for a sold-out simple dish, with no add button", () => {
+    const { container, getByText, queryByRole } = render(
+      <DishCard dish={soldOutSimpleDish} tenantSlug="demo" />,
+    );
+
+    expect(getByText("12,90 €")).toBeInTheDocument();
+    expect(queryByRole("button")).toBeNull();
+    expect(container.querySelector("summary")).toBeNull();
+  });
+
+  it("still renders the 'ab {price}' starting price for a sold-out multi-variant dish, with no chooser summary", () => {
+    const { queryByRole, container, getByText } = render(
+      <DishCard dish={soldOutMultiVariantDish} tenantSlug="demo" />,
+    );
+
+    expect(getByText(/ab 8,90.?€/u)).toBeInTheDocument();
+    expect(container.querySelector("summary")).toBeNull();
+    expect(queryByRole("button")).toBeNull();
   });
 });

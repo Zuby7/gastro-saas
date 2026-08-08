@@ -8,12 +8,14 @@ import { describe, expect, it } from "vitest";
  * public menu (`apps/web/src/app/r/[slug]/page.tsx`).
  *
  * The hero is a diagonal `linear-gradient` from `colors.espresso[900]` (deep
- * espresso, the darker stop) to `colors.espresso[800]` (warmer brown). Every
- * hero text/UI-element pair below is checked against the DARKER stop, per
- * this ticket's explicit instruction to treat the worst case as if the whole
- * background were the darkest point of the gradient.
+ * espresso, the darker stop) to `colors.espresso[800]` (warmer, LIGHTER
+ * brown). For light/white text on a dark background, a lighter background
+ * gives *less* contrast, so `espresso[800]` -- not `espresso[900]` -- is the
+ * worst case; every hero text/UI-element pair below is checked against that
+ * lighter stop (independently verified with `validateContrastRatio` to still
+ * pass AA with a healthy margin).
  */
-const HERO_DARK_STOP = colors.espresso[900];
+const HERO_WORST_CASE_STOP = colors.espresso[800];
 
 function compositeOverBackground(
   foregroundHex: string,
@@ -30,19 +32,19 @@ function compositeOverBackground(
 }
 
 describe("public menu hero color contrast (WCAG AA)", () => {
-  it("restaurant name (white, large text) on the hero's darkest gradient stop passes AA", () => {
-    const result = validateContrastRatio("#ffffff", HERO_DARK_STOP, "large");
+  it("restaurant name (white, large text) on the hero's worst-case (lighter) gradient stop passes AA", () => {
+    const result = validateContrastRatio("#ffffff", HERO_WORST_CASE_STOP, "large");
     expect(result.passesAA).toBe(true);
   });
 
-  it("tenant description (white/80 over the hero background) on the darkest gradient stop passes AA", () => {
-    const composited = compositeOverBackground("#ffffff", 0.8, HERO_DARK_STOP);
-    const result = validateContrastRatio(composited, HERO_DARK_STOP);
+  it("tenant description (white/80 over the hero background) on the worst-case (lighter) gradient stop passes AA", () => {
+    const composited = compositeOverBackground("#ffffff", 0.8, HERO_WORST_CASE_STOP);
+    const result = validateContrastRatio(composited, HERO_WORST_CASE_STOP);
     expect(result.passesAA).toBe(true);
   });
 
-  it("cart pill text (white) on its translucent white/12 background (composited over the darkest gradient stop) passes AA", () => {
-    const pillBackground = compositeOverBackground("#ffffff", 0.12, HERO_DARK_STOP);
+  it("cart pill text (white) on its translucent white/12 background (composited over the worst-case (lighter) gradient stop) passes AA", () => {
+    const pillBackground = compositeOverBackground("#ffffff", 0.12, HERO_WORST_CASE_STOP);
     const result = validateContrastRatio("#ffffff", pillBackground);
     expect(result.passesAA).toBe(true);
   });
@@ -87,5 +89,27 @@ describe("public menu category nav / dish card color contrast (WCAG AA)", () => 
   it("warm stone background (neutral-50) keeps secondary text (neutral-500) at AA for normal text", () => {
     const result = validateContrastRatio(colors.neutral[500], colors.neutral[50]);
     expect(result.passesAA).toBe(true);
+  });
+
+  /**
+   * Fix for Opus review finding 1 on PR #80's final repair cycle: sold-out
+   * dish cards used to wrap their whole text block (description + the
+   * legally-motivated allergen notice) in `opacity-60`, which independently
+   * computes to a real AA failure. `DishCard` no longer applies that opacity
+   * to text at all (see `dish-card.tsx` and `dish-card.test.tsx`'s DOM-level
+   * assertions) -- this asserts the actual rendered color combination (the
+   * card's `neutral-0` background, `foreground-secondary`/`neutral-500` text,
+   * un-dimmed) passes AA for normal text, i.e. the fixed state, not the
+   * previously-broken opacity composite.
+   */
+  it("sold-out dish card description/allergen-notice text (neutral-500, undimmed) on the card background (neutral-0) passes AA", () => {
+    const result = validateContrastRatio(colors.neutral[500], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("regression check: the previously-used opacity-60 dimming of neutral-500 text over a white/neutral-0 card would have FAILED AA (documents why it was removed)", () => {
+    const dimmedComposite = compositeOverBackground(colors.neutral[500], 0.6, colors.neutral[0]);
+    const result = validateContrastRatio(dimmedComposite, colors.neutral[0]);
+    expect(result.passesAA).toBe(false);
   });
 });

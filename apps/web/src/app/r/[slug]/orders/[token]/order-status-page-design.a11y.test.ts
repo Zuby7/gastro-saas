@@ -25,21 +25,23 @@ function compositeOverBackground(
 /**
  * The (found-order) header now uses the same quiet hero-gradient treatment
  * as the public menu page (see `../../public-menu-design.a11y.test.ts` and
- * `../../page.tsx`'s header comment) -- checked against the darker of the
- * two gradient stops. The "not found" state's `<main>` is untouched by this
- * pass and keeps its own `neutral-50` background, covered further below.
+ * `../../page.tsx`'s header comment) -- checked against `espresso[800]`, the
+ * LIGHTER of the two gradient stops, which is the worst case for light/white
+ * text (a lighter background gives white text less contrast, not more). The
+ * "not found" state's `<main>` is untouched by this pass and keeps its own
+ * `neutral-50` background, covered further below.
  */
-const HERO_DARK_STOP = colors.espresso[900];
+const HERO_WORST_CASE_STOP = colors.espresso[800];
 
 describe("order-status page header color contrast (WCAG AA)", () => {
-  it("'Bestellstatus' heading (white, large text) on the header's darkest gradient stop passes AA", () => {
-    const result = validateContrastRatio("#ffffff", HERO_DARK_STOP, "large");
+  it("'Bestellstatus' heading (white, large text) on the header's worst-case (lighter) gradient stop passes AA", () => {
+    const result = validateContrastRatio("#ffffff", HERO_WORST_CASE_STOP, "large");
     expect(result.passesAA).toBe(true);
   });
 
-  it("tenant name subtext (white/80 over the header background) on the darkest gradient stop passes AA", () => {
-    const composited = compositeOverBackground("#ffffff", 0.8, HERO_DARK_STOP);
-    const result = validateContrastRatio(composited, HERO_DARK_STOP);
+  it("tenant name subtext (white/80 over the header background) on the worst-case (lighter) gradient stop passes AA", () => {
+    const composited = compositeOverBackground("#ffffff", 0.8, HERO_WORST_CASE_STOP);
+    const result = validateContrastRatio(composited, HERO_WORST_CASE_STOP);
     expect(result.passesAA).toBe(true);
   });
 });

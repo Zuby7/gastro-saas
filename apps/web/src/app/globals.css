@@ -30,8 +30,8 @@
  * needs every surface audited to use the semantic background/foreground
  * tokens consistently, not just the two root variables; until that's done
  * as its own deliberate pass, shipping "automatic" dark mode does more harm
- * than good. Tracked as a follow-up; do not re-enable this media query
- * without first auditing every `bg-neutral-0`/`bg-neutral-50` usage.
+ * than good. See issue #83; do not re-enable this media query without first
+ * auditing every `bg-neutral-0`/`bg-neutral-50` usage.
  */
 
 body {

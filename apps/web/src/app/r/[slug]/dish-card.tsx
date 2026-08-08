@@ -91,7 +91,16 @@ export function DishCard({ dish, tenantSlug }: DishCardProps) {
         ) : null}
       </div>
 
-      <div className={`flex flex-1 flex-col gap-1.5 p-4 ${dish.soldOut ? "opacity-60" : ""}`}>
+      {/*
+        Sold-out de-emphasis lives on the image placeholder above (its own
+        gray gradient) and the solid "Ausverkauft" badge -- NOT on this text
+        block. An earlier version wrapped this whole block in `opacity-60`,
+        which dimmed the description AND the legally-motivated allergen
+        notice below AA (independently verified: neutral-500 at 60% opacity
+        over white composites to ~2.77:1, well under the 4.5:1 normal-text
+        minimum). See `public-menu-design.a11y.test.ts` and `dish-card.test.tsx`.
+      */}
+      <div className="flex flex-1 flex-col gap-1.5 p-4">
         <h3 className="text-[15px] font-medium text-foreground">{dish.name}</h3>
         {dish.description ? (
           <p className="line-clamp-3 text-[13px] text-foreground-secondary">{dish.description}</p>
@@ -112,7 +121,19 @@ export function DishCard({ dish, tenantSlug }: DishCardProps) {
 
         <p className="text-xs text-foreground-secondary">{dish.allergenNotice}</p>
 
-        {dish.soldOut ? null : isSimpleDish(dish) ? (
+        {dish.soldOut ? (
+          // Sold-out dishes still show their price -- only the add-to-cart
+          // button / variant-chooser disclosure is suppressed. See fix for
+          // Opus review finding 2 on PR #80 (price display was previously
+          // lost entirely for sold-out dishes).
+          <div className="mt-auto flex items-center pt-2">
+            <span className="font-display font-bold text-ember-700">
+              {isSimpleDish(dish)
+                ? formatPrice(dish.priceCents, dish.currency)
+                : startingPriceLabel(dish)}
+            </span>
+          </div>
+        ) : isSimpleDish(dish) ? (
           <div className="mt-auto flex items-center justify-between pt-2">
             <span className="font-display font-bold text-ember-700">
               {formatPrice(dish.priceCents, dish.currency)}

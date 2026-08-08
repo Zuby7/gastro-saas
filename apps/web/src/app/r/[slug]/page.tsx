@@ -28,8 +28,10 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
         warm, dark diagonal gradient replacing the old flat
         `bg-neutral-50` header band. The two gradient stops and the
         `gold-300` label/badge color are checked against
-        `public-menu-design.a11y.test.ts` (contrast measured against the
-        darker of the two stops, the worst case).
+        `public-menu-design.a11y.test.ts` (contrast measured against
+        `espresso-800`, the LIGHTER of the two stops -- the worst case for
+        light/white text, since a lighter background gives it less
+        contrast).
       */}
       <header className="bg-gradient-to-br from-espresso-900 to-espresso-800 px-5 pt-8 pb-6 sm:px-12 sm:pt-14 sm:pb-11">
         <div className="mx-auto flex max-w-5xl flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
