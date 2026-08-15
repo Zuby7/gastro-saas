@@ -53,7 +53,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
           Für diesen Link konnte keine Bestellung gefunden werden. Bitte prüfen Sie den Link aus
           Ihrer Bestellbestätigung.
         </p>
-        <Link href={`/r/${slug}`} className="font-medium text-clay-700 underline">
+        <Link href={`/r/${slug}`} className="font-medium text-ember-700 underline">
           Zurück zur Speisekarte
         </Link>
       </main>
@@ -67,19 +67,26 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
 
   return (
     <main className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-200 bg-neutral-50 px-5 py-10">
+      {/*
+        Same quieter hero-gradient treatment as `../../cart/page.tsx` -- see
+        that file's comment for rationale.
+      */}
+      <header className="bg-gradient-to-br from-espresso-900 to-espresso-800 px-5 py-8">
         <div className="mx-auto flex max-w-2xl flex-col gap-1">
-          <p className="text-sm text-foreground-secondary">
-            {menu?.tenant.name ?? "Ihre Bestellung"}
-          </p>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
+          <p className="text-sm text-white/80">{menu?.tenant.name ?? "Ihre Bestellung"}</p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-white">
             Bestellstatus
           </h1>
         </div>
       </header>
 
       <div className="mx-auto flex max-w-2xl flex-col gap-6 px-5 py-8">
-        <OrderStatusLive tenantSlug={slug} token={token} initialStatus={order.status} />
+        <OrderStatusLive
+          tenantSlug={slug}
+          token={token}
+          initialStatus={order.status}
+          orderId={order.orderId}
+        />
 
         <section className="rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground">Details</h2>
@@ -123,7 +130,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
           </ul>
           <div className="mt-4 flex items-center justify-between border-t border-neutral-200 pt-3">
             <span className="font-medium text-foreground">Gesamtsumme</span>
-            <span className="font-display text-lg font-semibold text-clay-700">
+            <span className="font-display text-lg font-semibold text-ember-700">
               {formatPrice(order.totalCents, order.currency)}
             </span>
           </div>
@@ -147,7 +154,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
 
         <Link
           href={`/r/${slug}`}
-          className="self-start text-sm font-medium text-clay-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+          className="self-start text-sm font-medium text-ember-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
         >
           Zurück zur Speisekarte
         </Link>
