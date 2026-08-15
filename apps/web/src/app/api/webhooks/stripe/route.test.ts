@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const constructEventMock = vi.fn();
-const insertWebhookEventMock = vi.fn();
+const claimEventMock = vi.fn();
 const updateWebhookEventMock = vi.fn();
 const handleStripePaymentWebhookEventMock = vi.fn();
 
@@ -20,10 +20,13 @@ vi.mock("@/lib/payments/webhook-service", () => ({
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => ({
+    rpc: (fn: string, args: unknown) => {
+      if (fn === "claim_payment_webhook_event") return claimEventMock(args);
+      throw new Error(`unexpected rpc ${fn}`);
+    },
     from: (table: string) => {
       if (table === "payment_webhook_events") {
         return {
-          insert: insertWebhookEventMock,
           update: (payload: unknown) => {
             updateWebhookEventMock(payload);
             return { eq: async () => ({ error: null }) };
@@ -47,7 +50,7 @@ function makeRequest(body: string, signature: string | null = "sig_test") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  insertWebhookEventMock.mockResolvedValue({ error: null });
+  claimEventMock.mockResolvedValue({ data: [{ already_processed: false }], error: null });
   handleStripePaymentWebhookEventMock.mockResolvedValue(undefined);
 });
 
@@ -67,7 +70,7 @@ describe("POST /api/webhooks/stripe", () => {
     const { POST } = await import("./route");
     const response = await POST(makeRequest("{}"));
     expect(response.status).toBe(400);
-    expect(insertWebhookEventMock).not.toHaveBeenCalled();
+    expect(claimEventMock).not.toHaveBeenCalled();
     expect(handleStripePaymentWebhookEventMock).not.toHaveBeenCalled();
   });
 
@@ -81,9 +84,9 @@ describe("POST /api/webhooks/stripe", () => {
     expect(constructEventMock).toHaveBeenCalledWith(rawBody, "sig_test", "whsec_test");
   });
 
-  it("deduplicates by event ID and never calls the processing logic for a duplicate delivery", async () => {
+  it("deduplicates a genuinely already-processed event and never calls the processing logic", async () => {
     constructEventMock.mockReturnValue({ id: "evt_1", type: "checkout.session.completed" });
-    insertWebhookEventMock.mockResolvedValue({ error: { code: "23505" } });
+    claimEventMock.mockResolvedValue({ data: [{ already_processed: true }], error: null });
 
     const { POST } = await import("./route");
     const response = await POST(makeRequest("{}"));
@@ -118,5 +121,77 @@ describe("POST /api/webhooks/stripe", () => {
 
     expect(response.status).toBe(500);
     expect(updateWebhookEventMock).not.toHaveBeenCalled();
+  });
+
+  it("claim RPC failure is a hard error (never silently swallowed)", async () => {
+    constructEventMock.mockReturnValue({
+      id: "evt_claim_error",
+      type: "checkout.session.completed",
+    });
+    claimEventMock.mockResolvedValue({ data: null, error: { message: "db error" } });
+
+    const { POST } = await import("./route");
+    const response = await POST(makeRequest("{}"));
+
+    expect(response.status).toBe(500);
+    expect(handleStripePaymentWebhookEventMock).not.toHaveBeenCalled();
+  });
+
+  // Regression test for the epic-7 batch review finding: the payment webhook
+  // had the identical dedup/retry contradiction just fixed on
+  // `stripe-connect/route.ts` -- a plain unique-violation-means-duplicate
+  // dedup check made a claimed-but-never-completed row permanently
+  // unreclaimable by Stripe's own retry of the same event id, silently and
+  // permanently losing a webhook's effect (money captured, order stuck in
+  // `awaiting_payment` forever) on any mid-processing failure.
+  // `claim_payment_webhook_event()` fixes this by only reporting
+  // `already_processed: true` once processing genuinely finished (the DB-level
+  // claim/reclaim semantics are covered by the migration/integration test;
+  // this proves the route's own reprocess-vs-duplicate branching).
+  describe("retry semantics (epic-7 batch review fix)", () => {
+    it("first delivery: processing throws -> 500, event left reclaimable (processed_at update never called)", async () => {
+      constructEventMock.mockReturnValue({ id: "evt_retry", type: "checkout.session.completed" });
+      handleStripePaymentWebhookEventMock.mockRejectedValueOnce(new Error("transient db blip"));
+
+      const { POST } = await import("./route");
+      const response = await POST(makeRequest("{}"));
+
+      expect(response.status).toBe(500);
+      expect(handleStripePaymentWebhookEventMock).toHaveBeenCalledTimes(1);
+      expect(updateWebhookEventMock).not.toHaveBeenCalled();
+    });
+
+    it("second delivery of the SAME event id (still unprocessed) is genuinely reprocessed and this time succeeds", async () => {
+      const event = { id: "evt_retry", type: "checkout.session.completed" };
+      constructEventMock.mockReturnValue(event);
+      // Claim RPC reports not-yet-processed (the DB row was claimed but never
+      // reached processed_at after the first failure) -- this delivery's
+      // processing succeeds.
+      claimEventMock.mockResolvedValue({ data: [{ already_processed: false }], error: null });
+      handleStripePaymentWebhookEventMock.mockResolvedValueOnce(undefined);
+
+      const { POST } = await import("./route");
+      const response = await POST(makeRequest("{}"));
+      const json = await response.json();
+
+      expect(json).toEqual({ received: true });
+      expect(handleStripePaymentWebhookEventMock).toHaveBeenCalledTimes(1);
+      expect(handleStripePaymentWebhookEventMock).toHaveBeenCalledWith(expect.anything(), event);
+      expect(updateWebhookEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({ processed_at: expect.any(String) }),
+      );
+    });
+
+    it("third delivery of an already-successfully-processed event is a true no-op duplicate", async () => {
+      constructEventMock.mockReturnValue({ id: "evt_retry", type: "checkout.session.completed" });
+      claimEventMock.mockResolvedValue({ data: [{ already_processed: true }], error: null });
+
+      const { POST } = await import("./route");
+      const response = await POST(makeRequest("{}"));
+      const json = await response.json();
+
+      expect(json).toEqual({ received: true, duplicate: true });
+      expect(handleStripePaymentWebhookEventMock).not.toHaveBeenCalled();
+    });
   });
 });

@@ -76,19 +76,19 @@ describe.skipIf(!dbAvailable)("payment_accounts (Stripe Connect onboarding)", ()
     ]);
   }
 
-  it("lets an Owner create and read their own tenant's payment_accounts row", async () => {
+  it("lets an Owner read their own tenant's payment_accounts row (created server-side, service_role)", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA } = fixture;
 
-    const inserted = await queryAsUser<{ tenant_id: string; status: string }>(
-      admin,
-      tenantA.ownerId,
+    // Rows are only ever created by trusted server code via the
+    // service-role client (`startStripeOnboardingAction`, epic-7 batch
+    // review fix) -- simulated here with the raw superuser admin
+    // connection, standing in for service_role, never `queryAsUser`.
+    await admin.query(
       `insert into payment_accounts (tenant_id, stripe_account_id, created_by_user_id)
-       values ($1, $2, $3)
-       returning tenant_id, status`,
+       values ($1, $2, $3)`,
       [tenantA.tenantId, "acct_test_a", tenantA.ownerId],
     );
-    expect(inserted.rows[0]).toMatchObject({ tenant_id: tenantA.tenantId, status: "pending" });
 
     const read = await queryAsUser<{ stripe_account_id: string }>(
       admin,
@@ -97,6 +97,111 @@ describe.skipIf(!dbAvailable)("payment_accounts (Stripe Connect onboarding)", ()
       [tenantA.tenantId],
     );
     expect(read.rows).toEqual([{ stripe_account_id: "acct_test_a" }]);
+  });
+
+  // Regression test for the epic-7 batch review finding (HIGH,
+  // payout-redirection): `authenticated` previously held INSERT gated only
+  // on `payments.read`, so a Manager (who holds `payments.read` but is not
+  // the Owner) could insert a row pointing `stripe_account_id` at an
+  // account they controlled *before* the real Owner ever connected Stripe,
+  // and the return_url page/webhook would later trust Stripe's real answer
+  // for that wrong account -- silently redirecting the tenant's payouts.
+  // The fix removes the INSERT grant/policy entirely, for every role,
+  // including the Owner -- `payment_accounts` rows can now only ever be
+  // created by trusted server code via the service-role client.
+  it("never lets an authenticated tenant member (Owner or Manager) insert a payment_accounts row directly, even pointing at their own tenant", async () => {
+    const managerUserId = randomUUID();
+    fixture = await seedTwoTenantFixture(admin, {
+      tenantA: {
+        additionalMembers: [
+          { userId: managerUserId, email: "manager-hijack@example.test", role: "manager" },
+        ],
+      },
+    });
+    const { tenantA } = fixture;
+
+    await expect(
+      queryAsUser(
+        admin,
+        tenantA.ownerId,
+        `insert into payment_accounts (tenant_id, stripe_account_id, created_by_user_id)
+         values ($1, $2, $3)`,
+        [tenantA.tenantId, "acct_owner_direct_insert", tenantA.ownerId],
+      ),
+    ).rejects.toThrow(/permission denied|row-level security/i);
+
+    // The actual attack scenario: a Manager tries to pre-provision the row
+    // with a `stripe_account_id` they control, before the Owner ever starts
+    // onboarding.
+    await expect(
+      queryAsUser(
+        admin,
+        managerUserId,
+        `insert into payment_accounts (tenant_id, stripe_account_id, created_by_user_id)
+         values ($1, $2, $3)`,
+        [tenantA.tenantId, "acct_manager_controlled", managerUserId],
+      ),
+    ).rejects.toThrow(/permission denied|row-level security/i);
+
+    const rows = await admin.query(`select 1 from payment_accounts where tenant_id = $1`, [
+      tenantA.tenantId,
+    ]);
+    expect(rows.rows).toHaveLength(0);
+  });
+
+  // Regression test for the epic-7 batch review low-severity finding:
+  // out-of-order `account.updated` events must not clobber newer,
+  // already-known status. `apply_connect_account_snapshot()` guards this by
+  // comparing the incoming event's own timestamp against `last_event_at`.
+  it("apply_connect_account_snapshot() ignores a strictly-older event and never downgrades already-stored newer status", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+
+    await admin.query(
+      `insert into payment_accounts (tenant_id, stripe_account_id, created_by_user_id)
+       values ($1, $2, $3)`,
+      [tenantA.tenantId, "acct_ordering", tenantA.ownerId],
+    );
+
+    // Newer event arrives first (e.g. the webhook processed it before a
+    // delayed retry of an older event caught up) and sets status enabled.
+    await admin.query(`select apply_connect_account_snapshot($1, $2, $3, $4, $5, $6)`, [
+      "acct_ordering",
+      "2026-08-16T12:00:00Z",
+      "enabled",
+      true,
+      true,
+      null,
+    ]);
+
+    // A strictly-older, out-of-order event now arrives claiming the account
+    // is merely "pending" -- this must be ignored entirely.
+    await admin.query(`select apply_connect_account_snapshot($1, $2, $3, $4, $5, $6)`, [
+      "acct_ordering",
+      "2026-08-16T11:00:00Z",
+      "pending",
+      false,
+      false,
+      "needs docs",
+    ]);
+
+    const row = await admin.query<{
+      status: string;
+      charges_enabled: boolean;
+      payouts_enabled: boolean;
+      onboarding_completed_at: string | null;
+    }>(
+      `select status, charges_enabled, payouts_enabled, onboarding_completed_at
+         from payment_accounts where stripe_account_id = $1`,
+      ["acct_ordering"],
+    );
+
+    expect(row.rows[0]).toMatchObject({
+      status: "enabled",
+      charges_enabled: true,
+      payouts_enabled: true,
+    });
+    expect(row.rows[0]?.onboarding_completed_at).not.toBeNull();
   });
 
   // Same-model self-check finding for this risk:payment ticket: a

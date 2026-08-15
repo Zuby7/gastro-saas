@@ -20,6 +20,11 @@ const REFUND_STATUS_LABEL: Record<string, string> = {
   pending: "Ausstehend",
   succeeded: "Erfolgreich",
   failed: "Fehlgeschlagen",
+  // Ambiguous Stripe failure (network timeout/connection drop) -- Stripe may
+  // or may not have actually processed the refund; still reserved against
+  // the payment's remaining refundable amount pending manual reconciliation
+  // (Opus epic-7 batch review finding 1).
+  unconfirmed: "Ungeklärt (manuell prüfen)",
 };
 
 /**
