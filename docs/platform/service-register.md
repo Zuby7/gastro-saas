@@ -47,7 +47,7 @@ Per explicit user instruction (2026-08-01): every library/framework in the codeb
 ## Transactional email — Resend
 
 - Free plan: 3,000 emails/month, capped at 100/day, 1 verified domain, 30-day log retention. Permanent free tier (not a trial).
-- Risk: the 100/day cap can be hit by password resets + order confirmations on a busy day for a single popular restaurant — worth monitoring once real order volume exists. Ticket #40 (order confirmation emails) surfaces a hit daily limit as a visible, logged/recorded failure (structured `console.error` plus an `email_sends` row, since `@sentry/nextjs` is not actually wired into the codebase yet despite being this project's designated error monitor below) rather than a silently-lost email — see `apps/web/src/lib/notifications/order-confirmation-email.ts`.
+- Risk: the 100/day cap can be hit by password resets + order confirmations on a busy day for a single popular restaurant — worth monitoring once real order volume exists. Ticket #40 (order confirmation emails) surfaces a hit daily limit as a visible, logged/recorded failure (structured `console.error` plus an `email_sends` row, since `@sentry/nextjs` is not actually wired into the codebase yet despite being this project's designated error monitor below — tracked as issue #89, see the Epic 7 batch review entry in `docs/decisions/assumptions.md`) rather than a silently-lost email — see `apps/web/src/lib/notifications/order-confirmation-email.ts`.
 - Credit card: not required.
 - Decision: **default** for order confirmations and staff invitations. Fallback: a second free-tier provider (e.g. Brevo, 300 emails/day free) only if Resend's daily cap becomes a real blocker — do not add both up front.
 

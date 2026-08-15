@@ -50,6 +50,13 @@ Deferred to ticket-level fixes (tracked as follow-up, not yet done): correcting 
 
 This was previously only recorded in the (merged) PR #44 description; it is tracked here so it isn't lost.
 
+## Epic 7 batch review, cycle 1 — residual risks tracked as issues, not fixed in-place
+
+Two findings from the Opus epic-7 batch review were judged genuine but out of scope for an in-place code fix in this repair cycle; each is tracked as its own GitHub Issue rather than silently deferred:
+
+- **Missing server-side `awaiting_payment` timeout (issue #88)**: no scheduled job or DB constraint currently enforces the documented 30-minute expiry window for orders stuck in `awaiting_payment` (e.g. a customer abandons Stripe Checkout) — such an order stays `awaiting_payment` indefinitely until a webhook happens to arrive. `.claude/rules/payments.md` already documents the intended behavior; issue #88 tracks actually implementing the enforcement (a scheduled sweep or a check on next read, with a decision on which is needed before a pilot tenant goes live with real payments).
+- **Sentry not wired into the codebase (issue #89)**: `@sentry/nextjs` is listed as this project's designated error monitor in `docs/platform/service-register.md`, but no code path actually reports to it yet — ticket #40's `email_sends` table and structured `console.error` calls are the only durable trail for a failed transactional email send today. Issue #89 tracks the actual Sentry wiring (init, error boundary, server-action/webhook error capture).
+
 ## Explicitly not decided yet (needs the user or a later ticket)
 
 - Real Stripe/Supabase/Resend/Sentry/PostHog/Better Stack account creation — these need the user's own email/identity and, for Stripe, banking details for payouts.
