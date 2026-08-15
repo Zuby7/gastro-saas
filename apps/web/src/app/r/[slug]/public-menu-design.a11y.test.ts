@@ -1,43 +1,115 @@
-import { colors, validateContrastRatio } from "@gastro-saas/ui";
+import { colors, parseHexColor, validateContrastRatio } from "@gastro-saas/ui";
 import { describe, expect, it } from "vitest";
 
 /**
- * Verifies the new `clay` accent color pairs introduced by the 2026-08-07
- * frontend design pass (see `packages/ui/src/tokens.ts`) meet WCAG 2.1 AA
- * contrast wherever they're used for text on the public menu
- * (`apps/web/src/app/r/[slug]/page.tsx`).
+ * Verifies the color pairs introduced by the 2026-08-08 frontend design
+ * pass v2 LAYOUT rework (see `packages/ui/src/tokens.ts` and `page.tsx`)
+ * meet WCAG 2.1 AA contrast wherever they're actually rendered on the
+ * public menu (`apps/web/src/app/r/[slug]/page.tsx`).
  *
- * - Dish prices use `font-display font-semibold text-clay-700` (>=18px
- *   semibold), which qualifies as "large text" under WCAG, but is checked
- *   against the stricter normal-text threshold here for a safety margin.
- * - Category nav link hover/focus state uses `text-clay-700` (14px normal
- *   text) on the near-white sticky nav background.
+ * The hero is a diagonal `linear-gradient` from `colors.espresso[900]` (deep
+ * espresso, the darker stop) to `colors.espresso[800]` (warmer, LIGHTER
+ * brown). For light/white text on a dark background, a lighter background
+ * gives *less* contrast, so `espresso[800]` -- not `espresso[900]` -- is the
+ * worst case; every hero text/UI-element pair below is checked against that
+ * lighter stop (independently verified with `validateContrastRatio` to still
+ * pass AA with a healthy margin).
  */
-describe("public menu clay accent color contrast (WCAG AA)", () => {
-  it("dish price (clay-700) on card background (neutral-0) passes AA", () => {
-    const result = validateContrastRatio(colors.clay[700], colors.neutral[0]);
+const HERO_WORST_CASE_STOP = colors.espresso[800];
+
+function compositeOverBackground(
+  foregroundHex: string,
+  alpha: number,
+  backgroundHex: string,
+): string {
+  const fg = parseHexColor(foregroundHex);
+  const bg = parseHexColor(backgroundHex);
+  const blend = (fgChannel: number, bgChannel: number) =>
+    Math.round(alpha * fgChannel + (1 - alpha) * bgChannel);
+  const toHexChannel = (value: number) => value.toString(16).padStart(2, "0");
+
+  return `#${toHexChannel(blend(fg.r, bg.r))}${toHexChannel(blend(fg.g, bg.g))}${toHexChannel(blend(fg.b, bg.b))}`;
+}
+
+describe("public menu hero color contrast (WCAG AA)", () => {
+  it("restaurant name (white, large text) on the hero's worst-case (lighter) gradient stop passes AA", () => {
+    const result = validateContrastRatio("#ffffff", HERO_WORST_CASE_STOP, "large");
     expect(result.passesAA).toBe(true);
   });
 
-  it("category nav hover/focus text (clay-700) on nav background (neutral-0) passes AA", () => {
-    const result = validateContrastRatio(colors.clay[700], colors.neutral[0]);
+  it("tenant description (white/80 over the hero background) on the worst-case (lighter) gradient stop passes AA", () => {
+    const composited = compositeOverBackground("#ffffff", 0.8, HERO_WORST_CASE_STOP);
+    const result = validateContrastRatio(composited, HERO_WORST_CASE_STOP);
     expect(result.passesAA).toBe(true);
   });
 
-  it("hero rule accent (clay-500) still reads as a distinct, non-decorative-only accent against the paper background (neutral-50) at large-graphic contrast", () => {
-    // Decorative (non-text) UI component contrast per WCAG 1.4.11 uses the
-    // relaxed 3:1 threshold.
-    const result = validateContrastRatio(colors.clay[500], colors.neutral[50], "large");
+  it("cart pill text (white) on its translucent white/12 background (composited over the worst-case (lighter) gradient stop) passes AA", () => {
+    const pillBackground = compositeOverBackground("#ffffff", 0.12, HERO_WORST_CASE_STOP);
+    const result = validateContrastRatio("#ffffff", pillBackground);
     expect(result.passesAA).toBe(true);
   });
 
-  it("warm paper background (neutral-50) keeps body text (neutral-900) at AA for normal text", () => {
+  it("cart item-count badge text (neutral-900) on its solid gold-300 background passes AA", () => {
+    const result = validateContrastRatio(colors.neutral[900], colors.gold[300]);
+    expect(result.passesAA).toBe(true);
+  });
+});
+
+describe("public menu category nav / dish card color contrast (WCAG AA)", () => {
+  it("active category tab text (ember-600) on the nav background (neutral-0) passes AA", () => {
+    const result = validateContrastRatio(colors.ember[600], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("inactive category tab text (foreground-secondary/neutral-500) on the nav background (neutral-0) passes AA", () => {
+    const result = validateContrastRatio(colors.neutral[500], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("dish price (ember-700) on card background (neutral-0) passes AA", () => {
+    const result = validateContrastRatio(colors.ember[700], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("'+' add-to-cart button icon (white) on its solid ember-600 background passes AA (non-text UI component, 3:1 minimum)", () => {
+    const result = validateContrastRatio("#ffffff", colors.ember[600], "large");
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("sold-out badge text (danger-600) on its solid neutral-0 background passes AA (solid, not translucent, so it stays legible over any placeholder gradient)", () => {
+    const result = validateContrastRatio(colors.danger[600], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("warm stone background (neutral-50) keeps body text (neutral-900) at AA for normal text", () => {
     const result = validateContrastRatio(colors.neutral[900], colors.neutral[50]);
     expect(result.passesAA).toBe(true);
   });
 
-  it("warm paper background (neutral-50) keeps secondary text (neutral-500) at AA for normal text", () => {
+  it("warm stone background (neutral-50) keeps secondary text (neutral-500) at AA for normal text", () => {
     const result = validateContrastRatio(colors.neutral[500], colors.neutral[50]);
     expect(result.passesAA).toBe(true);
+  });
+
+  /**
+   * Fix for Opus review finding 1 on PR #80's final repair cycle: sold-out
+   * dish cards used to wrap their whole text block (description + the
+   * legally-motivated allergen notice) in `opacity-60`, which independently
+   * computes to a real AA failure. `DishCard` no longer applies that opacity
+   * to text at all (see `dish-card.tsx` and `dish-card.test.tsx`'s DOM-level
+   * assertions) -- this asserts the actual rendered color combination (the
+   * card's `neutral-0` background, `foreground-secondary`/`neutral-500` text,
+   * un-dimmed) passes AA for normal text, i.e. the fixed state, not the
+   * previously-broken opacity composite.
+   */
+  it("sold-out dish card description/allergen-notice text (neutral-500, undimmed) on the card background (neutral-0) passes AA", () => {
+    const result = validateContrastRatio(colors.neutral[500], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("regression check: the previously-used opacity-60 dimming of neutral-500 text over a white/neutral-0 card would have FAILED AA (documents why it was removed)", () => {
+    const dimmedComposite = compositeOverBackground(colors.neutral[500], 0.6, colors.neutral[0]);
+    const result = validateContrastRatio(dimmedComposite, colors.neutral[0]);
+    expect(result.passesAA).toBe(false);
   });
 });
