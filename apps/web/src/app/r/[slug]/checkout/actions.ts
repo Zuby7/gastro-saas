@@ -10,6 +10,7 @@ import { resolveGuestCartContext } from "@/lib/cart/service";
 import { writeOrderAccessTokenCookie } from "@/lib/orders/cookie";
 import { createOrderFromCart } from "@/lib/orders/service";
 import { createOrderAccessToken, hashOrderAccessToken } from "@/lib/orders/token";
+import { createCheckoutSessionForOrder, isTenantChargeReady } from "@/lib/payments/service";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { CheckoutSchema } from "./schemas";
 
@@ -94,6 +95,21 @@ export async function checkoutAction(
       };
     }
 
+    // Reject checkout up front if the tenant's Stripe Connect account isn't
+    // ready to accept charges (ticket #23's `payment_accounts`, ADR-0002) --
+    // checked *before* creating the order so a not-yet-payable tenant can
+    // never end up with an order stuck in `awaiting_payment` with no way to
+    // ever pay it off. `createCheckoutSessionForOrder` below re-checks this
+    // again immediately before payment creation, and the DB-level
+    // `ensure_payment_matches_order()` trigger re-checks it a third,
+    // unbypassable time on INSERT.
+    if (!(await isTenantChargeReady(tenantId))) {
+      return {
+        error:
+          "Dieses Restaurant kann derzeit keine Kartenzahlungen entgegennehmen. Bitte versuchen Sie es später erneut.",
+      };
+    }
+
     const guestAccessToken = createOrderAccessToken();
 
     const order = await createOrderFromCart({
@@ -120,10 +136,26 @@ export async function checkoutAction(
     revalidatePath(`/r/${tenantSlug}/cart`);
     revalidatePath(`/r/${tenantSlug}/checkout`);
 
-    // The raw guest access token is embedded in this redirect URL and in the
+    // Never redirect straight to the order-status page: the customer must
+    // land on Stripe's own hosted payment page first. Reaching Stripe's
+    // success_url later is never treated as proof of payment
+    // (.claude/rules/payments.md) -- only ticket #25's verified webhook ever
+    // transitions the order to "paid"; the order-status page (ticket #22)
+    // renders whatever the order's real, webhook-driven status is,
+    // regardless of whether the guest completed or abandoned Stripe
+    // checkout.
+    const { checkoutUrl } = await createCheckoutSessionForOrder({
+      tenantId,
+      tenantSlug,
+      orderId: order.orderId,
+      guestAccessToken,
+    });
+
+    // The raw guest access token is embedded in Stripe's success/cancel
+    // return URLs (built inside createCheckoutSessionForOrder) and in the
     // httpOnly cookie written above -- it is never returned in the action's
     // state/JSON payload beyond this one-time redirect.
-    redirectTarget = `/r/${tenantSlug}/orders/${guestAccessToken}`;
+    redirectTarget = checkoutUrl;
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unbekannter Fehler." };
   }
