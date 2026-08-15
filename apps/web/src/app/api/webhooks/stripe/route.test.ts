@@ -124,7 +124,10 @@ describe("POST /api/webhooks/stripe", () => {
   });
 
   it("claim RPC failure is a hard error (never silently swallowed)", async () => {
-    constructEventMock.mockReturnValue({ id: "evt_claim_error", type: "checkout.session.completed" });
+    constructEventMock.mockReturnValue({
+      id: "evt_claim_error",
+      type: "checkout.session.completed",
+    });
     claimEventMock.mockResolvedValue({ data: null, error: { message: "db error" } });
 
     const { POST } = await import("./route");
