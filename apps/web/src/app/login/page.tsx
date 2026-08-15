@@ -68,7 +68,7 @@ export default function LoginPage() {
 
       <p className="text-sm text-foreground-secondary">
         Noch kein Konto?{" "}
-        <Link href="/register" className="font-medium text-brand-600 underline">
+        <Link href="/register" className="font-medium text-link-foreground underline">
           Restaurant registrieren
         </Link>
       </p>

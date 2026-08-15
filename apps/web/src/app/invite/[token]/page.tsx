@@ -27,7 +27,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
       ) : (
         <p className="rounded-md border border-neutral-300 bg-neutral-100 p-3 text-sm text-foreground">
           Bitte{" "}
-          <Link href="/login" className="font-medium text-brand-600 underline">
+          <Link href="/login" className="font-medium text-link-foreground underline">
             melden Sie sich an
           </Link>
           , um die Einladung anzunehmen.
