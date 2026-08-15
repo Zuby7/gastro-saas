@@ -15,7 +15,12 @@ export function RefundForm({
   const [state, formAction, isPending] = useActionState(issueRefundAction, initialState);
 
   return (
-    <form action={formAction} className="flex flex-col gap-3" noValidate aria-labelledby="refund-form-heading">
+    <form
+      action={formAction}
+      className="flex flex-col gap-3"
+      noValidate
+      aria-labelledby="refund-form-heading"
+    >
       <h3 id="refund-form-heading" className="text-base font-medium text-foreground">
         Rückerstattung auslösen
       </h3>

@@ -238,9 +238,8 @@ describe("issueRefundForOrder", () => {
       },
     ];
 
-    const { issueRefundForOrder, RefundExceedsRemainingAmountError } = await import(
-      "./refund-service"
-    );
+    const { issueRefundForOrder, RefundExceedsRemainingAmountError } =
+      await import("./refund-service");
 
     await expect(
       issueRefundForOrder(fakeSupabase() as never, {
@@ -257,9 +256,8 @@ describe("issueRefundForOrder", () => {
   });
 
   it("rejects a refund exceeding the full paid amount even as a single request", async () => {
-    const { issueRefundForOrder, RefundExceedsRemainingAmountError } = await import(
-      "./refund-service"
-    );
+    const { issueRefundForOrder, RefundExceedsRemainingAmountError } =
+      await import("./refund-service");
 
     await expect(
       issueRefundForOrder(fakeSupabase() as never, {
@@ -276,9 +274,8 @@ describe("issueRefundForOrder", () => {
   it("surfaces the DB-level 'exceed' guard as the same typed error if the app-level pre-check is somehow bypassed", async () => {
     state.refundsInsertError = { message: "would exceed the paid amount 2000 for payment x" };
 
-    const { issueRefundForOrder, RefundExceedsRemainingAmountError } = await import(
-      "./refund-service"
-    );
+    const { issueRefundForOrder, RefundExceedsRemainingAmountError } =
+      await import("./refund-service");
 
     await expect(
       issueRefundForOrder(fakeSupabase() as never, {
@@ -353,7 +350,10 @@ describe("getPaymentRefundSummary", () => {
     const { getPaymentRefundSummary } = await import("./refund-service");
 
     await expect(
-      getPaymentRefundSummary(fakeSupabase() as never, { tenantId: "tenant-1", orderId: "order-1" }),
+      getPaymentRefundSummary(fakeSupabase() as never, {
+        tenantId: "tenant-1",
+        orderId: "order-1",
+      }),
     ).resolves.toBeNull();
   });
 

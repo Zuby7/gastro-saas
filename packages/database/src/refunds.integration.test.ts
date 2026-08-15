@@ -96,6 +96,19 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
 
   afterEach(async () => {
     if (fixture) {
+      // Deletion order matters: refunds -> payments -> orders, since all
+      // three are `on delete restrict` by design (never silently lose a
+      // financial record) -- deleting orders first (as an earlier draft of
+      // this cleanup did) trips the payments_order_id_fkey/refunds_*_fkey
+      // constraints.
+      await admin.query(`delete from refunds where tenant_id in ($1, $2)`, [
+        fixture.tenantA.tenantId,
+        fixture.tenantB.tenantId,
+      ]);
+      await admin.query(`delete from payments where tenant_id in ($1, $2)`, [
+        fixture.tenantA.tenantId,
+        fixture.tenantB.tenantId,
+      ]);
       await admin.query(`delete from orders where tenant_id in ($1, $2)`, [
         fixture.tenantA.tenantId,
         fixture.tenantB.tenantId,
@@ -148,9 +161,10 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
       [refundId, `re_test_${randomUUID().replace(/-/g, "")}`],
     );
 
-    const refundRow = await admin.query(`select status, stripe_refund_id from refunds where id = $1`, [
-      refundId,
-    ]);
+    const refundRow = await admin.query(
+      `select status, stripe_refund_id from refunds where id = $1`,
+      [refundId],
+    );
     expect(refundRow.rows[0].status).toBe("succeeded");
     expect(refundRow.rows[0].stripe_refund_id).toMatch(/^re_test_/);
   });
@@ -216,7 +230,9 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
     const seed = await seedFixtureWithManager();
     fixture = seed.fixture;
     const { orderId, paymentId } = await seedPaidPayment(admin, fixture.tenantA.tenantId, 2000);
-    await admin.query(`update payments set status = 'flagged_for_review' where id = $1`, [paymentId]);
+    await admin.query(`update payments set status = 'flagged_for_review' where id = $1`, [
+      paymentId,
+    ]);
 
     await expect(
       queryAsUser(
@@ -241,12 +257,9 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
        values ($1, $2, $3, 2000, 'EUR', 'erster Versuch', $4) returning id`,
       [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId],
     );
-    await queryAsUser(
-      admin,
-      seed.managerId,
-      `update refunds set status = 'failed' where id = $1`,
-      [failedAttempt.rows[0]!.id],
-    );
+    await queryAsUser(admin, seed.managerId, `update refunds set status = 'failed' where id = $1`, [
+      failedAttempt.rows[0]!.id,
+    ]);
 
     // The full amount is still refundable -- the failed attempt released its reservation.
     const retry = await queryAsUser(
@@ -272,9 +285,10 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
       params: [fixture.tenantB.tenantId, paymentId, orderId, seed.staffId],
     });
 
-    const refundCount = await admin.query(`select count(*)::int as count from refunds where payment_id = $1`, [
-      paymentId,
-    ]);
+    const refundCount = await admin.query(
+      `select count(*)::int as count from refunds where payment_id = $1`,
+      [paymentId],
+    );
     expect(refundCount.rows[0].count).toBe(0);
   });
 
@@ -295,9 +309,10 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
       params: [fixture.tenantA.tenantId, paymentId, orderId, fixture.tenantB.ownerId],
     });
 
-    const refundCount = await admin.query(`select count(*)::int as count from refunds where payment_id = $1`, [
-      paymentId,
-    ]);
+    const refundCount = await admin.query(
+      `select count(*)::int as count from refunds where payment_id = $1`,
+      [paymentId],
+    );
     expect(refundCount.rows[0].count).toBe(0);
 
     // Even the tenantA owner cannot smuggle a cross-tenant reference by

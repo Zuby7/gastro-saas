@@ -64,7 +64,10 @@ export default async function OrderDetailPage({
             Sie haben nicht die erforderliche Berechtigung, um Zahlungs-/Rückerstattungsdaten
             einzusehen.
           </p>
-          <Link href="/account" className="font-medium text-brand-600 underline hover:text-brand-700">
+          <Link
+            href="/account"
+            className="font-medium text-brand-600 underline hover:text-brand-700"
+          >
             Zurück
           </Link>
         </main>
@@ -106,7 +109,10 @@ export default async function OrderDetailPage({
           <h1 className="font-display text-2xl font-semibold text-foreground">
             Bestellung {order.id}
           </h1>
-          <Link href="/account" className="text-sm font-medium text-brand-600 underline hover:text-brand-700">
+          <Link
+            href="/account"
+            className="text-sm font-medium text-brand-600 underline hover:text-brand-700"
+          >
             Zurück
           </Link>
         </div>
@@ -190,7 +196,9 @@ export default async function OrderDetailPage({
                         <td className="py-1">
                           {REFUND_STATUS_LABEL[refund.status] ?? refund.status}
                         </td>
-                        <td className="py-1">{new Date(refund.createdAt).toLocaleString("de-DE")}</td>
+                        <td className="py-1">
+                          {new Date(refund.createdAt).toLocaleString("de-DE")}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -200,7 +208,10 @@ export default async function OrderDetailPage({
               )}
 
               {canRefund ? (
-                <RefundForm orderId={order.id} remainingRefundableCents={summary.remainingRefundableCents} />
+                <RefundForm
+                  orderId={order.id}
+                  remainingRefundableCents={summary.remainingRefundableCents}
+                />
               ) : null}
             </>
           )}

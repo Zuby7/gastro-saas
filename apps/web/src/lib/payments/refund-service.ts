@@ -134,7 +134,9 @@ export async function getPaymentRefundSummary(
 
   const { data: refunds } = await supabase
     .from("refunds")
-    .select("id, amount_cents, currency, reason, status, stripe_refund_id, actor_user_id, created_at")
+    .select(
+      "id, amount_cents, currency, reason, status, stripe_refund_id, actor_user_id, created_at",
+    )
     .eq("tenant_id", params.tenantId)
     .eq("payment_id", payment.id)
     .order("created_at", { ascending: false })
