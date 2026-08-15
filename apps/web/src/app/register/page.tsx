@@ -135,7 +135,7 @@ export default function RegisterPage() {
 
       <p className="text-sm text-foreground-secondary">
         Bereits registriert?{" "}
-        <Link href="/login" className="font-medium text-brand-600 underline">
+        <Link href="/login" className="font-medium text-link-foreground underline">
           Anmelden
         </Link>
       </p>

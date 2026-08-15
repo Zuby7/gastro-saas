@@ -25,9 +25,37 @@ function compositeOverBackground(
   return `#${toHexChannel(blend(fg.r, bg.r))}${toHexChannel(blend(fg.g, bg.g))}${toHexChannel(blend(fg.b, bg.b))}`;
 }
 
+/**
+ * The header now uses the same quiet hero-gradient treatment as the public
+ * menu page (see `../public-menu-design.a11y.test.ts` and `../page.tsx`'s
+ * header comment) -- checked against `espresso[800]`, the LIGHTER of the two
+ * gradient stops, which is the worst case for light/white text (a lighter
+ * background gives white text less contrast, not more).
+ */
+const HERO_WORST_CASE_STOP = colors.espresso[800];
+
+describe("checkout page header color contrast (WCAG AA)", () => {
+  it("'Kasse' heading (white, large text) on the header's worst-case (lighter) gradient stop passes AA", () => {
+    const result = validateContrastRatio("#ffffff", HERO_WORST_CASE_STOP, "large");
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("tenant name subtext (white/80 over the header background) on the worst-case (lighter) gradient stop passes AA", () => {
+    const composited = compositeOverBackground("#ffffff", 0.8, HERO_WORST_CASE_STOP);
+    const result = validateContrastRatio(composited, HERO_WORST_CASE_STOP);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("'Zurück zum Warenkorb' pill text (white) on its translucent white/12 background (composited over the worst-case (lighter) gradient stop) passes AA", () => {
+    const pillBackground = compositeOverBackground("#ffffff", 0.12, HERO_WORST_CASE_STOP);
+    const result = validateContrastRatio("#ffffff", pillBackground);
+    expect(result.passesAA).toBe(true);
+  });
+});
+
 describe("checkout page color contrast (WCAG AA)", () => {
-  it("total-sum price (clay-700) on the summary bar background (neutral-0) passes AA", () => {
-    const result = validateContrastRatio(colors.clay[700], colors.neutral[0]);
+  it("total-sum price (ember-700) on the summary bar background (neutral-0) passes AA", () => {
+    const result = validateContrastRatio(colors.ember[700], colors.neutral[0]);
     expect(result.passesAA).toBe(true);
   });
 

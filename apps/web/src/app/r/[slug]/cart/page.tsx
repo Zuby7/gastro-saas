@@ -21,17 +21,25 @@ export default async function CartPage({ params }: CartPageProps) {
 
   return (
     <main className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-200 bg-neutral-50 px-5 py-10">
+      {/*
+        Quieter version of the public menu's hero gradient (design pass v2,
+        see `packages/ui/src/tokens.ts`'s header comment) -- kept modest
+        since the cart/checkout/order-status flow is not this pass's
+        "moment" (the menu hero is). Only the color language and header
+        chrome are unified here; the ticket-edge cart summary below is
+        untouched.
+      */}
+      <header className="bg-gradient-to-br from-espresso-900 to-espresso-800 px-5 py-8">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
           <div>
-            <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-white">
               Warenkorb
             </h1>
-            <p className="mt-1 text-sm text-foreground-secondary">{menu.tenant.name}</p>
+            <p className="mt-1 text-sm text-white/80">{menu.tenant.name}</p>
           </div>
           <Link
             href={`/r/${slug}`}
-            className="shrink-0 rounded-full border border-neutral-300 bg-neutral-0 px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-clay-400 hover:text-clay-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+            className="shrink-0 rounded-full border border-white/25 bg-white/12 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
           >
             Zurück zur Speisekarte
           </Link>
@@ -66,11 +74,19 @@ export default async function CartPage({ params }: CartPageProps) {
               </p>
             ) : null}
 
-            <div className="flex items-center justify-between border-t border-neutral-300 pt-4">
-              <span className="text-lg font-semibold text-foreground">Gesamtsumme</span>
-              <span className="font-display text-2xl font-semibold text-clay-700">
-                {formatPrice(cart.totalCents, cart.currency)}
-              </span>
+            {/*
+              Signature ticket-edge treatment (see globals.css's `.ticket-edge`
+              and packages/ui/src/tokens.ts's design-plan header comment) --
+              this card literally IS the order total, so the torn-receipt
+              motif is functionally motivated here, not decorative.
+            */}
+            <div className="ticket-edge rounded-t-lg border border-b-0 border-neutral-200 bg-neutral-0 px-4 pt-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-semibold text-foreground">Gesamtsumme</span>
+                <span className="font-display text-2xl font-semibold text-ember-700">
+                  {formatPrice(cart.totalCents, cart.currency)}
+                </span>
+              </div>
             </div>
 
             {cart.checkoutReady ? (
