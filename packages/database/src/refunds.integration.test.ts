@@ -272,6 +272,46 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
     expect(retry.rows[0]!.status).toBe("pending");
   });
 
+  // Regression test for the epic-7 batch review cycle-2 HIGH finding: an
+  // 'unconfirmed' refund (ambiguous Stripe failure -- see refund-service.ts's
+  // module header) must block ANY further refund attempt against the same
+  // payment, not just ones that would exceed the amount headroom. Previously
+  // only the running-total amount check existed, so a second, smaller
+  // attempt could still reach Stripe with its own fresh idempotency key
+  // while the first attempt's real outcome at Stripe was still unknown.
+  it("rejects any further refund insert while an unconfirmed refund exists for the same payment, even with amount headroom", async () => {
+    const seed = await seedFixtureWithManager();
+    fixture = seed.fixture;
+    const { orderId, paymentId } = await seedPaidPayment(admin, fixture.tenantA.tenantId, 2000);
+
+    const ambiguousAttempt = await queryAsUser(
+      admin,
+      seed.managerId,
+      `insert into refunds (tenant_id, payment_id, order_id, amount_cents, currency, reason, actor_user_id)
+       values ($1, $2, $3, 200, 'EUR', 'Netzwerkfehler, Ausgang unklar', $4) returning id`,
+      [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId],
+    );
+    await queryAsUser(
+      admin,
+      seed.managerId,
+      `update refunds set status = 'unconfirmed' where id = $1`,
+      [ambiguousAttempt.rows[0]!.id],
+    );
+
+    // Only 200 of 2000 cents is reserved -- plenty of amount headroom for a
+    // 100-cent second attempt, so only the existence check (not the amount
+    // check) can be what blocks it.
+    await expect(
+      queryAsUser(
+        admin,
+        seed.managerId,
+        `insert into refunds (tenant_id, payment_id, order_id, amount_cents, currency, reason, actor_user_id)
+         values ($1, $2, $3, 100, 'EUR', 'zweiter Versuch', $4)`,
+        [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId],
+      ),
+    ).rejects.toThrow(/unconfirmed refund pending manual reconciliation/i);
+  });
+
   it("denies a refund insert from a member without payments.refund (permission-denied case)", async () => {
     const seed = await seedFixtureWithManager();
     fixture = seed.fixture;

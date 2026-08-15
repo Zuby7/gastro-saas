@@ -38,7 +38,7 @@ interface FakeRefundRow {
 interface State {
   payment: FakePayment | null;
   refunds: FakeRefundRow[];
-  refundsInsertError: { message: string } | null;
+  refundsInsertError: { message: string; hint?: string } | null;
   refundIdCounter: number;
 }
 
@@ -126,6 +126,18 @@ beforeEach(() => {
     refundIdCounter: 1,
   };
   stripeRefundsCreateMock.mockResolvedValue({ id: "re_test_abc" });
+});
+
+describe("isDefinitiveStripeFailure", () => {
+  it("treats a 429 StripeRateLimitError as DEFINITIVE, not ambiguous (epic-7 cycle-2 SHOULD-fix)", async () => {
+    const { isDefinitiveStripeFailure } = await import("./refund-service");
+
+    expect(
+      isDefinitiveStripeFailure(
+        new Stripe.errors.StripeRateLimitError({ message: "Too many requests" }),
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("issueRefundForOrder", () => {
@@ -290,6 +302,66 @@ describe("issueRefundForOrder", () => {
     expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
   });
 
+  // Epic-7 batch review cycle-2 finding: a SECOND refund attempt against a
+  // payment with an existing 'unconfirmed' row must be rejected outright --
+  // even when there is still amount headroom, which the pre-existing
+  // amount-only check would have let through.
+  it("rejects a further refund attempt while an unconfirmed refund exists for the same payment, even with amount headroom, without calling Stripe again", async () => {
+    state.refunds = [
+      {
+        id: "refund-0",
+        // Small first attempt -- leaves plenty of headroom under
+        // amount_cents (2000), so only the existence check (not the amount
+        // check) can be the thing blocking the second attempt.
+        amount_cents: 200,
+        currency: "EUR",
+        reason: "erste Erstattung (Netzwerkfehler)",
+        status: "unconfirmed",
+        stripe_refund_id: null,
+        actor_user_id: "user-1",
+        created_at: new Date().toISOString(),
+      },
+    ];
+
+    const { issueRefundForOrder, RefundAwaitingReconciliationError } =
+      await import("./refund-service");
+
+    await expect(
+      issueRefundForOrder(fakeSupabase() as never, {
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        actorUserId: "user-1",
+        amountCents: 100,
+        reason: "zweiter Versuch",
+      }),
+    ).rejects.toBeInstanceOf(RefundAwaitingReconciliationError);
+
+    expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
+    expect(insertedRefund).toBeUndefined();
+  });
+
+  it("surfaces the DB trigger's unconfirmed-reconciliation rejection (hint=unconfirmed_refund_exists) as the same typed error if the app-level pre-check is somehow bypassed by a concurrent request, calling Stripe at most once", async () => {
+    state.refundsInsertError = {
+      message: "Payment payment-1 has an unconfirmed refund pending manual reconciliation",
+      hint: "unconfirmed_refund_exists",
+    };
+
+    const { issueRefundForOrder, RefundAwaitingReconciliationError } =
+      await import("./refund-service");
+
+    await expect(
+      issueRefundForOrder(fakeSupabase() as never, {
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        actorUserId: "user-1",
+        amountCents: 100,
+        reason: "zweiter Versuch",
+      }),
+    ).rejects.toBeInstanceOf(RefundAwaitingReconciliationError);
+
+    expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
+  });
+
   it("throws PaymentNotRefundableError when the order has no paid payment", async () => {
     state.payment = null;
 
@@ -409,9 +481,12 @@ describe("issueRefundForOrder", () => {
       expect.objectContaining({ action: "payment.refund_unconfirmed" }),
     );
 
-    // The ambiguous attempt's full 2000 cents still reserves the entire paid
-    // amount -- a naive retry for the remaining balance must still be
-    // blocked, since we can't be sure Stripe didn't already process it.
+    // The ambiguous attempt leaves an 'unconfirmed' row -- any further
+    // attempt against this payment, of ANY amount, must be rejected outright
+    // (epic-7 cycle-2 fix) since we can't be sure Stripe didn't already
+    // process the first one; this is no longer just an amount-headroom
+    // check, since even a tiny 1-cent retry (well within the amount that
+    // would otherwise fit) must still be blocked.
     state.refunds = [
       {
         id: "refund-1",
@@ -424,7 +499,7 @@ describe("issueRefundForOrder", () => {
         created_at: new Date().toISOString(),
       },
     ];
-    const { RefundExceedsRemainingAmountError } = await import("./refund-service");
+    const { RefundAwaitingReconciliationError } = await import("./refund-service");
     await expect(
       issueRefundForOrder(fakeSupabase() as never, {
         tenantId: "tenant-1",
@@ -433,7 +508,9 @@ describe("issueRefundForOrder", () => {
         amountCents: 1,
         reason: "erneuter Versuch",
       }),
-    ).rejects.toBeInstanceOf(RefundExceedsRemainingAmountError);
+    ).rejects.toBeInstanceOf(RefundAwaitingReconciliationError);
+    // Still only the one Stripe call from the original ambiguous attempt --
+    // the retry must never reach Stripe at all.
     expect(stripeRefundsCreateMock).toHaveBeenCalledTimes(1);
   });
 

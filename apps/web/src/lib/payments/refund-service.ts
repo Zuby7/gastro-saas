@@ -75,9 +75,21 @@ import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-e
  *     TWICE at Stripe while the database only ever shows one `succeeded`
  *     row. To prevent this, an ambiguous failure is marked `unconfirmed`
  *     (see the refunds migration's status check-constraint) instead of
- *     `failed` -- `unconfirmed` still counts against the payment's
- *     remaining refundable amount (same as `pending`/`succeeded`), so a
- *     careless retry cannot double-reserve, let alone double-refund.
+ *     `failed`. `unconfirmed` still counts against the payment's remaining
+ *     refundable amount (same as `pending`/`succeeded`) AND (epic-7 batch
+ *     review cycle-2 fix) the DB trigger
+ *     (`ensure_refund_matches_payment_and_within_limit`) now outright
+ *     rejects any further refunds INSERT for the same payment while an
+ *     `unconfirmed` row exists, regardless of remaining amount headroom --
+ *     this application layer mirrors that with its own pre-check
+ *     (`RefundAwaitingReconciliationError`) purely for a clear, translated
+ *     message before ever calling Stripe; the DB trigger is what actually
+ *     closes the race. Earlier revisions of this comment claimed a careless
+ *     retry "cannot double-reserve, let alone double-refund" on the strength
+ *     of the amount check alone -- that was false for a second, smaller
+ *     partial-refund attempt, which the amount check alone would not have
+ *     blocked; this explicit existence check is what makes the guarantee
+ *     hold.
  *     `unconfirmed` is a terminal, manual-reconciliation state: someone must
  *     check the real Stripe dashboard/API for what actually happened and
  *     resolve it by hand. Building automatic reconciliation via a
@@ -104,7 +116,14 @@ export function isDefinitiveStripeFailure(error: unknown): boolean {
     error instanceof Stripe.errors.StripeInvalidRequestError ||
     error instanceof Stripe.errors.StripeAuthenticationError ||
     error instanceof Stripe.errors.StripePermissionError ||
-    error instanceof Stripe.errors.StripeIdempotencyError
+    error instanceof Stripe.errors.StripeIdempotencyError ||
+    // A 429 means Stripe synchronously rejected the request before doing
+    // anything with it (definitive, like the other 4xx classes above) --
+    // unlike a connection/timeout error, there is no ambiguity about
+    // whether money moved (epic-7 batch review cycle-2 SHOULD-fix; this was
+    // previously miscategorized as ambiguous alongside genuine
+    // connection/timeout failures).
+    error instanceof Stripe.errors.StripeRateLimitError
   );
 }
 
@@ -126,6 +145,15 @@ export class RefundInvalidAmountError extends Error {
   constructor(message = "Der Rückerstattungsbetrag muss größer als 0 sein.") {
     super(message);
     this.name = "RefundInvalidAmountError";
+  }
+}
+
+export class RefundAwaitingReconciliationError extends Error {
+  constructor(
+    message = "Für diese Zahlung liegt eine unbestätigte Rückerstattung vor, die zuerst manuell im Stripe-Dashboard geprüft werden muss. Erst danach kann eine weitere Rückerstattung ausgelöst werden.",
+  ) {
+    super(message);
+    this.name = "RefundAwaitingReconciliationError";
   }
 }
 
@@ -297,6 +325,13 @@ export async function issueRefundForOrder(
     .eq("payment_id", payment.id)
     .returns<RefundRow[]>();
 
+  // Application-level pre-check: gives a clear, translated error before ever
+  // calling Stripe. NOT the race-proof guarantee -- see module header; the
+  // DB trigger below re-verifies this atomically regardless.
+  if ((existingRefunds ?? []).some((row) => row.status === "unconfirmed")) {
+    throw new RefundAwaitingReconciliationError();
+  }
+
   const alreadyReservedCents = (existingRefunds ?? [])
     .filter(
       (row) =>
@@ -304,9 +339,6 @@ export async function issueRefundForOrder(
     )
     .reduce((sum, row) => sum + row.amount_cents, 0);
 
-  // Application-level pre-check: gives a clear, translated error before ever
-  // calling Stripe. NOT the race-proof guarantee -- see module header; the
-  // DB trigger below re-verifies this atomically regardless.
   if (alreadyReservedCents + input.amountCents > payment.amount_cents) {
     throw new RefundExceedsRemainingAmountError();
   }
@@ -327,6 +359,15 @@ export async function issueRefundForOrder(
     .single<{ id: string }>();
 
   if (insertError || !reservedRefund) {
+    // The DB trigger is the race-proof source of truth (see module header):
+    // a concurrent request could have created the blocking unconfirmed row,
+    // or pushed the reserved total over the limit, between this module's own
+    // pre-checks above and this INSERT. `hint` is how the trigger marks the
+    // unconfirmed-reconciliation rejection specifically (epic-7 cycle-2
+    // fix); anything else mentioning "exceed" is the amount-limit rejection.
+    if (insertError?.hint === "unconfirmed_refund_exists") {
+      throw new RefundAwaitingReconciliationError();
+    }
     if ((insertError?.message ?? "").toLowerCase().includes("exceed")) {
       throw new RefundExceedsRemainingAmountError();
     }

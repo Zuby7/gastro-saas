@@ -136,4 +136,18 @@ describe("issueRefundAction", () => {
 
     expect(result.error).toMatch(/übersteigt/);
   });
+
+  it("surfaces a clear, specific error (not the generic retry message) when an unconfirmed refund already awaits manual reconciliation for this payment (epic-7 cycle-2 fix)", async () => {
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "require_tenant_permission") return { data: null, error: null };
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+    const { RefundAwaitingReconciliationError } = await import("@/lib/payments/refund-service");
+    issueRefundForOrderMock.mockRejectedValue(new RefundAwaitingReconciliationError());
+
+    const { issueRefundAction } = await import("./actions");
+    const result = await issueRefundAction({}, refundFormData({ amountCents: "100" }));
+
+    expect(result.error).toMatch(/manuell.*(geprüft|prüfen)/i);
+  });
 });
