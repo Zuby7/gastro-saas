@@ -27,7 +27,9 @@ const dbAvailable = await probeDatabase();
 
 if (!dbAvailable) {
   if (isCiEnvironment) {
-    throw new Error(`[payment-webhook-events.integration.test] no reachable Postgres at ${DB_URL}.`);
+    throw new Error(
+      `[payment-webhook-events.integration.test] no reachable Postgres at ${DB_URL}.`,
+    );
   }
   console.warn(
     `[payment-webhook-events.integration.test] Skipping: no reachable Postgres at ${DB_URL}.`,
@@ -100,9 +102,10 @@ describe.skipIf(!dbAvailable)("claim_payment_webhook_event()", () => {
       "acct_test",
       "account.updated",
     ]);
-    await admin.query(`update payment_webhook_events set processed_at = now() where stripe_event_id = $1`, [
-      eventId,
-    ]);
+    await admin.query(
+      `update payment_webhook_events set processed_at = now() where stripe_event_id = $1`,
+      [eventId],
+    );
 
     const retry = await admin.query<{ already_processed: boolean }>(
       `select already_processed from claim_payment_webhook_event($1, $2, $3)`,
