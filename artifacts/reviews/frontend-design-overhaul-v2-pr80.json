@@ -1,0 +1,150 @@
+{
+  "pr": 80,
+  "title": "style: Frontend-Design-Überarbeitung v2 (Ember/Gold-Ticket-Motiv)",
+  "context": "Direct user feedback that an earlier design pass looked generic (matched a cliché pattern flagged by Anthropic's own frontend-design skill guidance), followed by a second round of feedback that the resulting layout looked like a mobile banking app rather than a website. Two mockups were shown for approval; the second (dark warm-gradient hero, tab-style category nav, 3-column card grid) was explicitly approved by the user before implementation.",
+  "cycles": [
+    {
+      "cycle": 1,
+      "verdict": "CHANGES_REQUESTED",
+      "review_findings": [
+        {
+          "severity": "high",
+          "area": "design tokens / test integrity",
+          "reason": "Hero gradient hex colors (#2b1c14/#4a2e1c) were hardcoded ad-hoc in 4 page files instead of design tokens, and all 4 corresponding a11y test files independently re-declared the same hex literal instead of importing the real token value -- the contrast tests never observed the actual implementation."
+        },
+        {
+          "severity": "medium",
+          "area": "accessibility",
+          "reason": "Multi-variant dish card's <summary> disclosure trigger had its accessible name fully overridden by an aria-label that excluded the price, and focus-visible styling was applied to a decorative aria-hidden span instead of the actual focusable <summary>."
+        },
+        {
+          "severity": "low",
+          "area": "scope documentation",
+          "reason": "5 admin UI files were touched (legitimate link-color-scheme-safety migration + a publish-panel bugfix) but not documented as in-scope in the PR description."
+        },
+        {
+          "severity": "low",
+          "area": "license documentation",
+          "reason": "New lucide-react dependency (ISC-licensed) not recorded in docs/platform/service-register.md's permissive-license list."
+        },
+        {
+          "severity": "low",
+          "area": "test coverage",
+          "reason": "New order-status ticket-stamp order-number badge had no test coverage."
+        }
+      ],
+      "required_actions": [
+        "Promote hero gradient colors to real design tokens, used in all 4 pages, referenced (not restated) by the 4 a11y tests.",
+        "Fix the disclosure trigger's accessible name to include the price; move focus-visible to the actual focusable element.",
+        "Document the 5 touched admin files in the PR description.",
+        "Record lucide-react (ISC) in service-register.md.",
+        "Add a test for the order-number badge."
+      ],
+      "resolved_by": "commits addressing all 5 findings, pushed to chore/frontend-design-overhaul-v2"
+    },
+    {
+      "cycle": 2,
+      "verdict": "CHANGES_REQUESTED",
+      "review_findings": [
+        {
+          "severity": "high",
+          "area": "accessibility (real WCAG AA failure)",
+          "reason": "Sold-out dish cards applied a blanket opacity-60 to their entire text block, dimming the description AND the legally-relevant allergen notice to ~2.77:1 contrast -- below the 4.5:1 AA minimum. This was a genuine regression introduced by the cycle-1 repair's broader (owner-directed) layout rebuild, not present on main before this PR."
+        },
+        {
+          "severity": "medium",
+          "area": "content regression",
+          "reason": "Sold-out dishes no longer displayed a price at all (only available on main previously) -- the price render was fully gated behind `!dish.soldOut`."
+        },
+        {
+          "severity": "medium",
+          "area": "process",
+          "reason": "Two additional scope items (dark-mode removal fixing a real invisible-text bug; the public-menu layout rebuild responding to direct owner feedback) were introduced during repair cycles without being explicitly documented as their own scope items."
+        },
+        {
+          "severity": "low",
+          "area": "tracking",
+          "reason": "Dark-mode removal's globals.css comment said 'tracked as a follow-up' with no actual issue created anywhere."
+        },
+        {
+          "severity": "low",
+          "area": "test correctness",
+          "reason": "The 4 hero-contrast a11y tests asserted against the DARKER gradient stop (espresso-900) as the stated 'worst case' for light text on a dark background -- inverted; the lighter stop (espresso-800) is actually the worst case for that direction."
+        }
+      ],
+      "required_actions": [
+        "Remove the opacity-60 dimming from sold-out card text; rely on the existing solid badge + grayed placeholder for sold-out signalling.",
+        "Restore price display for sold-out dishes; only suppress the add/chooser control.",
+        "Document the dark-mode removal and layout rebuild as explicit scope items in the PR description.",
+        "Open a real GitHub issue for the dark-mode-reactivation follow-up and reference it by number.",
+        "Fix the hero-contrast tests to assert against the lighter/worse-case gradient stop."
+      ],
+      "resolved_by": "final repair commit, pushed to chore/frontend-design-overhaul-v2 (head 1a1c759)"
+    },
+    {
+      "cycle": 3,
+      "note": "FINAL cycle per 3-cycle-max policy.",
+      "verdict": "APPROVED",
+      "acceptance_criteria": [
+        {
+          "criterion": "Sold-out card no longer blanket-dims text; real contrast assertion added",
+          "status": "PASS",
+          "evidence": "opacity-60 removed from the dish-card text wrapper; public-menu-design.a11y.test.ts asserts the actual rendered neutral-500/neutral-0 pair passes AA, plus keeps an inverted regression test proving the old opacity-60 composite would fail. DOM-level test confirms no opacity-* class on the description/allergen-notice elements."
+        },
+        {
+          "criterion": "Sold-out dishes show price again; only add control suppressed",
+          "status": "PASS",
+          "evidence": "dish-card.tsx renders formatPrice/startingPriceLabel for sold-out dishes with no add button or chooser disclosure; covered by new tests."
+        },
+        {
+          "criterion": "PR description documents dark-mode removal and layout rebuild as explicit scope items",
+          "status": "PASS",
+          "evidence": "PR body's 'Zusätzliche Scope-Items' section covers both with rationale and commit references."
+        },
+        {
+          "criterion": "Real tracking issue exists for dark-mode reactivation, referenced by number",
+          "status": "PASS",
+          "evidence": "Issue #83 created and open; globals.css comment references it explicitly."
+        },
+        {
+          "criterion": "Hero-contrast tests use the correct worst-case gradient stop",
+          "status": "PASS",
+          "evidence": "All 4 *-design.a11y.test.ts files now assert against colors.espresso[800] with corrected reasoning in comments; white text still passes AA with a wide margin."
+        },
+        {
+          "criterion": "No new regressions; final commit scope contained; earlier cycle fixes intact",
+          "status": "PASS",
+          "evidence": "8 files, +169/-45 in the final commit, all attributable to the 5 findings. Cycle-1/2 fixes verified still present (no text-brand-600, espresso tokens intact, lucide-react license recorded, disclosure aria-label/focus-visible fix intact)."
+        }
+      ],
+      "deterministic_checks": {
+        "format": "PASS",
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "unit_tests": "PASS",
+        "integration_tests": "NOT_RUN",
+        "e2e_tests": "NOT_RUN",
+        "build": "PASS",
+        "security": "PASS"
+      },
+      "review_findings": [
+        {
+          "severity": "low",
+          "area": "ui-consistency",
+          "reason": "The visible price label differs between sold-out (\"ab 8,90 €\") and available (\"8,90 €\", with \"ab\" only in the aria-label) multi-variant dish cards.",
+          "required_correction": "Optional follow-up: use startingPriceLabel's visible text consistently in both states.",
+          "outcome": "not required for merge, deferred as optional polish"
+        }
+      ],
+      "accessibility": "PASS",
+      "maintainability": "PASS",
+      "residual_risks": [
+        "Contrast coverage is token-level + DOM-class assertions, not rendered-pixel verification.",
+        "Automatic OS dark mode remains disabled repo-wide pending the issue #83 audit.",
+        "No integration/e2e checks configured for this UI-only PR; verified at unit/DOM level only."
+      ],
+      "required_actions": []
+    }
+  ],
+  "final_verdict": "APPROVED"
+}
