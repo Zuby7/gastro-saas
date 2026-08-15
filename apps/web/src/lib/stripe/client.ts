@@ -48,3 +48,20 @@ export function getStripeConnectWebhookSecret(): string {
 
   return secret;
 }
+
+/**
+ * Resolves the signing secret for ticket #25's platform-account **payment
+ * events** webhook endpoint (`/api/webhooks/stripe`) -- deliberately a
+ * distinct env var/Stripe webhook endpoint from
+ * `getStripeConnectWebhookSecret()` above (see that function's comment and
+ * `.env.example`).
+ */
+export function getStripePaymentsWebhookSecret(): string {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!secret) {
+    throw new Error("STRIPE_WEBHOOK_SECRET must be set to verify the payments webhook.");
+  }
+
+  return secret;
+}
