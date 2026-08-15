@@ -1,3 +1,4 @@
+import Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const stripeRefundsCreateMock = vi.fn();
@@ -306,7 +307,11 @@ describe("issueRefundForOrder", () => {
     expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
   });
 
-  it("marks the refund row 'failed' and still writes an audit entry when the Stripe call itself fails", async () => {
+  it("marks the refund row 'unconfirmed' (not 'failed') and still writes an audit entry when a plain/unrecognized error is thrown by the Stripe call, since it cannot be confirmed as a definitive rejection (Opus epic-7 batch review finding 1)", async () => {
+    // A bare Error (not one of the Stripe SDK's own error classes) is
+    // treated as AMBIGUOUS, not DEFINITIVE -- see isDefinitiveStripeFailure()
+    // and the module header. This replaces the pre-fix assumption that ANY
+    // thrown error meant a confirmed, safe-to-retry failure.
     stripeRefundsCreateMock.mockRejectedValue(new Error("Stripe is down"));
 
     const { issueRefundForOrder } = await import("./refund-service");
@@ -319,6 +324,33 @@ describe("issueRefundForOrder", () => {
         amountCents: 500,
         reason: "grund",
       }),
+    ).rejects.toThrow(/nicht bestätigt werden/);
+
+    expect(updateCalls[0]).toMatchObject({ payload: { status: "unconfirmed" } });
+    expect(recordMenuAdminAuditEventMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "payment.refund_unconfirmed" }),
+    );
+  });
+
+  it("marks the refund row 'failed' (not 'unconfirmed') for a DEFINITIVE Stripe error, freeing the amount for a genuine retry (Opus epic-7 batch review finding 1)", async () => {
+    stripeRefundsCreateMock.mockRejectedValue(
+      new Stripe.errors.StripeInvalidRequestError({
+        message: "No such payment_intent",
+        type: "invalid_request_error",
+      }),
+    );
+
+    const { issueRefundForOrder } = await import("./refund-service");
+
+    await expect(
+      issueRefundForOrder(fakeSupabase() as never, {
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        actorUserId: "user-1",
+        amountCents: 2000,
+        reason: "grund",
+      }),
     ).rejects.toThrow(/nicht durchgeführt werden/);
 
     expect(updateCalls[0]).toMatchObject({ payload: { status: "failed" } });
@@ -326,6 +358,83 @@ describe("issueRefundForOrder", () => {
       expect.anything(),
       expect.objectContaining({ action: "payment.refund_failed" }),
     );
+
+    // A 'failed' row does not reserve any amount -- a genuine retry for the
+    // full paid amount must be allowed.
+    state.refunds = [
+      {
+        id: "refund-1",
+        amount_cents: 2000,
+        currency: "EUR",
+        reason: "grund",
+        status: "failed",
+        stripe_refund_id: null,
+        actor_user_id: "user-1",
+        created_at: new Date().toISOString(),
+      },
+    ];
+    stripeRefundsCreateMock.mockResolvedValue({ id: "re_retry" });
+    const retryResult = await issueRefundForOrder(fakeSupabase() as never, {
+      tenantId: "tenant-1",
+      orderId: "order-1",
+      actorUserId: "user-1",
+      amountCents: 2000,
+      reason: "erneuter Versuch",
+    });
+    expect(retryResult.stripeRefundId).toBe("re_retry");
+  });
+
+  it("marks the refund row 'unconfirmed' (not 'failed') for an AMBIGUOUS Stripe/network failure, and that amount still counts against the remaining refundable budget (Opus epic-7 batch review finding 1)", async () => {
+    stripeRefundsCreateMock.mockRejectedValue(
+      new Stripe.errors.StripeConnectionError({
+        message: "An error occurred while communicating with Stripe (ETIMEDOUT).",
+      }),
+    );
+
+    const { issueRefundForOrder } = await import("./refund-service");
+
+    await expect(
+      issueRefundForOrder(fakeSupabase() as never, {
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        actorUserId: "user-1",
+        amountCents: 2000,
+        reason: "grund",
+      }),
+    ).rejects.toThrow(/nicht bestätigt werden/);
+
+    expect(updateCalls[0]).toMatchObject({ payload: { status: "unconfirmed" } });
+    expect(recordMenuAdminAuditEventMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "payment.refund_unconfirmed" }),
+    );
+
+    // The ambiguous attempt's full 2000 cents still reserves the entire paid
+    // amount -- a naive retry for the remaining balance must still be
+    // blocked, since we can't be sure Stripe didn't already process it.
+    state.refunds = [
+      {
+        id: "refund-1",
+        amount_cents: 2000,
+        currency: "EUR",
+        reason: "grund",
+        status: "unconfirmed",
+        stripe_refund_id: null,
+        actor_user_id: "user-1",
+        created_at: new Date().toISOString(),
+      },
+    ];
+    const { RefundExceedsRemainingAmountError } = await import("./refund-service");
+    await expect(
+      issueRefundForOrder(fakeSupabase() as never, {
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        actorUserId: "user-1",
+        amountCents: 1,
+        reason: "erneuter Versuch",
+      }),
+    ).rejects.toBeInstanceOf(RefundExceedsRemainingAmountError);
+    expect(stripeRefundsCreateMock).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a zero or negative refund amount before ever touching the database", async () => {

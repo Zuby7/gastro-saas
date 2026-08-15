@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import Stripe from "stripe";
 import { createStripeClient } from "@/lib/stripe/client";
 import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-event";
 
@@ -51,7 +52,61 @@ import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-e
  * refund) and carries the real, richer reason in both `refunds.reason` (our
  * own table) and Stripe's own `metadata.reason` (best-effort, for anyone
  * looking at the Stripe dashboard directly).
+ *
+ * Definitive vs. ambiguous Stripe failures (Opus epic-7 batch review finding
+ * 1): if `stripe.refunds.create()` throws, this module distinguishes two
+ * cases via the Stripe Node SDK's own error classes
+ * (`isDefinitiveStripeFailure()` below):
+ *   - DEFINITIVE (`StripeCardError` / `StripeInvalidRequestError` /
+ *     `StripeAuthenticationError` / `StripePermissionError` /
+ *     `StripeIdempotencyError`): Stripe synchronously rejected the request
+ *     before it moved any money -- we KNOW for certain the refund did not
+ *     happen. These are marked `failed`, which (per the refunds migration)
+ *     releases the reserved amount for a genuine retry.
+ *   - AMBIGUOUS (anything else -- `StripeConnectionError`, `StripeAPIError`,
+ *     a bare network/timeout error, or any other unrecognized throw): the
+ *     response was lost before we could confirm one way or the other. Stripe
+ *     may well have processed the refund; if we marked this `failed` (as a
+ *     naive implementation once did), the reserved amount would be released
+ *     and a retry would mint a brand-new `refunds` row with a brand-new
+ *     idempotency key (`refund:<new-row-id>`) -- which Stripe cannot
+ *     recognize as a retry of the earlier attempt, so a genuinely-succeeded
+ *     first attempt plus a retried second attempt would refund the money
+ *     TWICE at Stripe while the database only ever shows one `succeeded`
+ *     row. To prevent this, an ambiguous failure is marked `unconfirmed`
+ *     (see the refunds migration's status check-constraint) instead of
+ *     `failed` -- `unconfirmed` still counts against the payment's
+ *     remaining refundable amount (same as `pending`/`succeeded`), so a
+ *     careless retry cannot double-reserve, let alone double-refund.
+ *     `unconfirmed` is a terminal, manual-reconciliation state: someone must
+ *     check the real Stripe dashboard/API for what actually happened and
+ *     resolve it by hand. Building automatic reconciliation via a
+ *     `charge.refunded`/`refund.updated` webhook listener is a larger scope
+ *     than this fix -- the existing payment webhook
+ *     (`apps/web/src/app/api/webhooks/stripe/route.ts`, ticket #25) does not
+ *     currently subscribe to any refund-related event types at all, so a
+ *     dedicated refund-reconciliation webhook is a clean, scoped follow-up
+ *     ticket, not built here. This is a documented residual risk: an
+ *     `unconfirmed` refund is not auto-retryable and requires a human to
+ *     reconcile it.
  */
+
+/**
+ * Distinguishes a DEFINITIVE Stripe failure (Stripe synchronously rejected
+ * the request -- the refund is known NOT to have happened at Stripe) from an
+ * AMBIGUOUS one (the response was lost -- e.g. network timeout/connection
+ * reset -- and Stripe may or may not have actually processed the refund).
+ * See the module header for why this distinction matters.
+ */
+export function isDefinitiveStripeFailure(error: unknown): boolean {
+  return (
+    error instanceof Stripe.errors.StripeCardError ||
+    error instanceof Stripe.errors.StripeInvalidRequestError ||
+    error instanceof Stripe.errors.StripeAuthenticationError ||
+    error instanceof Stripe.errors.StripePermissionError ||
+    error instanceof Stripe.errors.StripeIdempotencyError
+  );
+}
 
 export class PaymentNotRefundableError extends Error {
   constructor(message = "Für diese Bestellung liegt keine bezahlte Zahlung vor.") {
@@ -155,7 +210,10 @@ export async function getPaymentRefundSummary(
 
   const rows = refunds ?? [];
   const refundedOrReservedCents = rows
-    .filter((row) => row.status === "pending" || row.status === "succeeded")
+    .filter(
+      (row) =>
+        row.status === "pending" || row.status === "succeeded" || row.status === "unconfirmed",
+    )
     .reduce((sum, row) => sum + row.amount_cents, 0);
 
   return {
@@ -205,8 +263,9 @@ export interface IssueRefundResult {
  *   3. Calls `stripe.refunds.create()` against the payment intent, with
  *      `reverse_transfer: true` (see module header).
  *   4. Finalizes the `refunds` row to `succeeded` (with the Stripe refund
- *      id) or `failed`, and always writes an audit entry with actor, amount,
- *      reason, provider reference, and timestamp
+ *      id), `failed` (definitive Stripe rejection), or `unconfirmed`
+ *      (ambiguous failure -- see module header), and always writes an audit
+ *      entry with actor, amount, reason, provider reference, and timestamp
  *      (`audit_logs.created_at`) -- regardless of the Stripe outcome.
  */
 export async function issueRefundForOrder(
@@ -239,7 +298,10 @@ export async function issueRefundForOrder(
     .returns<RefundRow[]>();
 
   const alreadyReservedCents = (existingRefunds ?? [])
-    .filter((row) => row.status === "pending" || row.status === "succeeded")
+    .filter(
+      (row) =>
+        row.status === "pending" || row.status === "succeeded" || row.status === "unconfirmed",
+    )
     .reduce((sum, row) => sum + row.amount_cents, 0);
 
   // Application-level pre-check: gives a clear, translated error before ever
@@ -317,12 +379,25 @@ export async function issueRefundForOrder(
       amountCents: input.amountCents,
     };
   } catch (error) {
-    await supabase.from("refunds").update({ status: "failed" }).eq("id", reservedRefund.id);
+    // See module header: a DEFINITIVE Stripe failure means the refund is
+    // known NOT to have happened, so it's safe to release the reserved
+    // amount (`failed`). An AMBIGUOUS failure (network timeout/connection
+    // drop -- we cannot tell whether Stripe actually processed it before the
+    // response was lost) must NOT release the reservation, or a naive retry
+    // could double-refund at Stripe -- it's marked `unconfirmed` instead,
+    // which still counts against the remaining refundable amount and
+    // requires manual reconciliation.
+    const definitive = isDefinitiveStripeFailure(error);
+
+    await supabase
+      .from("refunds")
+      .update({ status: definitive ? "failed" : "unconfirmed" })
+      .eq("id", reservedRefund.id);
 
     await recordMenuAdminAuditEvent(supabase, {
       tenantId: input.tenantId,
       actorUserId: input.actorUserId,
-      action: "payment.refund_failed",
+      action: definitive ? "payment.refund_failed" : "payment.refund_unconfirmed",
       targetType: "order",
       targetId: input.orderId,
       metadata: {
@@ -335,6 +410,12 @@ export async function issueRefundForOrder(
       },
     });
 
-    throw new Error("Die Rückerstattung konnte bei Stripe nicht durchgeführt werden.");
+    if (definitive) {
+      throw new Error("Die Rückerstattung konnte bei Stripe nicht durchgeführt werden.");
+    }
+
+    throw new Error(
+      "Die Rückerstattung bei Stripe konnte nicht bestätigt werden. Bitte den Stripe-Status manuell prüfen, bevor erneut versucht wird.",
+    );
   }
 }

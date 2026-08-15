@@ -354,4 +354,48 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
     );
     expect(asOwner.rows).toHaveLength(1);
   });
+
+  it("never leaks payments/orders reads across tenants via payments_select_payments_read/orders_select_payments_read, even for a holder of payments.read in their OWN tenant (Opus epic-7 batch review finding 2)", async () => {
+    const seed = await seedFixtureWithManager();
+    fixture = seed.fixture;
+    const { orderId, paymentId } = await seedPaidPayment(admin, fixture.tenantB.tenantId, 2000);
+
+    // seed.managerId holds payments.read/payments.refund, but only in
+    // tenantA -- has_tenant_permission(tenant_id, 'payments.read') must
+    // evaluate false for tenantB's rows regardless of that unrelated grant.
+    const paymentsAsTenantAManager = await queryAsUser(
+      admin,
+      seed.managerId,
+      `select id from payments where id = $1`,
+      [paymentId],
+    );
+    expect(paymentsAsTenantAManager.rows).toHaveLength(0);
+
+    const ordersAsTenantAManager = await queryAsUser(
+      admin,
+      seed.managerId,
+      `select id from orders where id = $1`,
+      [orderId],
+    );
+    expect(ordersAsTenantAManager.rows).toHaveLength(0);
+
+    // Sanity check: tenantB's own owner (payments.read via the Owner role)
+    // can see both rows -- proves the empty results above are cross-tenant
+    // denial, not a broken policy that hides everything from everyone.
+    const paymentsAsTenantBOwner = await queryAsUser(
+      admin,
+      fixture.tenantB.ownerId,
+      `select id from payments where id = $1`,
+      [paymentId],
+    );
+    expect(paymentsAsTenantBOwner.rows).toHaveLength(1);
+
+    const ordersAsTenantBOwner = await queryAsUser(
+      admin,
+      fixture.tenantB.ownerId,
+      `select id from orders where id = $1`,
+      [orderId],
+    );
+    expect(ordersAsTenantBOwner.rows).toHaveLength(1);
+  });
 });

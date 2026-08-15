@@ -23,14 +23,19 @@
 -- Never-exceed-paid-amount enforcement (the ticket's core acceptance
 -- criterion) is done at the DB layer, inside a BEFORE INSERT trigger that
 -- locks the referenced `payments` row (`select ... for update`) before
--- summing this payment's own `pending`/`succeeded` refunds and comparing
--- against `payments.amount_cents` -- this closes the race between two
--- concurrent refund requests for the same payment (mirrors
+-- summing this payment's own `pending`/`succeeded`/`unconfirmed` refunds and
+-- comparing against `payments.amount_cents` -- this closes the race between
+-- two concurrent refund requests for the same payment (mirrors
 -- `create_order_from_cart()`'s row-lock precedent for the analogous
 -- duplicate-checkout race, ticket #21/Opus epic-6 finding 1). Applications
 -- insert a `status = 'pending'` row *before* calling Stripe (reserving the
--- amount), then update it to `succeeded`/`failed` afterwards -- a `failed`
--- row does not count against the limit, freeing that budget for a retry.
+-- amount), then update it to `succeeded`/`failed`/`unconfirmed` afterwards --
+-- only a `failed` row (a DEFINITIVE Stripe rejection) releases that reserved
+-- amount; an `unconfirmed` row (an AMBIGUOUS failure, e.g. a network
+-- timeout, where Stripe may have actually processed the refund) keeps
+-- reserving it and requires manual reconciliation instead of an automatic
+-- retry -- see `apps/web/src/lib/payments/refund-service.ts`'s module header
+-- (Opus epic-7 batch review finding 1).
 --
 -- Two enforcement layers for `payments.refund`, per this repo's tenant-
 -- isolation/RBAC standard:
@@ -78,9 +83,21 @@ create table refunds (
   stripe_refund_id text unique check (stripe_refund_id is null or stripe_refund_id ~ '^re_'),
   -- 'pending': reserved (this row's amount already counts against the
   -- payment's remaining refundable amount) but Stripe has not yet confirmed
-  -- it. 'succeeded'/'failed' are terminal; only 'failed' releases the
-  -- reserved amount (excluded from the running total below).
-  status text not null default 'pending' check (status in ('pending', 'succeeded', 'failed')),
+  -- it. 'succeeded'/'failed'/'unconfirmed' are terminal; only 'failed'
+  -- releases the reserved amount (excluded from the running total below).
+  -- 'unconfirmed' (added: Opus epic-7 batch review finding 1) is for an
+  -- AMBIGUOUS Stripe failure -- e.g. a network timeout/connection drop
+  -- where the refund may have actually succeeded at Stripe before the
+  -- response was lost. Unlike 'failed', it deliberately KEEPS counting
+  -- against the running total (see
+  -- ensure_refund_matches_payment_and_within_limit() below) so a naive
+  -- retry with a fresh idempotency key cannot double-refund the same money
+  -- at Stripe. It is a terminal, manual-reconciliation state (someone must
+  -- check the real Stripe dashboard/API for what actually happened) rather
+  -- than auto-retryable -- see
+  -- apps/web/src/lib/payments/refund-service.ts's module header.
+  status text not null default 'pending'
+    check (status in ('pending', 'succeeded', 'failed', 'unconfirmed')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -151,7 +168,7 @@ begin
     into v_already_reserved_cents
     from public.refunds
    where payment_id = new.payment_id
-     and status in ('pending', 'succeeded');
+     and status in ('pending', 'succeeded', 'unconfirmed');
 
   if v_already_reserved_cents + new.amount_cents > v_payment_amount_cents then
     raise exception
@@ -176,9 +193,10 @@ create trigger refunds_ensure_matches_payment
 -- guard_refunds_immutable_fields_change -- mirrors
 -- guard_payments_immutable_fields_change()'s precedent: once a refund row
 -- exists, only its lifecycle fields (status, stripe_refund_id, updated_at)
--- may ever change, and only forward (pending -> succeeded | failed), never
--- backward or sideways -- this is what actually finalizes a Stripe refund
--- attempt after the server-side Stripe API call resolves.
+-- may ever change, and only forward (pending -> succeeded | failed |
+-- unconfirmed), never backward or sideways -- this is what actually
+-- finalizes a Stripe refund attempt after the server-side Stripe API call
+-- resolves (or fails ambiguously -- see the status column's comment above).
 -- ----------------------------------------------------------------------------
 create or replace function guard_refunds_immutable_fields_change()
 returns trigger
@@ -209,8 +227,8 @@ begin
         using errcode = 'insufficient_privilege';
     end if;
 
-    if new.status is distinct from old.status and new.status not in ('succeeded', 'failed') then
-      raise exception 'refunds.status may only become ''succeeded'' or ''failed'''
+    if new.status is distinct from old.status and new.status not in ('succeeded', 'failed', 'unconfirmed') then
+      raise exception 'refunds.status may only become ''succeeded'', ''failed'', or ''unconfirmed'''
         using errcode = 'insufficient_privilege';
     end if;
   end if;
@@ -220,7 +238,7 @@ end;
 $$;
 
 comment on function guard_refunds_immutable_fields_change() is
-  'Rejects changes to refunds.tenant_id/payment_id/order_id/amount_cents/currency/reason/actor_user_id, and any status transition other than pending -> succeeded|failed, from app-facing roles (ticket #26, risk:payment).';
+  'Rejects changes to refunds.tenant_id/payment_id/order_id/amount_cents/currency/reason/actor_user_id, and any status transition other than pending -> succeeded|failed|unconfirmed, from app-facing roles (ticket #26, risk:payment).';
 
 create trigger refunds_guard_immutable_fields_change
   before update on refunds
@@ -255,7 +273,7 @@ create policy refunds_insert_payments_refund
   to authenticated
   with check (has_tenant_permission(tenant_id, 'payments.refund'));
 
--- Finalizing a refund (pending -> succeeded|failed, once the server-side
+-- Finalizing a refund (pending -> succeeded|failed|unconfirmed, once the server-side
 -- Stripe call resolves) is the second half of the same privileged action --
 -- also gated on payments.refund, never a lesser permission.
 create policy refunds_update_payments_refund
