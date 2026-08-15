@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type Stripe from "stripe";
 
 const recordOrderAuditEventMock = vi.fn();
+const sendOrderConfirmationEmailMock = vi.fn();
 
 vi.mock("@/lib/audit/record-order-audit-event", () => ({
   recordOrderAuditEvent: (...args: unknown[]) => recordOrderAuditEventMock(...args),
+}));
+
+vi.mock("@/lib/notifications/order-confirmation-email", () => ({
+  sendOrderConfirmationEmail: (...args: unknown[]) => sendOrderConfirmationEmailMock(...args),
 }));
 
 interface FakeOrder {
@@ -164,6 +169,7 @@ function checkoutSessionCompletedEvent(overrides: Record<string, unknown> = {}):
         amount_total: 2599,
         currency: "eur",
         payment_intent: "pi_test_abc",
+        customer_details: { email: "guest@example.com" },
         metadata: { tenant_id: "tenant-1", order_id: "order-1" },
         ...overrides,
       },
@@ -225,6 +231,40 @@ describe("handleStripePaymentWebhookEvent -- checkout.session.completed (success
     expect(recordOrderAuditEventMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ action: "payment_confirmed", targetId: "order-1" }),
+    );
+  });
+
+  it("triggers the order confirmation email (ticket #40) with the customer's email off the completed session", async () => {
+    const { handleStripePaymentWebhookEvent } = await import("./webhook-service");
+    const admin = makeAdmin();
+
+    await handleStripePaymentWebhookEvent(admin as never, checkoutSessionCompletedEvent());
+
+    expect(sendOrderConfirmationEmailMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        recipientEmail: "guest@example.com",
+      }),
+    );
+  });
+
+  it("still marks the order received/paid even when the confirmation email send rejects (acceptance criterion 2)", async () => {
+    sendOrderConfirmationEmailMock.mockRejectedValueOnce(new Error("Resend daily limit exceeded"));
+
+    const { handleStripePaymentWebhookEvent } = await import("./webhook-service");
+    const admin = makeAdmin();
+
+    await expect(
+      handleStripePaymentWebhookEvent(admin as never, checkoutSessionCompletedEvent()),
+    ).resolves.toBeUndefined();
+
+    expect(state.order?.status).toBe("received");
+    expect(state.payment?.status).toBe("paid");
+    expect(recordOrderAuditEventMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "payment_confirmed" }),
     );
   });
 

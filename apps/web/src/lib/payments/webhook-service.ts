@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type Stripe from "stripe";
 import { recordOrderAuditEvent } from "@/lib/audit/record-order-audit-event";
+import { sendOrderConfirmationEmail } from "@/lib/notifications/order-confirmation-email";
 
 /**
  * Payment webhook processing (ticket #25, risk:payment) -- the ONLY code
@@ -217,9 +218,10 @@ async function markOrderReceived(
     payment: PaymentRecord;
     stripeEventId: string;
     stripePaymentIntentId: string | null;
+    customerEmail: string | null;
   },
 ): Promise<void> {
-  const { order, payment, stripeEventId, stripePaymentIntentId } = params;
+  const { order, payment, stripeEventId, stripePaymentIntentId, customerEmail } = params;
 
   const { error: eventError } = await admin.from("order_status_events").insert({
     tenant_id: order.tenantId,
@@ -257,6 +259,27 @@ async function markOrderReceived(
     targetId: order.id,
     metadata: { stripeEventId, stripeCheckoutSessionId: payment.stripeCheckoutSessionId },
   });
+
+  // Ticket #40: fire the order-confirmation email only AFTER the order's
+  // `received` transition and the payment/audit rows above are already
+  // durably committed -- `sendOrderConfirmationEmail` itself never throws
+  // (see that module's header), and the extra try/catch here is deliberate
+  // defense-in-depth so a defect introduced there in the future can still
+  // never affect this webhook's own success response to Stripe (acceptance
+  // criterion 2, `.claude/rules/payments.md`).
+  try {
+    await sendOrderConfirmationEmail(admin, {
+      tenantId: order.tenantId,
+      orderId: order.id,
+      recipientEmail: customerEmail,
+    });
+  } catch (error) {
+    console.error(
+      "[payments-webhook] order confirmation email threw unexpectedly (ignored)",
+      order.id,
+      error,
+    );
+  }
 }
 
 async function markOrderCancelledForPaymentFailure(
@@ -381,6 +404,12 @@ async function handleCheckoutSessionCompleted(
     stripeEventId: event.id,
     stripePaymentIntentId:
       typeof session.payment_intent === "string" ? session.payment_intent : null,
+    // Stripe's hosted Checkout page always collects an email address from
+    // the customer during payment -- there is no `customer_email` column on
+    // `orders` to persist this (ticket #40's explicit "don't invent new
+    // order fields" guidance), so it's read directly off the completed
+    // session here, once, at the moment the confirmation email is sent.
+    customerEmail: session.customer_details?.email ?? session.customer_email ?? null,
   });
 }
 
