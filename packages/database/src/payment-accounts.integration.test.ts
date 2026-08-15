@@ -231,11 +231,14 @@ describe.skipIf(!dbAvailable)("payment_accounts (Stripe Connect onboarding)", ()
       null,
     ]);
 
-    const firstCompletion = await admin.query<{ onboarding_completed_at: string }>(
+    const firstCompletion = await admin.query<{ onboarding_completed_at: Date }>(
       `select onboarding_completed_at from payment_accounts where stripe_account_id = $1`,
       ["acct_completion_preserved"],
     );
-    const originalTimestamp = firstCompletion.rows[0]?.onboarding_completed_at;
+    // node-postgres deserializes timestamptz columns to Date objects, not
+    // strings -- compare by value (getTime()), not reference (toBe() would
+    // fail even for two Dates representing the exact same instant).
+    const originalTimestamp = firstCompletion.rows[0]?.onboarding_completed_at.getTime();
     expect(originalTimestamp).toBeTruthy();
 
     // A later event downgrades the account to 'restricted' (e.g. Stripe
@@ -262,14 +265,14 @@ describe.skipIf(!dbAvailable)("payment_accounts (Stripe Connect onboarding)", ()
 
     const row = await admin.query<{
       status: string;
-      onboarding_completed_at: string;
+      onboarding_completed_at: Date;
     }>(
       `select status, onboarding_completed_at from payment_accounts where stripe_account_id = $1`,
       ["acct_completion_preserved"],
     );
 
     expect(row.rows[0]?.status).toBe("enabled");
-    expect(row.rows[0]?.onboarding_completed_at).toBe(originalTimestamp);
+    expect(row.rows[0]?.onboarding_completed_at.getTime()).toBe(originalTimestamp);
   });
 
   // Same-model self-check finding for this risk:payment ticket: a
