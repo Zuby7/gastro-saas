@@ -60,7 +60,7 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
           required
           maxLength={200}
           autoComplete="name"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+          className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
         />
       </div>
 
@@ -75,7 +75,7 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
             type="tel"
             maxLength={40}
             autoComplete="tel"
-            className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+            className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
           />
         </div>
       ) : (
@@ -89,7 +89,7 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
             type="text"
             required
             maxLength={40}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+            className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
           />
         </div>
       )}
@@ -103,7 +103,7 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
           name="customerNote"
           maxLength={500}
           rows={3}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+          className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
         />
       </div>
 

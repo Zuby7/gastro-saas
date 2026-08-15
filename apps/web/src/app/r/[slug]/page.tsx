@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatPrice } from "@/lib/public-menu/format";
+import { ShoppingBag } from "lucide-react";
 import { getPublicMenu } from "@/lib/public-menu/fetch";
 import { loadCartViewForDisplay } from "./cart/actions";
-import { DishDetail } from "./dish-detail";
+import { CategoryNav } from "./category-nav";
+import { DishCard } from "./dish-card";
 
 interface PublicMenuPageProps {
   params: Promise<{ slug: string }>;
@@ -21,46 +22,50 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
 
   return (
     <main className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-200 bg-neutral-50 px-5 py-12">
-        <div className="mx-auto flex max-w-4xl items-start justify-between gap-4">
-          <div>
-            <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+      {/*
+        Hero (design pass v2, see `packages/ui/src/tokens.ts`'s header
+        comment for context and the approved mockup this replicates): a
+        warm, dark diagonal gradient replacing the old flat
+        `bg-neutral-50` header band. The two gradient stops and the
+        `gold-300` label/badge color are checked against
+        `public-menu-design.a11y.test.ts` (contrast measured against
+        `espresso-800`, the LIGHTER of the two stops -- the worst case for
+        light/white text, since a lighter background gives it less
+        contrast).
+      */}
+      <header className="bg-gradient-to-br from-espresso-900 to-espresso-800 px-5 pt-8 pb-6 sm:px-12 sm:pt-14 sm:pb-11">
+        <div className="mx-auto flex max-w-5xl flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="max-w-xl">
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-white sm:text-[2.5rem]">
               {menu.tenant.name}
             </h1>
-            <div aria-hidden="true" className="mt-4 h-1 w-16 rounded-full bg-clay-500" />
             {menu.tenant.description ? (
-              <p className="mt-4 max-w-2xl text-foreground-secondary">{menu.tenant.description}</p>
+              <p className="mt-3 max-w-[32rem] leading-relaxed text-white/80">
+                {menu.tenant.description}
+              </p>
             ) : null}
           </div>
+
           <Link
             href={`/r/${slug}/cart`}
-            className="shrink-0 rounded-full border border-neutral-300 bg-neutral-0 px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-clay-400 hover:text-clay-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
+            className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-white/25 bg-white/12 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
           >
-            Warenkorb{cart && cart.itemCount > 0 ? ` (${cart.itemCount})` : ""}
+            <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+            <span>Warenkorb</span>
+            {cart && cart.itemCount > 0 ? (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-gold-300 px-1.5 text-xs font-semibold text-neutral-900">
+                {cart.itemCount}
+              </span>
+            ) : null}
           </Link>
         </div>
       </header>
 
       {menu.categories.length > 0 ? (
-        <nav
-          aria-label="Kategorien"
-          className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-0/95 px-4 py-3 backdrop-blur"
-        >
-          <div className="mx-auto flex max-w-4xl gap-2 overflow-x-auto">
-            {menu.categories.map((category) => (
-              <a
-                key={category.id}
-                href={`#category-${category.id}`}
-                className="shrink-0 rounded-full border border-neutral-300 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-clay-400 hover:text-clay-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-600"
-              >
-                {category.name}
-              </a>
-            ))}
-          </div>
-        </nav>
+        <CategoryNav categories={menu.categories.map(({ id, name }) => ({ id, name }))} />
       ) : null}
 
-      <div className="mx-auto flex max-w-4xl flex-col gap-10 px-5 py-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-12 px-5 py-10 sm:px-8">
         {menu.categories.length === 0 ? (
           <p className="rounded-md border border-neutral-300 bg-neutral-0 p-4 text-foreground">
             Diese Speisekarte ist aktuell leer.
@@ -69,60 +74,12 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
 
         {menu.categories.map((category) => (
           <section key={category.id} id={`category-${category.id}`} className="scroll-mt-20">
-            <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+            <h2 className="font-display text-[1.375rem] font-semibold tracking-tight text-foreground">
               {category.name}
             </h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {category.dishes.map((dish) => (
-                <article
-                  key={dish.id}
-                  className="rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm"
-                >
-                  {dish.image ? (
-                    <div className="mb-3 aspect-[4/3] overflow-hidden rounded-md bg-neutral-100">
-                      <img
-                        src={`/media/${dish.image.path}`}
-                        alt={dish.image.alt}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                  ) : null}
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">{dish.name}</h3>
-                      {dish.description ? (
-                        <p className="mt-1 text-sm text-foreground-secondary">{dish.description}</p>
-                      ) : null}
-                    </div>
-                    <p className="font-display font-semibold text-clay-700">
-                      {formatPrice(dish.priceCents, dish.currency)}
-                    </p>
-                  </div>
-
-                  {dish.labels.length > 0 ? (
-                    <ul className="mt-3 flex flex-wrap gap-2" aria-label="Labels">
-                      {dish.labels.map((label) => (
-                        <li
-                          key={label}
-                          className="rounded-full border border-neutral-300 px-2 py-1 text-xs text-foreground"
-                        >
-                          {label}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-
-                  <p className="mt-3 text-xs text-foreground-secondary">{dish.allergenNotice}</p>
-
-                  {dish.soldOut ? (
-                    <p className="mt-3 rounded-md border border-danger-500 bg-danger-500/10 px-2 py-1 text-sm font-medium text-danger-600">
-                      Ausverkauft
-                    </p>
-                  ) : (
-                    <DishDetail dish={dish} tenantSlug={slug} />
-                  )}
-                </article>
+                <DishCard key={dish.id} dish={dish} tenantSlug={slug} />
               ))}
             </div>
           </section>
