@@ -8,6 +8,7 @@ const redirectMock = vi.fn((url: string) => {
 });
 const createExpressAccountMock = vi.fn();
 const createOnboardingAccountLinkMock = vi.fn();
+const adminFromMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => redirectMock(url),
@@ -19,6 +20,14 @@ vi.mock("@/lib/supabase/server", () => ({
     from: fromMock,
     rpc: rpcMock,
   }),
+}));
+
+// The server action must never insert `payment_accounts` through the
+// caller's own session client (which holds no INSERT grant on that table as
+// of the epic-7 batch review fix) -- only through the service-role admin
+// client, immediately after this exact call created the Stripe account.
+vi.mock("@/lib/supabase/admin", () => ({
+  createSupabaseAdminClient: () => ({ from: adminFromMock }),
 }));
 
 vi.mock("@/lib/stripe/client", () => ({
@@ -66,7 +75,7 @@ describe("startStripeOnboardingAction", () => {
     expect(createExpressAccountMock).not.toHaveBeenCalled();
   });
 
-  it("creates a new Express account, persists it tenant-scoped, and redirects to the Account Link", async () => {
+  it("creates a new Express account, persists it tenant-scoped via the service-role client, and redirects to the Account Link", async () => {
     let insertedPayload: unknown;
     fromMock.mockImplementation((table: string) => {
       if (table === "tenant_memberships") {
@@ -79,14 +88,21 @@ describe("startStripeOnboardingAction", () => {
               maybeSingle: async () => ({ data: null, error: null }),
             }),
           }),
+        };
+      }
+      // audit_logs insert -- goes through the caller's own session client.
+      return { insert: async () => ({ error: null }) };
+    });
+    adminFromMock.mockImplementation((table: string) => {
+      if (table === "payment_accounts") {
+        return {
           insert: async (payload: unknown) => {
             insertedPayload = payload;
             return { error: null };
           },
         };
       }
-      // audit_logs insert
-      return { insert: async () => ({ error: null }) };
+      throw new Error(`unexpected admin table ${table}`);
     });
 
     const { startStripeOnboardingAction } = await import("./actions");
@@ -99,6 +115,11 @@ describe("startStripeOnboardingAction", () => {
       { __fakeStripe: true },
       { tenantId: "tenant-1", email: "owner@example.test" },
     );
+    // Regression test (epic-7 batch review finding 1): the row is inserted
+    // only via the service-role admin client, never the caller's own
+    // session client -- `stripe_account_id` is always the value this action
+    // itself just received from `createExpressAccount()`, never something a
+    // client could supply directly.
     expect(insertedPayload).toMatchObject({
       tenant_id: "tenant-1",
       stripe_account_id: "acct_new",
