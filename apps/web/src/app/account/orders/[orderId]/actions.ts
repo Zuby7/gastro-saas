@@ -8,6 +8,7 @@ import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import {
   issueRefundForOrder,
   PaymentNotRefundableError,
+  RefundAwaitingReconciliationError,
   RefundExceedsRemainingAmountError,
   RefundInvalidAmountError,
 } from "@/lib/payments/refund-service";
@@ -85,7 +86,8 @@ export async function issueRefundAction(
     if (
       error instanceof RefundExceedsRemainingAmountError ||
       error instanceof PaymentNotRefundableError ||
-      error instanceof RefundInvalidAmountError
+      error instanceof RefundInvalidAmountError ||
+      error instanceof RefundAwaitingReconciliationError
     ) {
       return { error: error.message };
     }

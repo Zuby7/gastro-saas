@@ -164,6 +164,27 @@ begin
       using errcode = 'check_violation';
   end if;
 
+  -- An 'unconfirmed' row means we do not actually know whether Stripe
+  -- already processed a refund for this payment (see the status column's
+  -- comment and refund-service.ts's module header) -- it is a terminal,
+  -- manual-reconciliation state, not something a new refund attempt may be
+  -- queued behind. Reject any new INSERT outright while one exists,
+  -- regardless of remaining amount headroom (epic-7 batch review cycle-2
+  -- fix: previously only the aggregate reserved amount was checked, so a
+  -- SECOND, smaller refund attempt against the same payment could still
+  -- proceed and reach Stripe with its own fresh idempotency key while the
+  -- first attempt's real outcome was still unknown).
+  if exists (
+    select 1 from public.refunds
+     where payment_id = new.payment_id
+       and status = 'unconfirmed'
+  ) then
+    raise exception
+      'Payment % has an unconfirmed refund pending manual reconciliation; no further refund may be attempted until it is resolved',
+      new.payment_id
+      using errcode = 'check_violation', hint = 'unconfirmed_refund_exists';
+  end if;
+
   select coalesce(sum(amount_cents), 0)
     into v_already_reserved_cents
     from public.refunds
@@ -182,7 +203,7 @@ end;
 $$;
 
 comment on function ensure_refund_matches_payment_and_within_limit() is
-  'DB-level defense-in-depth (ticket #26, risk:payment): locks the referenced payments row and rejects any refunds INSERT whose tenant_id/order_id/currency does not match its payment, whose payment is not status=''paid'', or whose amount would push the running total of pending+succeeded refunds past the payment''s own paid amount_cents -- independent of and beneath apps/web/src/lib/payments/refund-service.ts''s own application-level check.';
+  'DB-level defense-in-depth (ticket #26, risk:payment): locks the referenced payments row and rejects any refunds INSERT whose tenant_id/order_id/currency does not match its payment, whose payment is not status=''paid'', whose payment already has an ''unconfirmed'' refund awaiting manual reconciliation (epic-7 cycle-2 fix, raised with hint=''unconfirmed_refund_exists''), or whose amount would push the running total of pending+succeeded+unconfirmed refunds past the payment''s own paid amount_cents -- independent of and beneath apps/web/src/lib/payments/refund-service.ts''s own application-level check.';
 
 create trigger refunds_ensure_matches_payment
   before insert on refunds
