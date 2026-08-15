@@ -59,17 +59,22 @@ export default async function PaymentsReturnPage() {
     // member's own session could set directly. Tenant scope (`membership.tenantId`)
     // was already resolved server-side above from the caller's own session,
     // never from client input.
+    //
+    // Goes through `apply_connect_account_snapshot()` (not a plain update)
+    // with `p_event_at = now()`: this is a fresh, synchronous Retrieve
+    // Account call, so it is definitionally at least as current as any
+    // `account.updated` webhook event applied so far -- this also keeps a
+    // subsequent delayed/out-of-order webhook event from clobbering the
+    // status this page just verified (epic-7 batch review fix).
     const admin = createSupabaseAdminClient();
-    await admin
-      .from("payment_accounts")
-      .update({
-        status: snapshot.status,
-        charges_enabled: snapshot.chargesEnabled,
-        payouts_enabled: snapshot.payoutsEnabled,
-        requirements_summary: snapshot.requirementsSummary,
-        onboarding_completed_at: snapshot.status === "enabled" ? new Date().toISOString() : null,
-      })
-      .eq("tenant_id", membership.tenantId);
+    await admin.rpc("apply_connect_account_snapshot", {
+      p_stripe_account_id: existing.stripe_account_id,
+      p_event_at: new Date().toISOString(),
+      p_status: snapshot.status,
+      p_charges_enabled: snapshot.chargesEnabled,
+      p_payouts_enabled: snapshot.payoutsEnabled,
+      p_requirements_summary: snapshot.requirementsSummary,
+    });
 
     if (snapshot.status !== existing.status) {
       await recordMenuAdminAuditEvent(supabase, {

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-event";
@@ -64,7 +65,15 @@ export async function startStripeOnboardingAction(
     });
     accountId = account.id;
 
-    const { error: insertError } = await supabase.from("payment_accounts").insert({
+    // Written through the service-role admin client, never the caller's own
+    // session client: `payment_accounts` intentionally grants `authenticated`
+    // no INSERT at all (see the migration) -- `stripe_account_id` must only
+    // ever be a value this server itself just received from Stripe for this
+    // exact tenant, never a value the client could choose (epic-7 batch
+    // review fix -- previously a Manager could insert a row pointing at an
+    // account they controlled and redirect the tenant's payouts).
+    const admin = createSupabaseAdminClient();
+    const { error: insertError } = await admin.from("payment_accounts").insert({
       tenant_id: membership.tenantId,
       stripe_account_id: accountId,
       created_by_user_id: user.id,
