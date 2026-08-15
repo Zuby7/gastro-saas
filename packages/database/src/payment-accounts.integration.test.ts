@@ -204,6 +204,74 @@ describe.skipIf(!dbAvailable)("payment_accounts (Stripe Connect onboarding)", ()
     expect(row.rows[0]?.onboarding_completed_at).not.toBeNull();
   });
 
+  // Regression test for the epic-7 batch review cycle-2 finding:
+  // apply_connect_account_snapshot() previously overwrote
+  // onboarding_completed_at on *every* 'enabled' snapshot and nulled it on
+  // any later non-'enabled' status, so a later requirements-change event
+  // (still 'enabled', e.g. new Stripe KYC ask) reset the original
+  // completion time, and a later restriction (e.g. 'restricted') erased it
+  // entirely. It must now be set once and preserved regardless of later
+  // snapshots.
+  it("apply_connect_account_snapshot() preserves the original onboarding_completed_at across later snapshots", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+
+    await admin.query(
+      `insert into payment_accounts (tenant_id, stripe_account_id, created_by_user_id)
+       values ($1, $2, $3)`,
+      [tenantA.tenantId, "acct_completion_preserved", tenantA.ownerId],
+    );
+
+    await admin.query(`select apply_connect_account_snapshot($1, $2, $3, $4, $5, $6)`, [
+      "acct_completion_preserved",
+      "2026-08-16T09:00:00Z",
+      "enabled",
+      true,
+      true,
+      null,
+    ]);
+
+    const firstCompletion = await admin.query<{ onboarding_completed_at: string }>(
+      `select onboarding_completed_at from payment_accounts where stripe_account_id = $1`,
+      ["acct_completion_preserved"],
+    );
+    const originalTimestamp = firstCompletion.rows[0]?.onboarding_completed_at;
+    expect(originalTimestamp).toBeTruthy();
+
+    // A later event downgrades the account to 'restricted' (e.g. Stripe
+    // flagged a compliance issue) -- onboarding_completed_at must survive.
+    await admin.query(`select apply_connect_account_snapshot($1, $2, $3, $4, $5, $6)`, [
+      "acct_completion_preserved",
+      "2026-08-16T10:00:00Z",
+      "restricted",
+      false,
+      false,
+      "needs additional verification",
+    ]);
+
+    // A subsequent event re-enables the account -- onboarding_completed_at
+    // must still be the *original* completion time, not reset to now.
+    await admin.query(`select apply_connect_account_snapshot($1, $2, $3, $4, $5, $6)`, [
+      "acct_completion_preserved",
+      "2026-08-16T11:00:00Z",
+      "enabled",
+      true,
+      true,
+      null,
+    ]);
+
+    const row = await admin.query<{
+      status: string;
+      onboarding_completed_at: string;
+    }>(
+      `select status, onboarding_completed_at from payment_accounts where stripe_account_id = $1`,
+      ["acct_completion_preserved"],
+    );
+
+    expect(row.rows[0]?.status).toBe("enabled");
+    expect(row.rows[0]?.onboarding_completed_at).toBe(originalTimestamp);
+  });
+
   // Same-model self-check finding for this risk:payment ticket: a
   // `payments.read` holder must never be able to self-declare their own
   // account "enabled" by writing straight to payment_accounts -- only

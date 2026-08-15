@@ -80,14 +80,17 @@ as $$
          charges_enabled = p_charges_enabled,
          payouts_enabled = p_payouts_enabled,
          requirements_summary = p_requirements_summary,
-         onboarding_completed_at = case when p_status = 'enabled' then now() else null end,
+         onboarding_completed_at = case
+           when p_status = 'enabled' then coalesce(onboarding_completed_at, p_event_at)
+           else onboarding_completed_at
+         end,
          last_event_at = p_event_at
    where stripe_account_id = p_stripe_account_id
      and (last_event_at is null or p_event_at >= last_event_at);
 $$;
 
 comment on function apply_connect_account_snapshot(text, timestamptz, text, boolean, boolean, text) is
-  'Applies a Stripe account status snapshot to payment_accounts, but only if p_event_at is not older than the last event already applied to this row -- a strictly-older event (e.g. a delayed webhook retry) is silently skipped rather than clobbering newer status. Used by both the account.updated webhook and the return_url page''s own synchronous check (which passes now()).';
+  'Applies a Stripe account status snapshot to payment_accounts, but only if p_event_at is not older than the last event already applied to this row -- a strictly-older event (e.g. a delayed webhook retry) is silently skipped rather than clobbering newer status. Used by both the account.updated webhook and the return_url page''s own synchronous check (which passes now()). onboarding_completed_at is set once (via coalesce) on the first ''enabled'' snapshot and never overwritten or nulled by any later snapshot, enabled or not -- it records original onboarding completion, not current standing (epic-7 cycle-2 fix; previously any later non-''enabled'' snapshot nulled it and any later ''enabled'' snapshot reset it to that event''s time).';
 
 revoke all on function apply_connect_account_snapshot(text, timestamptz, text, boolean, boolean, text) from public;
 grant execute on function apply_connect_account_snapshot(text, timestamptz, text, boolean, boolean, text) to service_role;
