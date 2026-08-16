@@ -96,7 +96,7 @@ export default async function PaymentsReturnPage() {
       <p className="text-sm text-foreground">Der aktuelle Verbindungsstatus wurde aktualisiert.</p>
       <Link
         href="/account/payments"
-        className="font-medium text-brand-600 underline hover:text-brand-700"
+        className="font-medium text-link-foreground underline hover:text-brand-700"
       >
         Zum Zahlungsstatus
       </Link>
