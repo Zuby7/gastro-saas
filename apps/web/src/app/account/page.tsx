@@ -80,7 +80,20 @@ export default async function AccountPage() {
         ) : null}
       </dl>
 
-      {!membership ? <CreateTenantForm /> : null}
+      {!membership ? (
+        <CreateTenantForm
+          defaultTenantName={
+            typeof user.user_metadata?.tenant_name === "string"
+              ? user.user_metadata.tenant_name
+              : undefined
+          }
+          defaultTenantSlug={
+            typeof user.user_metadata?.tenant_slug === "string"
+              ? user.user_metadata.tenant_slug
+              : undefined
+          }
+        />
+      ) : null}
       {membership ? <InviteMemberForm roles={roles ?? []} /> : null}
 
       <form action={logoutAction}>
