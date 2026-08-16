@@ -63,7 +63,18 @@ export async function registerAction(
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+  // Ticket #60: carry the tenant name/slug through Supabase's email
+  // confirmation flow via `user_metadata` (set here through signUp's
+  // `options.data`). With `enable_confirmations = true`, the values entered
+  // on this form would otherwise be discarded -- the user would have to
+  // retype them at the /account fallback after confirming their email. The
+  // /account page reads them back out of `user.user_metadata` to prefill
+  // that fallback form.
+  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { tenant_name: tenantName, tenant_slug: tenantSlug } },
+  });
 
   if (signUpError) {
     // Registration duplicate-email disclosure is accepted UX here (this

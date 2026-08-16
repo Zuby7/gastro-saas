@@ -9,7 +9,20 @@ const initialState: CreateTenantFormState = {};
  * Onboarding-completion fallback form (ticket #7 fix cycle 1, item 4/5) --
  * see `actions.ts`'s `createTenantAction` for the cases this covers.
  */
-export function CreateTenantForm() {
+export interface CreateTenantFormProps {
+  /**
+   * Prefill values recovered from `user_metadata` (set at signUp time, see
+   * ticket #60) so a user who confirmed their email after registering
+   * doesn't have to retype the restaurant name/slug they already entered.
+   */
+  defaultTenantName?: string;
+  defaultTenantSlug?: string;
+}
+
+export function CreateTenantForm({
+  defaultTenantName,
+  defaultTenantSlug,
+}: CreateTenantFormProps = {}) {
   const [state, formAction, isPending] = useActionState(createTenantAction, initialState);
 
   return (
@@ -42,6 +55,7 @@ export function CreateTenantForm() {
             name="tenantName"
             type="text"
             autoComplete="organization"
+            defaultValue={defaultTenantName}
             required
             aria-invalid={state.fieldErrors?.tenantName ? true : undefined}
             aria-describedby={state.fieldErrors?.tenantName ? "tenantName-error" : undefined}
@@ -63,6 +77,7 @@ export function CreateTenantForm() {
             name="tenantSlug"
             type="text"
             placeholder="mein-restaurant"
+            defaultValue={defaultTenantSlug}
             required
             aria-invalid={state.fieldErrors?.tenantSlug ? true : undefined}
             aria-describedby={state.fieldErrors?.tenantSlug ? "tenantSlug-error" : undefined}
