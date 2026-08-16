@@ -421,6 +421,127 @@ describe.skipIf(!dbAvailable)("restaurant profile and menu management", () => {
     }
   });
 
+  // Opus review finding on PR #104: the tests above for the
+  // clone_menu_version_as_draft() rewrite only ever clone an EMPTY dish (no
+  // variants/option-group/allergen/dietary-label assignments), so the CTE
+  // rewrite's forced-dependency joins for those specific child tables were
+  // never actually exercised end-to-end. This test clones a fully-populated
+  // dish and asserts every child row survives correctly in the clone.
+  it("clones a dish's variants, option-group assignment, allergen assignment, and dietary-label assignment", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const sourceId = randomUUID();
+    const categoryId = randomUUID();
+    const dishId = randomUUID();
+    const optionGroupId = randomUUID();
+    const allergenId = randomUUID();
+    const dietaryLabelId = randomUUID();
+
+    // Inserted as 'draft' first -- categories/dishes are read-only once their
+    // menu_version leaves 'draft' status (the write-guard from ticket #7's
+    // fix cycle), so all child rows must be populated before flipping this
+    // source version to 'published' below.
+    await admin.query(
+      `insert into menu_versions (id, tenant_id, status, version_number) values ($1, $2, 'draft', 1)`,
+      [sourceId, tenantA.tenantId],
+    );
+    await admin.query(
+      `insert into categories (id, tenant_id, menu_version_id, name, sort_order)
+       values ($1, $2, $3, 'Pizza', 1)`,
+      [categoryId, tenantA.tenantId, sourceId],
+    );
+    await admin.query(
+      `insert into dishes (id, tenant_id, menu_version_id, category_id, name, allergen_reviewed)
+       values ($1, $2, $3, $4, 'Margherita', true)`,
+      [dishId, tenantA.tenantId, sourceId, categoryId],
+    );
+    await admin.query(
+      `insert into dish_variants (tenant_id, dish_id, name, price_cents, is_available)
+       values ($1, $2, 'Groß', 1200, true)`,
+      [tenantA.tenantId, dishId],
+    );
+    await admin.query(`insert into option_groups (id, tenant_id, name) values ($1, $2, 'Größe')`, [
+      optionGroupId,
+      tenantA.tenantId,
+    ]);
+    await admin.query(
+      `insert into dish_option_group_assignments (dish_id, option_group_id, tenant_id, sort_order)
+       values ($1, $2, $3, 1)`,
+      [dishId, optionGroupId, tenantA.tenantId],
+    );
+    await admin.query(`insert into allergens (id, tenant_id, name) values ($1, $2, 'Gluten')`, [
+      allergenId,
+      tenantA.tenantId,
+    ]);
+    await admin.query(
+      `insert into dish_allergen_assignments (dish_id, allergen_id, tenant_id) values ($1, $2, $3)`,
+      [dishId, allergenId, tenantA.tenantId],
+    );
+    await admin.query(
+      `insert into dietary_labels (id, tenant_id, name) values ($1, $2, 'Vegetarisch')`,
+      [dietaryLabelId, tenantA.tenantId],
+    );
+    await admin.query(
+      `insert into dish_dietary_label_assignments (dish_id, dietary_label_id, tenant_id) values ($1, $2, $3)`,
+      [dishId, dietaryLabelId, tenantA.tenantId],
+    );
+
+    // admin.query runs as the postgres superuser, not an app-facing role
+    // (authenticated/anon/service_role), so guard_menu_versions_status_change()
+    // does not restrict this direct status flip -- same precedent as the
+    // temp-table-collision test above, which does the same thing.
+    await admin.query(`update menu_versions set status = 'published' where id = $1`, [sourceId]);
+
+    const cloned = await admin.query<{ clone_menu_version_as_draft: string }>(
+      `select clone_menu_version_as_draft($1)`,
+      [sourceId],
+    );
+    const newDraftId = cloned.rows[0]?.clone_menu_version_as_draft;
+    expect(newDraftId).toBeTruthy();
+
+    const clonedDish = await admin.query<{ id: string; name: string }>(
+      `select d.id, d.name
+         from dishes d
+         join categories c on c.id = d.category_id
+        where c.menu_version_id = $1`,
+      [newDraftId],
+    );
+    expect(clonedDish.rows).toHaveLength(1);
+    const clonedDishId = clonedDish.rows[0]!.id;
+    expect(clonedDishId).not.toBe(dishId);
+
+    const clonedVariants = await admin.query<{ name: string; price_cents: number }>(
+      `select name, price_cents from dish_variants where dish_id = $1`,
+      [clonedDishId],
+    );
+    expect(clonedVariants.rows).toEqual([
+      expect.objectContaining({ name: "Groß", price_cents: 1200 }),
+    ]);
+
+    const clonedOptionGroups = await admin.query<{ option_group_id: string }>(
+      `select option_group_id from dish_option_group_assignments where dish_id = $1`,
+      [clonedDishId],
+    );
+    // option_groups are tenant-scoped, not version-scoped -- referenced as-is.
+    expect(clonedOptionGroups.rows).toEqual([
+      expect.objectContaining({ option_group_id: optionGroupId }),
+    ]);
+
+    const clonedAllergens = await admin.query<{ allergen_id: string }>(
+      `select allergen_id from dish_allergen_assignments where dish_id = $1`,
+      [clonedDishId],
+    );
+    expect(clonedAllergens.rows).toEqual([expect.objectContaining({ allergen_id: allergenId })]);
+
+    const clonedDietaryLabels = await admin.query<{ dietary_label_id: string }>(
+      `select dietary_label_id from dish_dietary_label_assignments where dish_id = $1`,
+      [clonedDishId],
+    );
+    expect(clonedDietaryLabels.rows).toEqual([
+      expect.objectContaining({ dietary_label_id: dietaryLabelId }),
+    ]);
+  });
+
   it("public menu query returns only one tenant's published menu and hides drafts", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA, tenantB } = fixture;

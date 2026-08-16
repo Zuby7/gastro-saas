@@ -15,6 +15,89 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
+-- Opus review finding on PR #104: the two unique indexes below would abort
+-- mid-apply on any environment that already has duplicate version_numbers
+-- or multiple concurrent drafts for the same tenant -- which is exactly the
+-- bug this ticket fixes, so an already-affected environment (any deployed
+-- environment that hit the bug before this migration ships) cannot be
+-- assumed clean. These two backfill steps deterministically resolve any
+-- existing violations before the indexes are created, so the migration
+-- applies cleanly regardless of prior data state (and is a no-op if the
+-- environment is already clean, e.g. this repo's local/CI stacks).
+-- ----------------------------------------------------------------------------
+
+-- 1. Collapse multiple concurrent drafts per tenant down to one: keep the
+--    newest (by created_at, tie-broken by id) as the live draft, archive the
+--    rest. 'archived' (not a new status) is reused deliberately -- it's the
+--    same state a superseded published version already lands in, and this
+--    migration runs as a privileged/migration connection (not an app-facing
+--    role), so guard_menu_versions_status_change()'s guard trigger does not
+--    apply here (see that function's own comment: it only restricts
+--    'authenticated'/'anon'/'service_role' callers).
+do $$
+declare
+  v_tenant record;
+  v_ids uuid[];
+begin
+  for v_tenant in
+    select tenant_id
+      from public.menu_versions
+     where status = 'draft'
+     group by tenant_id
+    having count(*) > 1
+  loop
+    select array_agg(id order by created_at desc, id desc)
+      into v_ids
+      from public.menu_versions
+     where tenant_id = v_tenant.tenant_id
+       and status = 'draft';
+
+    update public.menu_versions
+       set status = 'archived'
+     where id = any (v_ids[2:array_length(v_ids, 1)]);
+  end loop;
+end;
+$$;
+
+-- 2. Renumber any duplicate (tenant_id, version_number) rows: the earliest
+--    (by created_at, tie-broken by id) keeps its existing number; every
+--    later duplicate gets bumped to the next free number for that tenant
+--    (computed fresh each time so multiple duplicates in the same tenant
+--    never collide with each other either).
+do $$
+declare
+  v_dup record;
+  v_ids uuid[];
+  v_next_number integer;
+  i integer;
+begin
+  for v_dup in
+    select tenant_id, version_number
+      from public.menu_versions
+     group by tenant_id, version_number
+    having count(*) > 1
+  loop
+    select array_agg(id order by created_at, id)
+      into v_ids
+      from public.menu_versions
+     where tenant_id = v_dup.tenant_id
+       and version_number = v_dup.version_number;
+
+    for i in 2..array_length(v_ids, 1) loop
+      select coalesce(max(version_number), 0) + 1
+        into v_next_number
+        from public.menu_versions
+       where tenant_id = v_dup.tenant_id;
+
+      update public.menu_versions
+         set version_number = v_next_number
+       where id = v_ids[i];
+    end loop;
+  end loop;
+end;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- Enforce both invariants at the database level (defense in depth -- not
 -- just relying on application/RPC logic to derive the right number or avoid
 -- creating a second draft):
@@ -32,10 +115,10 @@
 --    statements run in the same transaction so the UPDATE's effect is
 --    already visible when the INSERT's constraint check runs).
 -- ----------------------------------------------------------------------------
-create unique index menu_versions_tenant_version_number_key
+create unique index if not exists menu_versions_tenant_version_number_key
   on public.menu_versions (tenant_id, version_number);
 
-create unique index menu_versions_single_draft_per_tenant_key
+create unique index if not exists menu_versions_single_draft_per_tenant_key
   on public.menu_versions (tenant_id)
   where status = 'draft';
 
