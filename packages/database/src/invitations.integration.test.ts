@@ -203,6 +203,55 @@ describe.skipIf(!dbAvailable)("invitations", () => {
     ).rejects.toThrow(/insufficient_privilege|permission|Missing permission/i);
   });
 
+  // Regression test for ticket #71 (Opus review finding on PR #106): an
+  // earlier version checked "invitation exists" BEFORE checking
+  // users.invite, raising a distinct "Invitation not found" error --
+  // letting an authenticated caller distinguish "this invitation id doesn't
+  // exist" from "it exists but you lack permission" purely from the error
+  // message, effectively probing invitation-id existence across tenants.
+  // Both cases must now raise the identical error.
+  it("returns the identical error for a nonexistent invitation id and a cross-tenant invitation id", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA, tenantB } = fixture;
+    const tokenHash = "f".repeat(64);
+
+    const created = await queryAsUser<{ create_invitation: string }>(
+      admin,
+      tenantA.ownerId,
+      `select create_invitation($1, $2, $3, $4, now() + interval '7 days')`,
+      [
+        tenantA.tenantId,
+        `probe-target-${randomUUID()}@example.test`,
+        await roleId(tenantA.tenantId),
+        tokenHash,
+      ],
+    );
+    const realInvitationId = created.rows[0]!.create_invitation;
+    const nonexistentInvitationId = randomUUID();
+
+    let crossTenantError: unknown;
+    try {
+      await queryAsUser(admin, tenantB.ownerId, `select mark_invitation_email_sent($1)`, [
+        realInvitationId,
+      ]);
+    } catch (error) {
+      crossTenantError = error;
+    }
+
+    let nonexistentError: unknown;
+    try {
+      await queryAsUser(admin, tenantB.ownerId, `select mark_invitation_email_sent($1)`, [
+        nonexistentInvitationId,
+      ]);
+    } catch (error) {
+      nonexistentError = error;
+    }
+
+    expect(crossTenantError).toBeInstanceOf(Error);
+    expect(nonexistentError).toBeInstanceOf(Error);
+    expect((crossTenantError as Error).message).toBe((nonexistentError as Error).message);
+  });
+
   it("rejects expired invitations without creating a membership", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA } = fixture;

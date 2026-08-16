@@ -54,6 +54,10 @@ export async function registerAction(
     ip,
     email,
     maxAttempts: 5,
+    // Explicit and deliberately equal to maxAttempts (no widening) -- the
+    // shared-IP/CGNAT concern that widens the login/invite scopes was never
+    // scoped to registration.
+    maxIpAttempts: 5,
     windowSeconds: 60 * 60,
   });
   if (limited) {

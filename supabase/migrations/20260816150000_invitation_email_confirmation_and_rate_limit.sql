@@ -39,6 +39,20 @@ comment on column invitations.email_sent_at is
 -- Gated on the same users.invite permission create_invitation() itself
 -- requires -- called by the same request that just created the invitation,
 -- immediately after its email send succeeds.
+--
+-- Opus review finding on PR #106: an earlier version of this function
+-- checked "invitation exists" (raising a distinct "Invitation not found"
+-- error) BEFORE checking users.invite for its tenant -- letting an
+-- authenticated caller probe whether an arbitrary invitation id exists
+-- across tenants, distinguishing "doesn't exist" from "exists but you lack
+-- permission" purely from the error response. Both the not-found and
+-- permission-denied cases now raise the exact same error via a single
+-- combined boolean check (`has_tenant_permission()`, not the
+-- exception-raising `require_tenant_permission()`), so nothing is
+-- distinguishable. `has_tenant_permission()`'s own membership lookup
+-- (`tm.user_id = auth.uid()`) also naturally returns false when
+-- `auth.uid()` is null, so an unauthenticated caller folds into the same
+-- generic error too, rather than a distinct "Authentication required".
 -- ----------------------------------------------------------------------------
 create or replace function mark_invitation_email_sent(p_invitation_id uuid)
 returns void
@@ -53,11 +67,10 @@ begin
     from public.invitations
    where id = p_invitation_id;
 
-  if v_tenant_id is null then
-    raise exception 'Invitation not found' using errcode = 'invalid_parameter_value';
+  if v_tenant_id is null or not public.has_tenant_permission(v_tenant_id, 'users.invite') then
+    raise exception 'Invitation not found or insufficient permission'
+      using errcode = 'insufficient_privilege';
   end if;
-
-  perform public.require_tenant_permission(v_tenant_id, 'users.invite');
 
   update public.invitations
      set email_sent_at = now()
@@ -66,7 +79,7 @@ end;
 $$;
 
 comment on function mark_invitation_email_sent(uuid) is
-  'Marks a previously-created invitation''s email as sent (ticket #71). Gated on users.invite for the invitation''s own tenant, resolved from the invitation row itself, never from client-supplied tenant context.';
+  'Marks a previously-created invitation''s email as sent (ticket #71). Gated on users.invite for the invitation''s own tenant, resolved from the invitation row itself, never from client-supplied tenant context. The not-found and permission-denied cases are deliberately indistinguishable (same error, via has_tenant_permission() rather than require_tenant_permission()) so a caller cannot probe invitation-id existence across tenants (Opus review finding, PR #106).';
 
 revoke all on function mark_invitation_email_sent(uuid) from public;
 grant execute on function mark_invitation_email_sent(uuid) to authenticated;

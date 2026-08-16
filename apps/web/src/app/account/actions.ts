@@ -169,6 +169,16 @@ export async function inviteMemberAction(
     ip,
     email: parsed.data.email,
     maxAttempts: 5,
+    // Explicit and deliberately wider than maxAttempts -- Opus review
+    // finding on PR #106: without an explicit value here, this scope would
+    // silently inherit whatever reserveAndCheckRateLimit's default IP-only
+    // multiplier resolves to (see rate-limit.ts). Inviting several
+    // employees from one shared office IP within an hour is a real,
+    // legitimate case (issue #62's own shared-IP/CGNAT concern applies here
+    // too, not just to login) -- 20 lets a manager invite a whole team in
+    // one sitting while still hard-blocking sustained invite spam from a
+    // single IP well before it could enumerate many distinct target emails.
+    maxIpAttempts: 20,
     windowSeconds: 60 * 60,
   });
   if (limited) {
@@ -226,7 +236,21 @@ export async function inviteMemberAction(
     };
   }
 
-  await supabase.rpc("mark_invitation_email_sent", { p_invitation_id: invitationId });
+  const { error: markSentError } = await supabase.rpc("mark_invitation_email_sent", {
+    p_invitation_id: invitationId,
+  });
+  if (markSentError) {
+    // The email genuinely was sent (we're past sendInvitationEmail() above
+    // without throwing) -- a failure here only means our own bookkeeping
+    // (invitations.email_sent_at) didn't record that. Log loudly so this
+    // surfaces to monitoring instead of silently leaving a permanently
+    // "unconfirmed" invitation row with no record of the discrepancy
+    // (matching the finalize_refund() logging pattern in refund-service.ts).
+    console.error(
+      "[invitations] mark_invitation_email_sent failed after a successful email send -- email_sent_at left null",
+      { invitationId, error: markSentError },
+    );
+  }
   await rateLimitStore.markSucceeded(attemptId);
 
   return { success: "Einladung wurde erstellt und versendet." };

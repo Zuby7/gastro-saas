@@ -195,6 +195,41 @@ describe("inviteMemberAction", () => {
     expect(markSucceededMock).not.toHaveBeenCalled();
   });
 
+  // Opus review finding on PR #106: mark_invitation_email_sent()'s
+  // error/result was previously discarded entirely -- the caller was told
+  // "created and sent" while email_sent_at silently stayed null with no
+  // record of the discrepancy. Now logged loudly (console.error), matching
+  // the finalize_refund() logging pattern.
+  it("logs loudly (console.error) when mark_invitation_email_sent fails after a successful send, without failing the action", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "require_tenant_permission") {
+        return { data: null, error: null };
+      }
+      if (fn === "create_invitation") {
+        return { data: "invitation-1", error: null };
+      }
+      if (fn === "mark_invitation_email_sent") {
+        return { data: null, error: { message: "connection reset" } };
+      }
+      throw new Error(`unexpected rpc call: ${fn}`);
+    });
+    sendInvitationEmailMock.mockResolvedValue(undefined);
+
+    const { inviteMemberAction } = await import("./actions");
+    const result = await inviteMemberAction({}, inviteFormData());
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("mark_invitation_email_sent"),
+      expect.objectContaining({ invitationId: "invitation-1" }),
+    );
+    // The email genuinely was sent -- this is a bookkeeping failure only,
+    // not a reason to tell the caller the whole action failed.
+    expect(result.success).toBeDefined();
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it("reports an error when the persist itself fails, without ever emailing", async () => {
     rpcMock.mockImplementation(async (fn: string) => {
       if (fn === "require_tenant_permission") {

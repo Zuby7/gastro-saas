@@ -68,6 +68,34 @@ describe("loginAction", () => {
     expect(signInWithPasswordMock).not.toHaveBeenCalled();
   });
 
+  // Ticket #62: the login scope (only) gets a deliberately wider IP-only
+  // threshold (5 * 4 = 20) than the (ip, email) threshold (5), so one
+  // coworker's failed attempts don't lock out everyone else behind a shared
+  // office/CGNAT IP. ipCount: 6 exceeds the (ip, email) threshold but must
+  // NOT trip the wider IP-only one when the email differs.
+  it("does not block a login purely because the IP-only count (6) exceeds maxAttempts, when the (ip, email) count is low", async () => {
+    reserveAttemptMock.mockResolvedValue({ attemptId: "attempt-6", ipCount: 6, ipEmailCount: 1 });
+    signInWithPasswordMock.mockResolvedValueOnce({
+      data: { session: { access_token: "token" } },
+      error: null,
+    });
+
+    const { loginAction } = await import("./actions");
+    await expect(
+      loginAction({}, formData("coworker@example.com", "correctPassword123!")),
+    ).rejects.toThrow("NEXT_REDIRECT:/account");
+  });
+
+  it("still blocks a login once the IP-only count exceeds the wider 20-attempt threshold", async () => {
+    reserveAttemptMock.mockResolvedValue({ attemptId: "attempt-21", ipCount: 21, ipEmailCount: 1 });
+
+    const { loginAction } = await import("./actions");
+    const result = await loginAction({}, formData("someone-else@example.com", "whatever"));
+
+    expect(result.error).toBe("Zu viele Anmeldeversuche. Bitte versuchen Sie es später erneut.");
+    expect(signInWithPasswordMock).not.toHaveBeenCalled();
+  });
+
   it("returns byte-identical error strings for a wrong password and an unknown email", async () => {
     const { loginAction } = await import("./actions");
 

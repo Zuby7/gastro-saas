@@ -86,6 +86,10 @@ export async function checkoutAction(
       ip,
       email: cartId,
       maxAttempts: 10,
+      // Explicit and deliberately equal to maxAttempts (no widening) -- the
+      // shared-IP/CGNAT concern that widens the login/invite scopes was
+      // never scoped to checkout.
+      maxIpAttempts: 10,
       windowSeconds: 60 * 60,
     });
 

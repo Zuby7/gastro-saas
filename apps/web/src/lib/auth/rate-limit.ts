@@ -34,6 +34,15 @@
  *   fully stops a single attacker IP from brute-forcing one account (or
  *   cycling through many), while never fully denying the victim's *own*
  *   login from their own, different IP.
+ * - **Optional, per-call `maxIpAttempts`** (ticket #62/#71, Opus review
+ *   finding on PR #101): the IP-only bucket exists to catch IP-wide abuse
+ *   (credential stuffing/brute-forcing across many accounts from one
+ *   source), not to punish a single account's failures -- that's what the
+ *   tighter (ip, email) bucket is for. Every caller in this codebase sets
+ *   `maxIpAttempts` explicitly (never relying on the fallback default
+ *   below), so widening this threshold for one scope (e.g. login, invite)
+ *   never silently also widens another (e.g. register, checkout) that
+ *   never asked for it.
  */
 
 export type RateLimitScope = "login" | "register" | "checkout" | "invite";
@@ -70,12 +79,36 @@ export interface RateLimitStore {
   markSucceeded(attemptId: string | null): Promise<void>;
 }
 
+/**
+ * Fallback multiplier applied to `maxAttempts` ONLY when a caller doesn't
+ * supply an explicit `maxIpAttempts`. Every caller in this codebase sets
+ * `maxIpAttempts` explicitly, so this only matters as a conservative
+ * fallback for a future caller that forgets to set it -- it should not be
+ * read as "the IP-only threshold for any scope in this codebase today".
+ */
+const DEFAULT_IP_THRESHOLD_MULTIPLIER = 4;
+
 export interface RateLimitCheck {
   scope: RateLimitScope;
   ip: string;
   email: string;
-  /** Attempts allowed per window before further attempts are blocked. */
+  /**
+   * Attempts allowed per window, per (ip, email) combination, before
+   * further attempts for that specific account from that specific IP are
+   * blocked.
+   */
   maxAttempts: number;
+  /**
+   * Attempts allowed per window for the IP alone (i.e. across any number of
+   * different emails/targets attempted from that IP) before the IP itself
+   * is blocked. Set this explicitly for every scope -- deliberately looser
+   * than `maxAttempts` where a shared/CGNAT IP with several legitimate
+   * users is a real concern (login, invite), and pinned equal to
+   * `maxAttempts` (no widening) where it isn't (register, checkout).
+   * Defaults to `maxAttempts * DEFAULT_IP_THRESHOLD_MULTIPLIER` if not
+   * given.
+   */
+  maxIpAttempts?: number;
   windowSeconds: number;
 }
 
@@ -102,8 +135,10 @@ export async function reserveAndCheckRateLimit(
     check.windowSeconds,
   );
 
+  const maxIpAttempts = check.maxIpAttempts ?? check.maxAttempts * DEFAULT_IP_THRESHOLD_MULTIPLIER;
+
   return {
     attemptId,
-    limited: ipCount > check.maxAttempts || ipEmailCount > check.maxAttempts,
+    limited: ipCount > maxIpAttempts || ipEmailCount > check.maxAttempts,
   };
 }

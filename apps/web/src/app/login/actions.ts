@@ -59,6 +59,12 @@ export async function loginAction(
     ip,
     email,
     maxAttempts: 5,
+    // Ticket #62: deliberately looser than maxAttempts (5 * 4) so a single
+    // coworker's failed login attempts on a shared office/CGNAT IP don't
+    // lock out everyone else behind that IP -- see rate-limit.ts's header
+    // comment. Explicit here (not relying on reserveAndCheckRateLimit's
+    // default) so this widening only ever applies to the login scope.
+    maxIpAttempts: 20,
     windowSeconds: 15 * 60,
   });
   if (limited) {
