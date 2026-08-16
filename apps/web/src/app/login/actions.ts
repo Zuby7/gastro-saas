@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseRateLimitStore } from "@/lib/auth/supabase-rate-limit-store";
@@ -79,12 +80,18 @@ export async function loginAction(
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error || !data.session) {
-    // Fire-and-forget, deliberately not awaited: this must never add
-    // latency (or a distinguishing extra DB round-trip that only happens
-    // for emails resolving to a real tenant) to this response -- see
+    // Ticket #61 (Opus finding, ticket #7 cycle 2): must never add latency
+    // (or a distinguishing extra DB round-trip that only happens for
+    // emails resolving to a real tenant) to this response -- see
     // login-audit.ts's own comment and the LOGIN_FAILURE_FLOOR_MS note
-    // above.
-    void recordFailedLoginAttempt(admin, email);
+    // above. Previously a bare `void recordFailedLoginAttempt(...)`: on a
+    // serverless/edge runtime (e.g. Cloudflare Workers) the process can be
+    // frozen/recycled right after the response is sent, dropping an
+    // in-flight, un-awaited promise before its DB write completes. `after()`
+    // registers the write with the platform's request lifecycle (Next.js's
+    // `waitUntil` equivalent) so it's guaranteed to run to completion after
+    // the response is sent, without adding to the measured response time.
+    after(() => recordFailedLoginAttempt(admin, email));
     await padToFloor(startedAt, LOGIN_FAILURE_FLOOR_MS);
     return { error: GENERIC_LOGIN_ERROR };
   }
