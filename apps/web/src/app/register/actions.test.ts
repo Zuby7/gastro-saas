@@ -59,6 +59,22 @@ describe("registerAction", () => {
     expect(signUpMock).not.toHaveBeenCalled();
   });
 
+  // Opus review finding on PR #101: reserveAndCheckRateLimit's default
+  // IP-only threshold multiplier (ticket #62, scoped to login only) must
+  // NOT silently widen the register scope's IP-only threshold. ipCount: 6
+  // exceeds maxAttempts (5) but would NOT exceed an implicit 4x-widened
+  // threshold (20) -- if register's maxIpAttempts weren't explicitly
+  // pinned to 5, this attempt would wrongly be allowed through.
+  it("blocks a register attempt once the IP-only count exceeds its own (unwidened) threshold", async () => {
+    reserveAttemptMock.mockResolvedValue({ attemptId: "attempt-6", ipCount: 6, ipEmailCount: 1 });
+
+    const { registerAction } = await import("./actions");
+    const result = await registerAction({}, validFormData());
+
+    expect(result.error).toContain("Zu viele Registrierungsversuche");
+    expect(signUpMock).not.toHaveBeenCalled();
+  });
+
   it("creates the tenant and redirects on a full successful signup", async () => {
     signUpMock.mockResolvedValueOnce({
       data: { session: { access_token: "token" }, user: { identities: [{ id: "1" }] } },

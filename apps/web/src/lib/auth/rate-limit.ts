@@ -82,14 +82,18 @@ export interface RateLimitStore {
 }
 
 /**
- * Default multiplier applied to `maxAttempts` when a caller doesn't supply
- * an explicit `maxIpAttempts` (ticket #62): the IP-only bucket exists to
- * catch IP-wide abuse (credential stuffing/brute-forcing across many
- * accounts from one source), not to punish a single account's failures --
- * that's what the tighter (ip, email) bucket is for. 4x keeps a real
- * single-account brute-force from that IP still hard-blocked well before it
- * could succeed, while giving a shared office/CGNAT IP meaningfully more
- * room before an unrelated coworker's mistyped password locks everyone out.
+ * Fallback multiplier applied to `maxAttempts` ONLY when a caller doesn't
+ * supply an explicit `maxIpAttempts`. Opus review finding on PR #101: every
+ * *existing* caller (login, register, checkout) now passes `maxIpAttempts`
+ * explicitly, specifically so this default can never silently change their
+ * behavior -- ticket #62's shared-IP/CGNAT concern was scoped to the login
+ * lockout only, and login is the only scope that actually widens its
+ * IP-only threshold (to `maxAttempts * 4` = 20, set explicitly in
+ * `login/actions.ts`, not via this default). register/checkout instead pin
+ * `maxIpAttempts` equal to their own `maxAttempts` (no widening). This
+ * constant now only matters as a conservative fallback for a future caller
+ * that forgets to set `maxIpAttempts` at all -- it should not be read as
+ * "the IP-only threshold for any scope in this codebase today".
  */
 const DEFAULT_IP_THRESHOLD_MULTIPLIER = 4;
 

@@ -153,6 +153,22 @@ describe("checkoutAction", () => {
     expect(createOrderFromCartMock).not.toHaveBeenCalled();
   });
 
+  // Opus review finding on PR #101: reserveAndCheckRateLimit's default
+  // IP-only threshold multiplier (ticket #62, scoped to login only) must
+  // NOT silently widen the checkout scope's IP-only threshold. ipCount: 11
+  // exceeds maxAttempts (10) but would NOT exceed an implicit 4x-widened
+  // threshold (40) -- if checkout's maxIpAttempts weren't explicitly pinned
+  // to 10, this attempt would wrongly be allowed through.
+  it("blocks a checkout once the IP-only count exceeds its own (unwidened) threshold, even for a different cart", async () => {
+    reserveAttemptMock.mockResolvedValue({ attemptId: "attempt-11", ipCount: 11, ipEmailCount: 1 });
+
+    const { checkoutAction } = await import("./actions");
+    const result = await checkoutAction("demo", {}, validFormData());
+
+    expect(result.error).toContain("Zu viele Bestellversuche");
+    expect(createOrderFromCartMock).not.toHaveBeenCalled();
+  });
+
   it("does not block a checkout still within the per-IP window", async () => {
     reserveAttemptMock.mockResolvedValue({ attemptId: "attempt-9", ipCount: 9, ipEmailCount: 9 });
 

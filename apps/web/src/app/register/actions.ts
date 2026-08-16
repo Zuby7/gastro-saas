@@ -54,6 +54,13 @@ export async function registerAction(
     ip,
     email,
     maxAttempts: 5,
+    // Explicit and deliberately equal to maxAttempts (no widening) -- Opus
+    // review finding on PR #101: ticket #62's shared-IP/CGNAT concern was
+    // scoped to the login lockout only. Relying on
+    // reserveAndCheckRateLimit's default multiplier here would have
+    // silently loosened this scope's IP-only threshold too, which was never
+    // part of that ticket.
+    maxIpAttempts: 5,
     windowSeconds: 60 * 60,
   });
   if (limited) {
