@@ -3,9 +3,15 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Verifies every distinct foreground/background color pair actually
- * rendered by `page.tsx` (see `globals.css` for how each CSS custom
- * property resolves per color scheme) meets WCAG 2.1 AA contrast, in both
- * light and dark color schemes.
+ * rendered by `page.tsx` meets WCAG 2.1 AA contrast.
+ *
+ * Light mode only: automatic OS-driven dark mode was removed from
+ * `globals.css` (see that file's comment) because almost every surface in
+ * this app hardcodes light-mode utility classes (`bg-neutral-0`, etc.)
+ * rather than the `--background`/`--foreground` variables, so flipping just
+ * those two root variables produced invisible text on still-white cards
+ * instead of a real dark theme. Re-add dark-mode assertions here only once
+ * a real, fully-audited dark mode ships.
  *
  * Keep this list in sync with `page.tsx`: every text element there should
  * have a corresponding entry below, keyed by the Tailwind class it uses.
@@ -17,8 +23,8 @@ import { describe, expect, it } from "vitest";
 interface RenderedTextPair {
   /** Human-readable description, matched to the element in page.tsx. */
   description: string;
-  light: { foreground: string; background: string };
-  dark: { foreground: string; background: string };
+  foreground: string;
+  background: string;
   /**
    * "h1" (text-3xl font-semibold, 30px) qualifies as WCAG "large text"
    * (>=18.66px), so the relaxed 3:1 threshold applies. Everything else on
@@ -30,42 +36,29 @@ interface RenderedTextPair {
 const renderedTextPairs: RenderedTextPair[] = [
   {
     description: "h1 (text-foreground on background)",
-    light: { foreground: colors.neutral[900], background: colors.neutral[0] },
-    dark: { foreground: colors.neutral[50], background: colors.neutral[900] },
+    foreground: colors.neutral[900],
+    background: colors.neutral[0],
     textSize: "large",
   },
   {
     description: "p (text-foreground-secondary on background)",
-    light: { foreground: colors.neutral[500], background: colors.neutral[0] },
-    dark: { foreground: colors.neutral[300], background: colors.neutral[900] },
+    foreground: colors.neutral[500],
+    background: colors.neutral[0],
     textSize: "normal",
   },
   {
     description:
       "nav links 'Restaurant registrieren' / 'Anmelden' (text-link-foreground on background, text-sm)",
-    light: { foreground: colors.brand[600], background: colors.neutral[0] },
-    dark: { foreground: colors.brand[300], background: colors.neutral[900] },
+    foreground: colors.brand[600],
+    background: colors.neutral[0],
     textSize: "normal",
   },
 ];
 
 describe("homepage color contrast (WCAG AA)", () => {
   for (const pair of renderedTextPairs) {
-    it(`light mode: ${pair.description} passes AA for ${pair.textSize} text`, () => {
-      const result = validateContrastRatio(
-        pair.light.foreground,
-        pair.light.background,
-        pair.textSize,
-      );
-      expect(result.passesAA).toBe(true);
-    });
-
-    it(`dark mode: ${pair.description} passes AA for ${pair.textSize} text`, () => {
-      const result = validateContrastRatio(
-        pair.dark.foreground,
-        pair.dark.background,
-        pair.textSize,
-      );
+    it(`${pair.description} passes AA for ${pair.textSize} text`, () => {
+      const result = validateContrastRatio(pair.foreground, pair.background, pair.textSize);
       expect(result.passesAA).toBe(true);
     });
   }
