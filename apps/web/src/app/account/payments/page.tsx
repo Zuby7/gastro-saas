@@ -51,7 +51,7 @@ export default async function PaymentsPage() {
           </p>
           <Link
             href="/account"
-            className="font-medium text-brand-600 underline hover:text-brand-700"
+            className="font-medium text-link-foreground underline hover:text-brand-700"
           >
             Zurück
           </Link>
@@ -88,7 +88,7 @@ export default async function PaymentsPage() {
           <h1 className="font-display text-2xl font-semibold text-foreground">Zahlungen</h1>
           <Link
             href="/account"
-            className="text-sm font-medium text-brand-600 underline hover:text-brand-700"
+            className="text-sm font-medium text-link-foreground underline hover:text-brand-700"
           >
             Zurück
           </Link>

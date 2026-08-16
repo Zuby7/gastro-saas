@@ -76,6 +76,29 @@ describe("registerAction", () => {
     expect(markSucceededMock).toHaveBeenCalledWith("attempt-1");
   });
 
+  it("carries tenant name/slug into signUp's user_metadata so it survives email confirmation (ticket #60)", async () => {
+    // With enable_confirmations=true, signUp() returns no session and this
+    // action defers tenant creation to first login -- the only way to
+    // recover the tenant name/slug the user already typed is if signUp()
+    // stashed it in user_metadata here.
+    signUpMock.mockResolvedValueOnce({
+      data: { session: null, user: { id: "user-1", identities: [{ id: "1" }] } },
+      error: null,
+    });
+
+    const { registerAction } = await import("./actions");
+    await registerAction(
+      {},
+      validFormData({ tenantName: "Pizzeria Napoli", tenantSlug: "pizzeria-napoli" }),
+    );
+
+    expect(signUpMock).toHaveBeenCalledWith({
+      email: "owner@example.com",
+      password: "Sup3rSecurePassw0rd!",
+      options: { data: { tenant_name: "Pizzeria Napoli", tenant_slug: "pizzeria-napoli" } },
+    });
+  });
+
   it("handles email-confirmation-required signups (no session yet) with an informational message, not a dead-end error", async () => {
     // Ticket #7 fix cycle 1, item 5: with enable_confirmations = true,
     // signUp() succeeds but returns no session -- tenant creation must be
