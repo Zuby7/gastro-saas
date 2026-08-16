@@ -11,11 +11,11 @@ export const RegisterSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .min(2, "Die Web-Adresse muss mindestens 2 Zeichen lang sein.")
-    .max(80, "Die Web-Adresse darf höchstens 80 Zeichen lang sein.")
+    .min(2, "Der Slug muss mindestens 2 Zeichen lang sein.")
+    .max(80, "Der Slug darf höchstens 80 Zeichen lang sein.")
     .regex(
       /^[a-z0-9]+(-[a-z0-9]+)*$/,
-      "Die Web-Adresse darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten.",
+      "Der Slug darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten.",
     ),
   email: z.string().trim().toLowerCase().email("Bitte geben Sie eine gültige E-Mail-Adresse ein."),
   password: z

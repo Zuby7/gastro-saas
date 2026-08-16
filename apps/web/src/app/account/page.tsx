@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { roleLabel } from "@/lib/auth/role-labels";
 import { logoutAction } from "./actions";
 import { CreateTenantForm } from "./create-tenant-form";
 import { InviteMemberForm } from "./invite-member-form";
@@ -13,7 +12,6 @@ interface TenantMembershipRow {
 
 interface RoleRow {
   id: string;
-  key: string;
   name: string;
 }
 
@@ -51,7 +49,7 @@ export default async function AccountPage() {
   const { data: roles } = membership
     ? await supabase
         .from("roles")
-        .select("id, key, name")
+        .select("id, name")
         .eq("tenant_id", membership.tenant_id)
         .order("name")
         .returns<RoleRow[]>()
@@ -74,7 +72,7 @@ export default async function AccountPage() {
             </div>
             <div>
               <dt className="font-medium">Rolle</dt>
-              <dd>{roleLabel(membership.role)}</dd>
+              <dd>{membership.role}</dd>
             </div>
           </>
         ) : null}
