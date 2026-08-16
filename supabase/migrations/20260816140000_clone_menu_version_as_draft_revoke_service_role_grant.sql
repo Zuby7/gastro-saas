@@ -1,0 +1,29 @@
+-- ============================================================================
+-- Ticket #70 (Opus batch review, epic-3-5-batch, cycle 2 finding):
+-- clone_menu_version_as_draft() is SECURITY DEFINER with no tenant/
+-- permission check of its own, and was granted EXECUTE to service_role --
+-- callable directly via RPC using the service-role key, bypassing
+-- publish_menu_version()'s menu.publish permission check, blocker
+-- validation, and audit log entirely (a caller could clone -- and thus
+-- silently create a brand-new draft, or read/replicate another version's
+-- full menu structure into a new draft -- without ever going through the
+-- sanctioned publish path).
+--
+-- Fix (the first of the two options the ticket names): revoke the
+-- service_role grant. Nothing in this codebase calls
+-- clone_menu_version_as_draft() via a Supabase RPC -- its only caller is
+-- publish_menu_version()'s own `perform public.clone_menu_version_as_draft(...)`.
+-- That internal call does not need this grant: SECURITY DEFINER functions
+-- execute with the privileges of their OWNER (not the original caller's
+-- role), and both functions share the same owner (the migration-applying
+-- role), which has implicit execute rights on its own functions regardless
+-- of any GRANT. So revoking service_role's grant here has no effect on the
+-- legitimate internal call, while closing off the direct-RPC path entirely.
+--
+-- (The alternative the ticket names -- adding
+-- `require_tenant_permission('menu.write')` inside the function -- was
+-- deliberately not done: the 'marketing' role holds menu.publish but NOT
+-- menu.write (see 20260801080000_roles_and_permissions_rbac.sql), so a
+-- menu.write check here would break publish_menu_version() for that role.)
+-- ============================================================================
+revoke execute on function clone_menu_version_as_draft(uuid) from service_role;

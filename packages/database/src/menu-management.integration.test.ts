@@ -317,6 +317,35 @@ describe.skipIf(!dbAvailable)("restaurant profile and menu management", () => {
     ).rejects.toThrow(/Missing permission menu\.write|permission denied|insufficient_privilege/i);
   });
 
+  // Regression test for ticket #70 (Opus batch review, epic-3-5-batch, cycle
+  // 2): clone_menu_version_as_draft() is SECURITY DEFINER with no
+  // tenant/permission check of its own, and was granted EXECUTE to
+  // service_role -- callable directly via RPC using the service-role key,
+  // completely bypassing publish_menu_version()'s menu.publish check,
+  // blocker validation, and audit log. The grant is now revoked;
+  // publish_menu_version() (tested elsewhere in this file) still works
+  // since its internal call to clone_menu_version_as_draft() runs with the
+  // shared function owner's implicit privileges, not service_role's.
+  it("rejects a direct service_role RPC call to clone_menu_version_as_draft", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const sourceId = randomUUID();
+
+    await admin.query(
+      `insert into menu_versions (id, tenant_id, status, version_number) values ($1, $2, 'published', 1)`,
+      [sourceId, tenantA.tenantId],
+    );
+
+    await admin.query("set role service_role");
+    try {
+      await expect(
+        admin.query(`select clone_menu_version_as_draft($1)`, [sourceId]),
+      ).rejects.toThrow(/permission denied for function clone_menu_version_as_draft/i);
+    } finally {
+      await admin.query("reset role");
+    }
+  });
+
   // Regression test for ticket #69 (Opus batch review, epic-3-5-batch, cycle
   // 2): clone_menu_version_as_draft() used to derive version_number from
   // SOURCE.version_number + 1, so cloning from an older (non-latest) version
