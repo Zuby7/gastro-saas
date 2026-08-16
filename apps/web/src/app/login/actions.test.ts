@@ -4,12 +4,17 @@ const signInWithPasswordMock = vi.fn();
 const reserveAttemptMock = vi.fn();
 const markSucceededMock = vi.fn();
 const recordFailedLoginAttemptMock = vi.fn();
+const afterMock = vi.fn((callback: () => unknown) => callback());
 const redirectMock = vi.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
 });
 
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => redirectMock(url),
+}));
+
+vi.mock("next/server", () => ({
+  after: (callback: () => unknown) => afterMock(callback),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -91,6 +96,26 @@ describe("loginAction", () => {
 
     expect(wrongPasswordResult.error).toBe(unknownEmailResult.error);
     expect(wrongPasswordResult.error).toBe("E-Mail-Adresse oder Passwort ist ungültig.");
+  });
+
+  it("registers the failed-login audit write via next/server's after() instead of an unmanaged fire-and-forget call (ticket #61)", async () => {
+    // On a serverless/edge runtime, a bare `void recordFailedLoginAttempt(...)`
+    // can be dropped if the process is frozen/recycled right after the
+    // response is sent. `after()` guarantees the callback runs to completion
+    // as part of the request lifecycle.
+    signInWithPasswordMock.mockResolvedValueOnce({
+      data: { session: null },
+      error: { message: "Invalid login credentials" },
+    });
+
+    const { loginAction } = await import("./actions");
+    await loginAction({}, formData("existing@example.com", "wrongPassword123!"));
+
+    expect(afterMock).toHaveBeenCalledTimes(1);
+    expect(recordFailedLoginAttemptMock).toHaveBeenCalledWith(
+      { __marker: "admin-client" },
+      "existing@example.com",
+    );
   });
 
   it("redirects to /account and marks the rate-limit attempt succeeded on a real login", async () => {
