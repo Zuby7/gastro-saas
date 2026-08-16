@@ -144,6 +144,43 @@ function makeAdmin() {
       }
       throw new Error(`Unexpected table: ${table}`);
     },
+    // Issue #90: the received/paid transition is one atomic RPC call, not
+    // two separate .from() writes -- see mark_order_received_and_paid() in
+    // the migration and markOrderReceived() in webhook-service.ts.
+    rpc: async (fn: string, params: Record<string, unknown>) => {
+      if (fn !== "mark_order_received_and_paid") {
+        throw new Error(`Unexpected rpc: ${fn}`);
+      }
+
+      orderStatusEventInserts.push({
+        tenant_id: params.p_tenant_id,
+        order_id: params.p_order_id,
+        from_status: "awaiting_payment",
+        to_status: "received",
+      });
+
+      if (state.orderStatusEventInsertError) {
+        // Mirrors validate_order_status_event()'s check_violation ->
+        // mark_order_received_and_paid() catching it and returning false,
+        // not an error -- the graceful "order status already moved on" case.
+        return { data: false, error: null };
+      }
+
+      if (state.order) {
+        state.order.status = "received";
+      }
+
+      const updatePayload = {
+        status: "paid",
+        stripe_payment_intent_id: params.p_stripe_payment_intent_id,
+      };
+      paymentUpdates.push(updatePayload);
+      if (state.payment) {
+        Object.assign(state.payment, mapUpdatePayload(updatePayload));
+      }
+
+      return { data: true, error: null };
+    },
   };
 }
 

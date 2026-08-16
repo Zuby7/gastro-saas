@@ -154,12 +154,14 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
     expect(insertResult.rows[0]!.status).toBe("pending");
     const refundId = insertResult.rows[0]!.id as string;
 
-    await queryAsUser(
-      admin,
-      seed.managerId,
-      `update refunds set status = 'succeeded', stripe_refund_id = $2 where id = $1`,
-      [refundId, `re_test_${randomUUID().replace(/-/g, "")}`],
-    );
+    // Finalization (pending -> succeeded|failed|unconfirmed) is service_role-only
+    // via finalize_refund() (issue #93) -- a direct authenticated UPDATE is no
+    // longer permitted, matching apps/web/src/lib/payments/refund-service.ts's
+    // real code path.
+    await admin.query(`select finalize_refund($1, 'succeeded', $2)`, [
+      refundId,
+      `re_test_${randomUUID().replace(/-/g, "")}`,
+    ]);
 
     const refundRow = await admin.query(
       `select status, stripe_refund_id from refunds where id = $1`,
@@ -257,9 +259,8 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
        values ($1, $2, $3, 2000, 'EUR', 'erster Versuch', $4) returning id`,
       [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId],
     );
-    await queryAsUser(admin, seed.managerId, `update refunds set status = 'failed' where id = $1`, [
-      failedAttempt.rows[0]!.id,
-    ]);
+    // Finalization is service_role-only via finalize_refund() (issue #93).
+    await admin.query(`select finalize_refund($1, 'failed', null)`, [failedAttempt.rows[0]!.id]);
 
     // The full amount is still refundable -- the failed attempt released its reservation.
     const retry = await queryAsUser(
@@ -291,12 +292,10 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
        values ($1, $2, $3, 200, 'EUR', 'Netzwerkfehler, Ausgang unklar', $4) returning id`,
       [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId],
     );
-    await queryAsUser(
-      admin,
-      seed.managerId,
-      `update refunds set status = 'unconfirmed' where id = $1`,
-      [ambiguousAttempt.rows[0]!.id],
-    );
+    // Finalization is service_role-only via finalize_refund() (issue #93).
+    await admin.query(`select finalize_refund($1, 'unconfirmed', null)`, [
+      ambiguousAttempt.rows[0]!.id,
+    ]);
 
     // Only 200 of 2000 cents is reserved -- plenty of amount headroom for a
     // 100-cent second attempt, so only the existence check (not the amount
@@ -310,6 +309,38 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
         [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId],
       ),
     ).rejects.toThrow(/unconfirmed refund pending manual reconciliation/i);
+  });
+
+  // Regression test for issue #93: finalization (pending -> succeeded|failed|
+  // unconfirmed) must be service_role-only via finalize_refund() -- even a
+  // Manager holding payments.refund must not be able to finalize a refund
+  // row directly via a plain UPDATE, since that would let a payments.refund
+  // holder flip a still-pending row (whose own finalize call may have been
+  // lost) to e.g. 'failed' without going through the trusted server code
+  // path that actually confirms the Stripe outcome.
+  it("denies a payments.refund holder from finalizing a refund row directly (must go through finalize_refund())", async () => {
+    const seed = await seedFixtureWithManager();
+    fixture = seed.fixture;
+    const { orderId, paymentId } = await seedPaidPayment(admin, fixture.tenantA.tenantId, 2000);
+
+    const inserted = await queryAsUser(
+      admin,
+      seed.managerId,
+      `insert into refunds (tenant_id, payment_id, order_id, amount_cents, currency, reason, actor_user_id)
+       values ($1, $2, $3, 500, 'EUR', 'grund', $4) returning id`,
+      [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId],
+    );
+
+    await expect(
+      queryAsUser(admin, seed.managerId, `update refunds set status = 'succeeded' where id = $1`, [
+        inserted.rows[0]!.id,
+      ]),
+    ).rejects.toThrow(/permission denied/i);
+
+    const row = await admin.query(`select status from refunds where id = $1`, [
+      inserted.rows[0]!.id,
+    ]);
+    expect(row.rows[0]!.status).toBe("pending");
   });
 
   it("denies a refund insert from a member without payments.refund (permission-denied case)", async () => {
