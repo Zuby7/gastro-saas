@@ -47,9 +47,11 @@ describe("AccountPage", () => {
     render(element);
 
     expect(screen.getByLabelText("Restaurantname")).toHaveValue("Pizzeria Napoli");
-    expect(
-      screen.getByLabelText("Restaurant-Slug (für Ihre öffentliche Speisekarten-URL)"),
-    ).toHaveValue("pizzeria-napoli");
+    // Matched by partial label text (not the full string) so this test
+    // doesn't depend on the exact wording of the slug/web-address field's
+    // label, which is copy that legitimately changes independently (see
+    // PR #108) -- both the old and new label mention "Speisekarte".
+    expect(screen.getByLabelText(/Speisekarte/)).toHaveValue("pizzeria-napoli");
   });
 
   it("renders the fallback form without prefill when there is no tenant metadata", async () => {
