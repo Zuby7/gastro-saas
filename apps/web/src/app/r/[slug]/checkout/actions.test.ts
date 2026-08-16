@@ -40,8 +40,16 @@ vi.mock("@/lib/orders/cookie", () => ({
   writeOrderAccessTokenCookie: (...args: unknown[]) => writeOrderAccessTokenCookieMock(...args),
 }));
 
+class FakeCheckoutDomainError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CheckoutDomainError";
+  }
+}
+
 vi.mock("@/lib/orders/service", () => ({
   createOrderFromCart: (...args: unknown[]) => createOrderFromCartMock(...args),
+  CheckoutDomainError: FakeCheckoutDomainError,
 }));
 
 vi.mock("@/lib/orders/token", () => ({
@@ -144,6 +152,18 @@ describe("checkoutAction", () => {
     expect(consoleErrorSpy).toHaveBeenCalled();
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it("still surfaces the specific, already-safe CheckoutDomainError message (e.g. empty cart) instead of the generic fallback (issue #96 regression guard)", async () => {
+    createOrderFromCartMock.mockRejectedValue(
+      new FakeCheckoutDomainError("Ihr Warenkorb ist leer."),
+    );
+
+    const { checkoutAction } = await import("./actions");
+    const result = await checkoutAction("demo", {}, validFormData());
+
+    expect(result.error).toBe("Ihr Warenkorb ist leer.");
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 
   it("blocks further checkout attempts once the per-IP window is exhausted by prior *successful* checkouts", async () => {

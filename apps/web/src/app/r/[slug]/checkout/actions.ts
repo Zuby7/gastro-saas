@@ -8,7 +8,7 @@ import { createSupabaseRateLimitStore } from "@/lib/auth/supabase-rate-limit-sto
 import { recordOrderAuditEvent } from "@/lib/audit/record-order-audit-event";
 import { resolveGuestCartContext } from "@/lib/cart/service";
 import { writeOrderAccessTokenCookie } from "@/lib/orders/cookie";
-import { createOrderFromCart } from "@/lib/orders/service";
+import { CheckoutDomainError, createOrderFromCart } from "@/lib/orders/service";
 import { createOrderAccessToken, hashOrderAccessToken } from "@/lib/orders/token";
 import { createCheckoutSessionForOrder, isTenantChargeReady } from "@/lib/payments/service";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -157,12 +157,17 @@ export async function checkoutAction(
     // state/JSON payload beyond this one-time redirect.
     redirectTarget = checkoutUrl;
   } catch (error) {
-    // Never leak the raw error message to the guest (issue #96) -- it can
-    // originate from Stripe's SDK, a DB constraint violation, or any other
-    // internal detail, none of which are safe or meaningful to show a
-    // customer. Log the real error server-side for diagnosis and return a
-    // single generic, translated message instead (`.claude/rules/backend-api.md`
-    // "never leak raw database errors / consistent error shape").
+    // A CheckoutDomainError's message is already a known, safe, translated
+    // domain error (see orders/service.ts) -- e.g. "Ihr Warenkorb ist leer.",
+    // safe and actionable to show as-is. Anything else (Stripe SDK errors, a
+    // DB constraint violation, or any other internal detail) is never safe
+    // or meaningful to show a customer (issue #96) -- log it server-side for
+    // diagnosis and return one generic, translated message instead
+    // (`.claude/rules/backend-api.md` "never leak raw database errors /
+    // consistent error shape").
+    if (error instanceof CheckoutDomainError) {
+      return { error: error.message };
+    }
     console.error("[checkout] checkoutAction failed", error);
     return {
       error: "Die Bestellung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",

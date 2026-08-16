@@ -191,6 +191,66 @@ describe.skipIf(!dbAvailable)("mark_order_received_and_paid() (issue #90)", () =
     expect(payment.rows[0]?.status).toBe("pending");
   });
 
+  // Regression test for the cycle-3 review finding: a check_violation raised
+  // by the payments UPDATE itself (not the order_status_events insert) must
+  // propagate as a real error, NOT be misreported as the benign "order
+  // already moved on" case -- a malformed stripe_payment_intent_id tripping
+  // the `~ '^pi_'` check constraint is the concrete trigger used here.
+  it("propagates an error (does not return false) when the payments UPDATE itself fails, and leaves the order's received transition rolled back", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const seed = await seedAwaitingPaymentOrder(admin, fixture.tenantA.tenantId);
+
+    await expect(
+      admin.query(`select mark_order_received_and_paid($1, $2, $3, $4)`, [
+        seed.tenantId,
+        seed.orderId,
+        seed.paymentId,
+        "not-a-valid-payment-intent-id",
+      ]),
+    ).rejects.toThrow();
+
+    // The whole call rolled back -- the order must NOT be left "received"
+    // with its payment still "pending" (the exact bug issue #90 fixes).
+    const order = await admin.query<{ status: string }>(`select status from orders where id = $1`, [
+      seed.orderId,
+    ]);
+    expect(order.rows[0]?.status).toBe("awaiting_payment");
+
+    const payment = await admin.query<{ status: string }>(
+      `select status from payments where id = $1`,
+      [seed.paymentId],
+    );
+    expect(payment.rows[0]?.status).toBe("pending");
+  });
+
+  // Regression test for the cycle-3 review finding: the payments UPDATE
+  // must only ever touch the row matching tenant_id/order_id/status='pending'
+  // in addition to its id -- defense in depth beyond the bare id match.
+  it("does not mark a payment paid if it no longer belongs to the given tenant/order or is no longer pending", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const seed = await seedAwaitingPaymentOrder(admin, fixture.tenantA.tenantId);
+
+    // Payment already finalized by another path in the meantime.
+    await admin.query(`update payments set status = 'paid' where id = $1`, [seed.paymentId]);
+
+    const result = await admin.query<{ mark_order_received_and_paid: boolean }>(
+      `select mark_order_received_and_paid($1, $2, $3, $4)`,
+      [seed.tenantId, seed.orderId, seed.paymentId, "pi_test_new"],
+    );
+    // The order_status_events insert still succeeds (order_status_events has
+    // no idea the payment is already paid), so the RPC still reports true --
+    // but the payments UPDATE's `where ... and status = 'pending'` guard
+    // means the already-paid row's stripe_payment_intent_id is left
+    // untouched rather than silently overwritten.
+    expect(result.rows[0]?.mark_order_received_and_paid).toBe(true);
+
+    const payment = await admin.query<{ stripe_payment_intent_id: string | null }>(
+      `select stripe_payment_intent_id from payments where id = $1`,
+      [seed.paymentId],
+    );
+    expect(payment.rows[0]?.stripe_payment_intent_id).toBeNull();
+  });
+
   it("is only callable by service_role, never by an authenticated session directly", async () => {
     const result = await admin.query<{ proacl: string }>(
       `select has_function_privilege('authenticated', 'mark_order_received_and_paid(uuid,uuid,uuid,text)', 'execute') as has_priv`,
