@@ -89,7 +89,9 @@ export async function createTenantAction(
       error: slugTaken
         ? "Diese Web-Adresse ist bereits vergeben. Bitte wählen Sie eine andere."
         : "Ihr Restaurant konnte nicht angelegt werden. Bitte versuchen Sie es erneut.",
-      fieldErrors: slugTaken ? { tenantSlug: "Dieser Slug ist bereits vergeben." } : undefined,
+      fieldErrors: slugTaken
+        ? { tenantSlug: "Diese Web-Adresse ist bereits vergeben." }
+        : undefined,
     };
   }
 

@@ -12,14 +12,20 @@
  * shown in the UI; an unrecognized key (e.g. a future custom role) falls
  * back to the role's own `name`/the raw key as-is.
  */
-const ROLE_KEY_LABELS_DE: Record<string, string> = {
+// `Object.create(null)` -- not a plain `{}` -- so a role key that happens to
+// collide with an inherited Object.prototype member name (e.g. a future
+// tenant-defined role key "constructor"; `roles.key` only constrains the
+// character set, not against reserved words) can never resolve to anything
+// other than `undefined`, never to a function/object from the prototype
+// chain that React would refuse to render.
+const ROLE_KEY_LABELS_DE: Record<string, string> = Object.assign(Object.create(null), {
   owner: "Inhaber",
   manager: "Geschäftsführung",
   staff: "Mitarbeiter",
   kitchen: "Küche",
   service: "Service",
   marketing: "Marketing",
-};
+});
 
 export function roleLabel(roleKey: string, fallbackName?: string): string {
   return ROLE_KEY_LABELS_DE[roleKey] ?? fallbackName ?? roleKey;
