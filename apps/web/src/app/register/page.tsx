@@ -14,7 +14,7 @@ export default function RegisterPage() {
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Restaurant registrieren</h1>
         <p className="mt-1 text-sm text-foreground-secondary">
-          Erstellen Sie Ihr Konto — Sie werden automatisch Owner eines neuen Restaurant-Tenants.
+          Erstellen Sie Ihr Konto — Sie werden automatisch Inhaber Ihres neuen Restaurants.
         </p>
       </div>
 
@@ -62,7 +62,7 @@ export default function RegisterPage() {
 
         <div className="flex flex-col gap-1">
           <label htmlFor="tenantSlug" className="text-sm font-medium text-foreground">
-            Restaurant-Slug (für Ihre öffentliche Speisekarten-URL)
+            Web-Adresse Ihres Restaurants (Teil des Links zu Ihrer Speisekarte)
           </label>
           <input
             id="tenantSlug"

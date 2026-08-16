@@ -126,9 +126,11 @@ export async function registerAction(
       rpcError.code === "23505" || rpcError.message.toLowerCase().includes("duplicate");
     return {
       error: slugTaken
-        ? "Dieser Restaurant-Slug ist bereits vergeben. Bitte wählen Sie einen anderen."
-        : "Ihr Konto wurde erstellt, aber der Restaurant-Tenant konnte nicht angelegt werden. Bitte melden Sie sich an, um es über Ihr Konto erneut zu versuchen.",
-      fieldErrors: slugTaken ? { tenantSlug: "Dieser Slug ist bereits vergeben." } : undefined,
+        ? "Diese Web-Adresse ist bereits vergeben. Bitte wählen Sie eine andere."
+        : "Ihr Konto wurde erstellt, aber Ihr Restaurant konnte nicht angelegt werden. Bitte melden Sie sich an, um es über Ihr Konto erneut zu versuchen.",
+      fieldErrors: slugTaken
+        ? { tenantSlug: "Diese Web-Adresse ist bereits vergeben." }
+        : undefined,
     };
   }
 
