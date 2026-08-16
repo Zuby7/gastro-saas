@@ -3,10 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const stripeRefundsCreateMock = vi.fn();
 const recordMenuAdminAuditEventMock = vi.fn();
+const finalizeRefundRpcMock = vi.fn();
 
 vi.mock("@/lib/stripe/client", () => ({
   createStripeClient: () => ({
     refunds: { create: (...args: unknown[]) => stripeRefundsCreateMock(...args) },
+  }),
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createSupabaseAdminClient: () => ({
+    rpc: (name: string, params: Record<string, unknown>) => finalizeRefundRpcMock(name, params),
   }),
 }));
 
@@ -93,12 +100,6 @@ function fakeSupabase() {
               }),
             };
           },
-          update: (payload: Record<string, unknown>) => ({
-            eq: (_col: string, id: string) => {
-              updateCalls.push({ id, payload });
-              return Promise.resolve({ error: null });
-            },
-          }),
         };
       }
 
@@ -126,6 +127,18 @@ beforeEach(() => {
     refundIdCounter: 1,
   };
   stripeRefundsCreateMock.mockResolvedValue({ id: "re_test_abc" });
+  finalizeRefundRpcMock.mockImplementation(
+    (
+      _name: string,
+      params: { p_refund_id: string; p_status: string; p_stripe_refund_id: string | null },
+    ) => {
+      updateCalls.push({
+        id: params.p_refund_id,
+        payload: { status: params.p_status, stripe_refund_id: params.p_stripe_refund_id },
+      });
+      return Promise.resolve({ error: null });
+    },
+  );
 });
 
 describe("isDefinitiveStripeFailure", () => {
@@ -527,6 +540,36 @@ describe("issueRefundForOrder", () => {
       }),
     ).rejects.toBeInstanceOf(RefundInvalidAmountError);
     expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
+  });
+
+  // Regression test for issue #94: a lost/failed finalize_refund() call must
+  // never be swallowed silently -- the refund still succeeds (Stripe already
+  // moved the money), but the failure to record that is logged loudly so it
+  // surfaces to monitoring instead of leaving the row stuck 'pending'
+  // unnoticed.
+  it("logs loudly (console.error) when finalize_refund() itself fails after a successful Stripe refund, without throwing to the caller", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    finalizeRefundRpcMock.mockResolvedValueOnce({
+      error: { message: "connection reset", code: "08006" },
+    });
+
+    const { issueRefundForOrder } = await import("./refund-service");
+
+    const result = await issueRefundForOrder(fakeSupabase() as never, {
+      tenantId: "tenant-1",
+      orderId: "order-1",
+      actorUserId: "user-1",
+      amountCents: 2000,
+      reason: "grund",
+    });
+
+    expect(result.stripeRefundId).toBe("re_test_abc");
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("finalize_refund(succeeded) failed"),
+      expect.objectContaining({ refundId: expect.any(String) }),
+    );
+
+    consoleErrorSpy.mockRestore();
   });
 });
 

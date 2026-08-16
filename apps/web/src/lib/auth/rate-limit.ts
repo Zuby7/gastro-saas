@@ -34,15 +34,20 @@
  *   fully stops a single attacker IP from brute-forcing one account (or
  *   cycling through many), while never fully denying the victim's *own*
  *   login from their own, different IP.
- * - **Optional, per-call `maxIpAttempts`** (ticket #62/#71, Opus review
- *   finding on PR #101): the IP-only bucket exists to catch IP-wide abuse
- *   (credential stuffing/brute-forcing across many accounts from one
- *   source), not to punish a single account's failures -- that's what the
- *   tighter (ip, email) bucket is for. Every caller in this codebase sets
- *   `maxIpAttempts` explicitly (never relying on the fallback default
- *   below), so widening this threshold for one scope (e.g. login, invite)
- *   never silently also widens another (e.g. register, checkout) that
- *   never asked for it.
+ * - **IP-only threshold set well above the (IP, email) threshold** (ticket
+ *   #62, Opus finding ticket #7 cycle 2): a single IP reaching `maxAttempts`
+ *   failures *across different emails* used to hard-block the whole IP for
+ *   the rest of the window -- on a shared office connection or CGNAT, one
+ *   coworker mistyping their password a few times locked out everyone else
+ *   behind the same IP. `maxIpAttempts` (defaulting to a generous multiple
+ *   of `maxAttempts` when not given explicitly) keeps the IP-only bucket as
+ *   a much looser backstop against IP-wide brute-forcing/credential
+ *   stuffing across many accounts, while the tighter `maxAttempts`
+ *   (IP, email) bucket still fully protects any single account from being
+ *   brute-forced from that IP. Every caller in this codebase (login,
+ *   register, checkout, invite) sets `maxIpAttempts` explicitly, so
+ *   widening this threshold for one scope never silently widens another
+ *   that never asked for it.
  */
 
 export type RateLimitScope = "login" | "register" | "checkout" | "invite";
@@ -81,10 +86,19 @@ export interface RateLimitStore {
 
 /**
  * Fallback multiplier applied to `maxAttempts` ONLY when a caller doesn't
- * supply an explicit `maxIpAttempts`. Every caller in this codebase sets
- * `maxIpAttempts` explicitly, so this only matters as a conservative
- * fallback for a future caller that forgets to set it -- it should not be
- * read as "the IP-only threshold for any scope in this codebase today".
+ * supply an explicit `maxIpAttempts`. Opus review finding on PR #101: every
+ * *existing* caller (login, register, checkout, invite) now passes
+ * `maxIpAttempts` explicitly, specifically so this default can never
+ * silently change their behavior -- ticket #62's shared-IP/CGNAT concern was
+ * scoped to the login lockout only, and login is the only scope that
+ * actually widens its IP-only threshold (to `maxAttempts * 4` = 20, set
+ * explicitly in `login/actions.ts`, not via this default); the invite scope
+ * (ticket #71) also widens its own threshold explicitly for the same
+ * shared-office-IP reason. register/checkout instead pin `maxIpAttempts`
+ * equal to their own `maxAttempts` (no widening). This constant now only
+ * matters as a conservative fallback for a future caller that forgets to
+ * set `maxIpAttempts` at all -- it should not be read as "the IP-only
+ * threshold for any scope in this codebase today".
  */
 const DEFAULT_IP_THRESHOLD_MULTIPLIER = 4;
 

@@ -62,7 +62,7 @@ beforeEach(() => {
 });
 
 describe("startStripeOnboardingAction", () => {
-  it("denies onboarding when the caller lacks payments.read", async () => {
+  it("denies onboarding when the caller lacks payments.connect (issue #95 -- Owner-only, not payments.read)", async () => {
     rpcMock.mockResolvedValue({ data: null, error: { message: "insufficient_privilege" } });
     fromMock.mockImplementation(() =>
       membershipQueryBuilder({ data: { tenant_id: "tenant-1", role: "owner" } }),
