@@ -1,10 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
+import { roleLabel } from "@/lib/auth/role-labels";
 import { inviteMemberAction, type InviteMemberFormState } from "./actions";
 
 interface RoleOption {
   id: string;
+  key: string;
   name: string;
 }
 
@@ -73,7 +75,7 @@ export function InviteMemberForm({ roles }: InviteMemberFormProps) {
           >
             {roles.map((role) => (
               <option key={role.id} value={role.id}>
-                {role.name}
+                {roleLabel(role.key, role.name)}
               </option>
             ))}
           </select>

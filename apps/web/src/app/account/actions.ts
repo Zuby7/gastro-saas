@@ -87,7 +87,7 @@ export async function createTenantAction(
 
     return {
       error: slugTaken
-        ? "Dieser Restaurant-Slug ist bereits vergeben. Bitte wählen Sie einen anderen."
+        ? "Diese Web-Adresse ist bereits vergeben. Bitte wählen Sie eine andere."
         : "Ihr Restaurant konnte nicht angelegt werden. Bitte versuchen Sie es erneut.",
       fieldErrors: slugTaken ? { tenantSlug: "Dieser Slug ist bereits vergeben." } : undefined,
     };
