@@ -59,6 +59,22 @@ describe("registerAction", () => {
     expect(signUpMock).not.toHaveBeenCalled();
   });
 
+  // Opus review finding on PR #101/#106: reserveAndCheckRateLimit's default
+  // IP-only threshold multiplier (ticket #62, scoped to login/invite only)
+  // must NOT silently widen the register scope's IP-only threshold. ipCount:
+  // 6 exceeds maxAttempts (5) but would NOT exceed an implicit 4x-widened
+  // threshold (20) -- if register's maxIpAttempts weren't explicitly pinned
+  // to 5, this attempt would wrongly be allowed through.
+  it("blocks a register attempt once the IP-only count exceeds its own (unwidened) threshold", async () => {
+    reserveAttemptMock.mockResolvedValue({ attemptId: "attempt-6", ipCount: 6, ipEmailCount: 1 });
+
+    const { registerAction } = await import("./actions");
+    const result = await registerAction({}, validFormData());
+
+    expect(result.error).toContain("Zu viele Registrierungsversuche");
+    expect(signUpMock).not.toHaveBeenCalled();
+  });
+
   it("creates the tenant and redirects on a full successful signup", async () => {
     signUpMock.mockResolvedValueOnce({
       data: { session: { access_token: "token" }, user: { identities: [{ id: "1" }] } },
@@ -74,6 +90,29 @@ describe("registerAction", () => {
       p_tenant_slug: "testrestaurant",
     });
     expect(markSucceededMock).toHaveBeenCalledWith("attempt-1");
+  });
+
+  it("carries tenant name/slug into signUp's user_metadata so it survives email confirmation (ticket #60)", async () => {
+    // With enable_confirmations=true, signUp() returns no session and this
+    // action defers tenant creation to first login -- the only way to
+    // recover the tenant name/slug the user already typed is if signUp()
+    // stashed it in user_metadata here.
+    signUpMock.mockResolvedValueOnce({
+      data: { session: null, user: { id: "user-1", identities: [{ id: "1" }] } },
+      error: null,
+    });
+
+    const { registerAction } = await import("./actions");
+    await registerAction(
+      {},
+      validFormData({ tenantName: "Pizzeria Napoli", tenantSlug: "pizzeria-napoli" }),
+    );
+
+    expect(signUpMock).toHaveBeenCalledWith({
+      email: "owner@example.com",
+      password: "Sup3rSecurePassw0rd!",
+      options: { data: { tenant_name: "Pizzeria Napoli", tenant_slug: "pizzeria-napoli" } },
+    });
   });
 
   it("handles email-confirmation-required signups (no session yet) with an informational message, not a dead-end error", async () => {

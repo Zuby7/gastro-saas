@@ -17,8 +17,11 @@ export interface PaymentsOnboardingFormState {
  * Ticket #23: creates the tenant's Stripe Express connected account (if it
  * doesn't exist yet) and redirects to a freshly generated, Stripe-hosted
  * Account Link. Never handles verification documents itself -- Stripe's
- * hosted onboarding does that. Gated server-side on `payments.read` (RLS
- * enforces it again independently on the `payment_accounts` writes below).
+ * hosted onboarding does that. Gated server-side on the Owner-only
+ * `payments.connect` permission (issue #95 -- this action controls the
+ * tenant's payout destination, a more sensitive action than the read-shaped
+ * `payments.read` it was previously gated on; RLS enforces the
+ * `payment_accounts` writes below independently, at the service-role layer).
  */
 export async function startStripeOnboardingAction(
   _prevState: PaymentsOnboardingFormState,
@@ -39,7 +42,7 @@ export async function startStripeOnboardingAction(
   }
 
   try {
-    await requireTenantPermission(supabase, membership.tenantId, "payments.read");
+    await requireTenantPermission(supabase, membership.tenantId, "payments.connect");
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return {

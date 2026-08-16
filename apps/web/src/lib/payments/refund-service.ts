@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { createStripeClient } from "@/lib/stripe/client";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-event";
 
 /**
@@ -100,7 +101,22 @@ import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-e
  *     dedicated refund-reconciliation webhook is a clean, scoped follow-up
  *     ticket, not built here. This is a documented residual risk: an
  *     `unconfirmed` refund is not auto-retryable and requires a human to
- *     reconcile it.
+ *     reconcile it. See `docs/operations/refund-reconciliation.md` for the
+ *     manual procedure.
+ *
+ * Finalization lockdown (issue #93, epic-7 cycle-3 fix): a refund row's
+ * pending -> succeeded|failed|unconfirmed transition is no longer a plain
+ * authenticated UPDATE -- `refunds` no longer grants `authenticated` UPDATE
+ * at all. Finalization goes exclusively through the `finalize_refund()`
+ * service_role SECURITY DEFINER RPC (see the migration), called here via
+ * `createSupabaseAdminClient()`, never the caller's own RLS-scoped
+ * `supabase` client. This closes the gap where a `payments.refund` holder
+ * could finalize a row directly via PostgREST -- e.g. flipping a row that is
+ * still `pending` only because ITS OWN finalize call was lost (issue #94) to
+ * `failed`, releasing a reservation whose real Stripe outcome is still
+ * unknown. `finalize_refund()` raises if the target row is missing or not
+ * `pending` rather than silently no-op-ing, so a lost/duplicate finalize
+ * attempt is always logged (issue #94), not swallowed.
  */
 
 /**
@@ -393,10 +409,24 @@ export async function issueRefundForOrder(
       { idempotencyKey: `refund:${reservedRefund.id}` },
     );
 
-    await supabase
-      .from("refunds")
-      .update({ status: "succeeded", stripe_refund_id: stripeRefund.id })
-      .eq("id", reservedRefund.id);
+    const admin = createSupabaseAdminClient();
+    const { error: finalizeError } = await admin.rpc("finalize_refund", {
+      p_refund_id: reservedRefund.id,
+      p_status: "succeeded",
+      p_stripe_refund_id: stripeRefund.id,
+    });
+
+    if (finalizeError) {
+      // The refund DID succeed at Stripe (we're past stripe.refunds.create()
+      // without throwing) -- a failure here means our own row never recorded
+      // that. Log loudly so this surfaces to monitoring (issue #94): the
+      // fix is to manually set this row to 'succeeded' with the Stripe
+      // refund id above, not to retry the Stripe call.
+      console.error(
+        "[refund-service] finalize_refund(succeeded) failed after a successful Stripe refund -- manual reconciliation required",
+        { refundId: reservedRefund.id, stripeRefundId: stripeRefund.id, error: finalizeError },
+      );
+    }
 
     await recordMenuAdminAuditEvent(supabase, {
       tenantId: input.tenantId,
@@ -429,11 +459,25 @@ export async function issueRefundForOrder(
     // which still counts against the remaining refundable amount and
     // requires manual reconciliation.
     const definitive = isDefinitiveStripeFailure(error);
+    const finalStatus = definitive ? "failed" : "unconfirmed";
 
-    await supabase
-      .from("refunds")
-      .update({ status: definitive ? "failed" : "unconfirmed" })
-      .eq("id", reservedRefund.id);
+    const admin = createSupabaseAdminClient();
+    const { error: finalizeError } = await admin.rpc("finalize_refund", {
+      p_refund_id: reservedRefund.id,
+      p_status: finalStatus,
+      p_stripe_refund_id: null,
+    });
+
+    if (finalizeError) {
+      // Same reasoning as the success path: if this write is lost, the row
+      // stays 'pending' and keeps reserving its amount forever with no
+      // record of the actual (failed/unconfirmed) outcome -- log loudly so
+      // it surfaces to monitoring (issue #94) instead of silently vanishing.
+      console.error(
+        `[refund-service] finalize_refund(${finalStatus}) failed -- refund row left in 'pending', manual reconciliation required`,
+        { refundId: reservedRefund.id, error: finalizeError },
+      );
+    }
 
     await recordMenuAdminAuditEvent(supabase, {
       tenantId: input.tenantId,
