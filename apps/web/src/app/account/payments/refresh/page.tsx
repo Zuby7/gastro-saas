@@ -10,7 +10,10 @@ import { createOnboardingAccountLink } from "@/lib/stripe/connect";
  * the previously generated Account Link expired before the owner finished.
  * Account Links are single-use and short-lived, so the only correct
  * response is to mint a fresh one and redirect again, never to show an
- * error for an expected expiry.
+ * error for an expected expiry. Gated on the Owner-only `payments.connect`
+ * permission (issue #95), same as `startStripeOnboardingAction` -- minting a
+ * fresh Account Link is just as sensitive as starting onboarding in the
+ * first place.
  */
 export default async function PaymentsRefreshPage() {
   const supabase = await createSupabaseServerClient();
@@ -28,7 +31,7 @@ export default async function PaymentsRefreshPage() {
   }
 
   try {
-    await requireTenantPermission(supabase, membership.tenantId, "payments.read");
+    await requireTenantPermission(supabase, membership.tenantId, "payments.connect");
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       redirect("/account/payments");

@@ -223,34 +223,39 @@ async function markOrderReceived(
 ): Promise<void> {
   const { order, payment, stripeEventId, stripePaymentIntentId, customerEmail } = params;
 
-  const { error: eventError } = await admin.from("order_status_events").insert({
-    tenant_id: order.tenantId,
-    order_id: order.id,
-    from_status: "awaiting_payment",
-    to_status: "received",
+  // Issue #90: the order's received transition and the payment's paid
+  // transition happen atomically in one RPC call, not as two separate
+  // round trips -- a crash between them could previously leave an order
+  // "received" with its payment still "pending" (permanently non-refundable
+  // through the normal UI). See the migration for the full rationale.
+  const { data: applied, error: rpcError } = await admin.rpc("mark_order_received_and_paid", {
+    p_tenant_id: order.tenantId,
+    p_order_id: order.id,
+    p_payment_id: payment.id,
+    p_stripe_payment_intent_id: stripePaymentIntentId ?? payment.stripePaymentIntentId,
   });
 
-  if (eventError) {
+  if (rpcError) {
+    // An unexpected DB failure (not the graceful race case below, which the
+    // RPC signals via `applied === false` instead of an error) -- propagate
+    // so the webhook route returns a 5xx and Stripe retries.
+    throw new Error(
+      `mark_order_received_and_paid failed for order ${order.id}: ${rpcError.message}`,
+    );
+  }
+
+  if (!applied) {
     // The state-machine/from-status guard (validate_order_status_event(),
-    // ticket #21) is the actual authoritative enforcement point -- if this
-    // rejects (e.g. a race where the order moved on between our read and
-    // this insert), never fall back to trusting the webhook: log and
+    // ticket #21) is the actual authoritative enforcement point -- the RPC
+    // caught its rejection (e.g. a race where the order moved on between our
+    // read and this call) and returned false rather than throwing: log and
     // acknowledge without marking the payment paid.
     console.error(
-      "[payments-webhook] failed to record order_status_events for order",
+      "[payments-webhook] mark_order_received_and_paid declined (order status already moved on) for order",
       order.id,
-      eventError,
     );
     return;
   }
-
-  await admin
-    .from("payments")
-    .update({
-      status: "paid",
-      stripe_payment_intent_id: stripePaymentIntentId ?? payment.stripePaymentIntentId,
-    })
-    .eq("id", payment.id);
 
   await recordOrderAuditEvent(admin, {
     tenantId: order.tenantId,

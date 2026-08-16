@@ -40,8 +40,16 @@ vi.mock("@/lib/orders/cookie", () => ({
   writeOrderAccessTokenCookie: (...args: unknown[]) => writeOrderAccessTokenCookieMock(...args),
 }));
 
+class FakeCheckoutDomainError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CheckoutDomainError";
+  }
+}
+
 vi.mock("@/lib/orders/service", () => ({
   createOrderFromCart: (...args: unknown[]) => createOrderFromCartMock(...args),
+  CheckoutDomainError: FakeCheckoutDomainError,
 }));
 
 vi.mock("@/lib/orders/token", () => ({
@@ -124,13 +132,37 @@ describe("checkoutAction", () => {
     expect(createCheckoutSessionForOrderMock).not.toHaveBeenCalled();
   });
 
-  it("surfaces a generic error and never redirects if payment-session creation fails after order creation", async () => {
-    createCheckoutSessionForOrderMock.mockRejectedValue(new Error("boom"));
+  it("surfaces a generic, translated error (never the raw internal error message) and never redirects if payment-session creation fails after order creation (issue #96)", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    createCheckoutSessionForOrderMock.mockRejectedValue(
+      new Error("Stripe API key invalid: sk_live_xxx rejected by connected account acct_internal"),
+    );
 
     const { checkoutAction } = await import("./actions");
     const result = await checkoutAction("demo", {}, validFormData());
 
-    expect(result.error).toBe("boom");
+    // The raw internal error message must never reach the guest.
+    expect(result.error).not.toContain("Stripe API key");
+    expect(result.error).not.toContain("acct_internal");
+    expect(result.error).toBe(
+      "Die Bestellung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
+    );
+    expect(redirectMock).not.toHaveBeenCalled();
+    // The real error is still logged server-side for diagnosis.
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("still surfaces the specific, already-safe CheckoutDomainError message (e.g. empty cart) instead of the generic fallback (issue #96 regression guard)", async () => {
+    createOrderFromCartMock.mockRejectedValue(
+      new FakeCheckoutDomainError("Ihr Warenkorb ist leer."),
+    );
+
+    const { checkoutAction } = await import("./actions");
+    const result = await checkoutAction("demo", {}, validFormData());
+
+    expect(result.error).toBe("Ihr Warenkorb ist leer.");
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
