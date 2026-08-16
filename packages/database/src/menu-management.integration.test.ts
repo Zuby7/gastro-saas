@@ -581,4 +581,76 @@ describe.skipIf(!dbAvailable)("restaurant profile and menu management", () => {
     expect(dishNames).toContain("Tenant A Dish");
     expect(dishNames).not.toContain("Tenant B Dish");
   });
+
+  // Regression test for ticket #84: get_public_menu() previously hardcoded
+  // 'soldOut', false for every dish, so the frontend's sold-out UI never
+  // triggered regardless of variant availability. Now derived using the
+  // same "is this dish purchasable" formula as run_menu_publish_checks()'s
+  // 'no-purchasable-dish' blocker: purchasable if the dish has its own
+  // price_cents OR at least one available variant; soldOut is the negation.
+  //
+  // A dish with zero purchasable variants (and no base price) can never be
+  // *published* in the first place (the 'dish-without-price' blocker
+  // rejects it) -- the realistic path to a sold-out published dish is
+  // toggling an already-published dish's only variant to
+  // is_available = false afterwards, which
+  // 20260803100000_dish_variant_availability_toggle_exemption.sql
+  // deliberately allows on a published menu version.
+  it("derives soldOut from dish_variants.is_available instead of hardcoding false", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const draftId = randomUUID();
+    const categoryId = randomUUID();
+    const priceOnlyDishId = randomUUID();
+    const variantOnlyDishId = randomUUID();
+    const variantId = randomUUID();
+
+    await admin.query(
+      `insert into menu_versions (id, tenant_id, status) values ($1, $2, 'draft')`,
+      [draftId, tenantA.tenantId],
+    );
+    await admin.query(
+      `insert into categories (id, tenant_id, menu_version_id, name, sort_order)
+       values ($1, $2, $3, 'Pizza', 1)`,
+      [categoryId, tenantA.tenantId, draftId],
+    );
+    await admin.query(
+      `insert into dishes (id, tenant_id, menu_version_id, category_id, name, price_cents, allergen_reviewed)
+       values
+         ($1, $3, $4, $5, 'Has own price', 900, true),
+         ($2, $3, $4, $5, 'Priced only via variant', null, true)`,
+      [priceOnlyDishId, variantOnlyDishId, tenantA.tenantId, draftId, categoryId],
+    );
+    await admin.query(
+      `insert into dish_variants (id, tenant_id, dish_id, name, price_cents, is_available)
+       values ($1, $2, $3, 'Groß', 1200, true)`,
+      [variantId, tenantA.tenantId, variantOnlyDishId],
+    );
+
+    await queryAsUser(admin, tenantA.ownerId, `select publish_menu_version($1)`, [draftId]);
+
+    const beforeToggle = await admin.query<{
+      menu: { categories: { dishes: { name: string; soldOut: boolean }[] }[] };
+    }>(`select get_public_menu($1) as menu`, [tenantA.slug]);
+    const dishesBefore = beforeToggle.rows[0]!.menu.categories.flatMap(
+      (category) => category.dishes,
+    );
+    const soldOutBefore = Object.fromEntries(dishesBefore.map((dish) => [dish.name, dish.soldOut]));
+
+    expect(soldOutBefore["Has own price"]).toBe(false);
+    expect(soldOutBefore["Priced only via variant"]).toBe(false);
+
+    // Staff marks the dish's only variant unavailable on the now-published
+    // menu (permitted by the availability-toggle exemption).
+    await admin.query(`update dish_variants set is_available = false where id = $1`, [variantId]);
+
+    const afterToggle = await admin.query<{
+      menu: { categories: { dishes: { name: string; soldOut: boolean }[] }[] };
+    }>(`select get_public_menu($1) as menu`, [tenantA.slug]);
+    const dishesAfter = afterToggle.rows[0]!.menu.categories.flatMap((category) => category.dishes);
+    const soldOutAfter = Object.fromEntries(dishesAfter.map((dish) => [dish.name, dish.soldOut]));
+
+    expect(soldOutAfter["Has own price"]).toBe(false);
+    expect(soldOutAfter["Priced only via variant"]).toBe(true);
+  });
 });
