@@ -34,6 +34,17 @@
  *   fully stops a single attacker IP from brute-forcing one account (or
  *   cycling through many), while never fully denying the victim's *own*
  *   login from their own, different IP.
+ * - **IP-only threshold set well above the (IP, email) threshold** (ticket
+ *   #62, Opus finding ticket #7 cycle 2): a single IP reaching `maxAttempts`
+ *   failures *across different emails* used to hard-block the whole IP for
+ *   the rest of the window -- on a shared office connection or CGNAT, one
+ *   coworker mistyping their password a few times locked out everyone else
+ *   behind the same IP. `maxIpAttempts` (defaulting to a generous multiple
+ *   of `maxAttempts` when not given explicitly) keeps the IP-only bucket as
+ *   a much looser backstop against IP-wide brute-forcing/credential
+ *   stuffing across many accounts, while the tighter `maxAttempts`
+ *   (IP, email) bucket still fully protects any single account from being
+ *   brute-forced from that IP.
  */
 
 export type RateLimitScope = "login" | "register" | "checkout";
@@ -70,12 +81,37 @@ export interface RateLimitStore {
   markSucceeded(attemptId: string | null): Promise<void>;
 }
 
+/**
+ * Default multiplier applied to `maxAttempts` when a caller doesn't supply
+ * an explicit `maxIpAttempts` (ticket #62): the IP-only bucket exists to
+ * catch IP-wide abuse (credential stuffing/brute-forcing across many
+ * accounts from one source), not to punish a single account's failures --
+ * that's what the tighter (ip, email) bucket is for. 4x keeps a real
+ * single-account brute-force from that IP still hard-blocked well before it
+ * could succeed, while giving a shared office/CGNAT IP meaningfully more
+ * room before an unrelated coworker's mistyped password locks everyone out.
+ */
+const DEFAULT_IP_THRESHOLD_MULTIPLIER = 4;
+
 export interface RateLimitCheck {
   scope: RateLimitScope;
   ip: string;
   email: string;
-  /** Attempts allowed per window before further attempts are blocked. */
+  /**
+   * Attempts allowed per window, per (ip, email) combination, before
+   * further attempts for that specific account from that specific IP are
+   * blocked.
+   */
   maxAttempts: number;
+  /**
+   * Attempts allowed per window for the IP alone (i.e. across any number of
+   * different emails attempted from that IP) before the IP itself is
+   * blocked. Deliberately looser than `maxAttempts` (ticket #62) so a
+   * shared/CGNAT IP with several legitimate users isn't hard-blocked by one
+   * user's failed attempts against their own account. Defaults to
+   * `maxAttempts * DEFAULT_IP_THRESHOLD_MULTIPLIER` if not given.
+   */
+  maxIpAttempts?: number;
   windowSeconds: number;
 }
 
@@ -102,8 +138,10 @@ export async function reserveAndCheckRateLimit(
     check.windowSeconds,
   );
 
+  const maxIpAttempts = check.maxIpAttempts ?? check.maxAttempts * DEFAULT_IP_THRESHOLD_MULTIPLIER;
+
   return {
     attemptId,
-    limited: ipCount > check.maxAttempts || ipEmailCount > check.maxAttempts,
+    limited: ipCount > maxIpAttempts || ipEmailCount > check.maxAttempts,
   };
 }

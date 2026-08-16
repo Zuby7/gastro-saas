@@ -76,7 +76,11 @@ describe("reserveAndCheckRateLimit", () => {
     expect(result.limited).toBe(false);
   });
 
-  it("blocks once the IP reaches maxAttempts across different emails", async () => {
+  it("does NOT block the IP just because it reaches maxAttempts across different emails (ticket #62: shared IP/CGNAT)", async () => {
+    // A single coworker mistyping their password a few times must not lock
+    // out everyone else behind the same office/CGNAT IP -- the IP-only
+    // threshold is deliberately looser than the per-account (ip, email)
+    // threshold (defaults to maxAttempts * 4 here).
     const store = createFakeStore();
     for (let i = 0; i < 5; i += 1) {
       await store.reserveAttempt("login", "1.2.3.4", `user-${i}@example.com`, 900);
@@ -87,6 +91,42 @@ describe("reserveAndCheckRateLimit", () => {
       ip: "1.2.3.4",
       email: "someone-else@example.com",
       maxAttempts: 5,
+      windowSeconds: 900,
+    });
+
+    expect(result.limited).toBe(false);
+  });
+
+  it("still blocks the IP once it reaches the (looser) default IP-only threshold across different emails", async () => {
+    const store = createFakeStore();
+    // Default IP-only threshold is maxAttempts * 4 = 20 for maxAttempts: 5.
+    for (let i = 0; i < 20; i += 1) {
+      await store.reserveAttempt("login", "1.2.3.4", `user-${i}@example.com`, 900);
+    }
+
+    const result = await reserveAndCheckRateLimit(store, {
+      scope: "login",
+      ip: "1.2.3.4",
+      email: "someone-else@example.com",
+      maxAttempts: 5,
+      windowSeconds: 900,
+    });
+
+    expect(result.limited).toBe(true);
+  });
+
+  it("respects an explicit maxIpAttempts override instead of the default multiplier", async () => {
+    const store = createFakeStore();
+    for (let i = 0; i < 8; i += 1) {
+      await store.reserveAttempt("login", "1.2.3.4", `user-${i}@example.com`, 900);
+    }
+
+    const result = await reserveAndCheckRateLimit(store, {
+      scope: "login",
+      ip: "1.2.3.4",
+      email: "someone-else@example.com",
+      maxAttempts: 5,
+      maxIpAttempts: 8,
       windowSeconds: 900,
     });
 
