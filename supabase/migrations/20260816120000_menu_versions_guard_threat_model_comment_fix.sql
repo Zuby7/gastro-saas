@@ -1,0 +1,32 @@
+-- ----------------------------------------------------------------------------
+-- Ticket #68 (Opus batch review, epic-3-5-batch, cycle 2 finding): corrects
+-- guard_menu_versions_status_change()'s comment, which overstated the
+-- protection the transaction-local gastro_saas.allow_menu_version_status_change
+-- flag actually provides.
+--
+-- The flag is an ordinary Postgres custom GUC (`set_config`/`current_setting`
+-- with a namespaced name). Any role -- including a plain `authenticated`
+-- role -- can set an arbitrary custom GUC in its own session; Postgres does
+-- not restrict this to any particular caller (empirically confirmed against
+-- the local DB via a direct psql session: `select
+-- set_config('gastro_saas.allow_menu_version_status_change', 'on', false);`
+-- followed by a direct `update menu_versions set status = ...` succeeds even
+-- though the caller is not publish_menu_version()). The previous comment's
+-- "only publish_menu_version() sets it" was therefore not a mechanism the
+-- database itself enforces -- it described convention, not a guarantee.
+--
+-- What actually protects this app's real attack surface (PostgREST /
+-- Supabase client traffic, the only way `authenticated`/`anon` roles reach
+-- this database): every PostgREST request is exactly one function call in
+-- its own transaction, with no way for a client to inject an earlier
+-- `SET`/`set_config` statement into that same transaction ahead of the
+-- guarded UPDATE. A client cannot open a multi-statement session against
+-- this database at all -- there is no direct psql/libpq access exposed to
+-- app-facing traffic, only the PostgREST/Supabase client surface. So the
+-- guard's real guarantee is "no PostgREST-reachable role can flip
+-- menu_versions.status outside publish_menu_version()'s own RPC call", not
+-- "no role can ever set this GUC" -- a caller with a genuine direct
+-- multi-statement database session (which this app's architecture does not
+-- grant to end users) could set the flag and bypass the guard.
+comment on function guard_menu_versions_status_change() is
+  'Rejects direct menu_versions.status transitions from app-facing roles (authenticated/anon/service_role) unless the transaction-local gastro_saas.allow_menu_version_status_change flag is set to on. Convention only sets this flag from inside publish_menu_version(), around its own sanctioned status UPDATEs -- but the flag is an ordinary Postgres custom GUC, settable by any role with a session (empirically confirmed via direct psql), NOT a database-enforced secret. The actual guarantee this provides is scoped to this app''s real attack surface: PostgREST/Supabase-client traffic reaches this database as one function call per transaction, with no way to inject a prior SET into that transaction, so no PostgREST-reachable (authenticated/anon) caller can flip status outside publish_menu_version(). It does NOT protect against a role with genuine direct multi-statement database access (this app''s architecture never grants that to end users; a privileged/ops connection could always set the flag or use current_setting(''role'') = ''none'' to bypass this guard entirely, matching the audit_logs immutability guard''s precedent). A non-app-facing caller (current_setting(''role'') = ''none'') is not restricted by this guard.';
