@@ -10,6 +10,7 @@ export type PermissionKey =
   | "orders.cancel"
   | "payments.read"
   | "payments.refund"
+  | "payments.connect"
   | "analytics.read"
   | "audit.read";
 

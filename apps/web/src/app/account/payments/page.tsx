@@ -67,6 +67,20 @@ export default async function PaymentsPage() {
     .eq("tenant_id", membership.tenantId)
     .maybeSingle<PaymentAccountRow>();
 
+  // payments.connect (issue #95) is a separate, Owner-only permission from
+  // the payments.read that gates this whole page -- a Manager can view
+  // status but must not see a button that would just fail server-side.
+  let canConnect = true;
+  try {
+    await requireTenantPermission(supabase, membership.tenantId, "payments.connect");
+  } catch (error) {
+    if (error instanceof PermissionDeniedError) {
+      canConnect = false;
+    } else {
+      throw error;
+    }
+  }
+
   return (
     <main className="min-h-screen bg-neutral-50">
       <div className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
@@ -115,15 +129,22 @@ export default async function PaymentsPage() {
             <p className="text-sm text-foreground">Es wurde noch kein Stripe-Konto verbunden.</p>
           )}
 
-          <OnboardingButton
-            label={
-              !account
-                ? "Verbindung mit Stripe starten"
-                : account.status === "enabled"
-                  ? "Stripe-Onboarding erneut aufrufen"
-                  : "Onboarding fortsetzen"
-            }
-          />
+          {canConnect ? (
+            <OnboardingButton
+              label={
+                !account
+                  ? "Verbindung mit Stripe starten"
+                  : account.status === "enabled"
+                    ? "Stripe-Onboarding erneut aufrufen"
+                    : "Onboarding fortsetzen"
+              }
+            />
+          ) : (
+            <p className="text-sm text-foreground">
+              Nur der Inhaber (Owner) kann das Stripe-Konto verbinden oder das Onboarding
+              fortsetzen.
+            </p>
+          )}
         </section>
       </div>
     </main>

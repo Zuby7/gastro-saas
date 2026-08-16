@@ -157,7 +157,16 @@ export async function checkoutAction(
     // state/JSON payload beyond this one-time redirect.
     redirectTarget = checkoutUrl;
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unbekannter Fehler." };
+    // Never leak the raw error message to the guest (issue #96) -- it can
+    // originate from Stripe's SDK, a DB constraint violation, or any other
+    // internal detail, none of which are safe or meaningful to show a
+    // customer. Log the real error server-side for diagnosis and return a
+    // single generic, translated message instead (`.claude/rules/backend-api.md`
+    // "never leak raw database errors / consistent error shape").
+    console.error("[checkout] checkoutAction failed", error);
+    return {
+      error: "Die Bestellung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
+    };
   }
 
   redirect(redirectTarget);
