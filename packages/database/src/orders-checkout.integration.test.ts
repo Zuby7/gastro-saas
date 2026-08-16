@@ -331,8 +331,15 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
     await admin.query(`update menu_versions set status = 'archived' where id = $1`, [
       menu.menuVersionId,
     ]);
+    // Ticket #69's unique index on (tenant_id, version_number) now enforces
+    // that no two menu_versions rows for the same tenant can share a
+    // version_number -- this test's fixture already seeded version_number 1
+    // for tenantA, so this new version needs a fresh, non-colliding number
+    // (computed via subquery rather than hardcoded, same idiom used
+    // elsewhere for deriving the next version_number for a tenant).
     await admin.query(
-      `insert into menu_versions (id, tenant_id, status, published_at) values ($1, $2, 'published', now())`,
+      `insert into menu_versions (id, tenant_id, status, published_at, version_number)
+       values ($1, $2, 'published', now(), (select coalesce(max(version_number), 0) + 1 from menu_versions where tenant_id = $2))`,
       [randomUUID(), tenantA.tenantId],
     );
     const afterSupersede = await admin.query(
