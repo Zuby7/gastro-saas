@@ -44,9 +44,7 @@ describe("describeOrderChanges", () => {
   });
 
   it("combines multiple simultaneous changes into a single announcement", () => {
-    const previous = [
-      order({ id: "order-1", status: "received" }),
-    ];
+    const previous = [order({ id: "order-1", status: "received" })];
     const next = [
       order({ id: "order-1", status: "accepted" }),
       order({ id: "order-2", customerName: "Neuer Kunde", status: "received" }),

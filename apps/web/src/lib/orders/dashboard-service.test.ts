@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ORDER_DASHBOARD_STATUSES, groupOrdersByStatus, type TenantOrderRow } from "./dashboard-service";
+import {
+  ORDER_DASHBOARD_STATUSES,
+  groupOrdersByStatus,
+  type TenantOrderRow,
+} from "./dashboard-service";
 
 function order(overrides: Partial<TenantOrderRow>): TenantOrderRow {
   return {

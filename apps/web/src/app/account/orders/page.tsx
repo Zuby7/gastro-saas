@@ -58,9 +58,7 @@ export default async function OrdersDashboardPage() {
     <main className="min-h-screen bg-neutral-50">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 p-8">
         <div className="flex items-center justify-between">
-          <h1 className="font-display text-2xl font-semibold text-foreground">
-            Bestell-Dashboard
-          </h1>
+          <h1 className="font-display text-2xl font-semibold text-foreground">Bestell-Dashboard</h1>
           <Link
             href="/account"
             className="text-sm font-medium text-link-foreground underline hover:text-brand-700"

@@ -26,12 +26,7 @@ export const DEFAULT_ORDER_DASHBOARD_PAGE_SIZE = 50;
  * than the full `payments` table read gated on `payments.read`).
  */
 export type OrderPaymentStatus =
-  | "unpaid"
-  | "processing"
-  | "paid"
-  | "partially_refunded"
-  | "refunded"
-  | "failed";
+  "unpaid" | "processing" | "paid" | "partially_refunded" | "refunded" | "failed";
 
 export interface TenantOrderRow {
   id: string;
@@ -99,7 +94,9 @@ export async function listTenantOrdersForDashboard(
 
   const { data, error } = await supabase
     .from("orders")
-    .select("id, status, fulfillment_type, customer_name, table_identifier, total_cents, currency, created_at")
+    .select(
+      "id, status, fulfillment_type, customer_name, table_identifier, total_cents, currency, created_at",
+    )
     .eq("tenant_id", options.tenantId)
     .in("status", ORDER_DASHBOARD_STATUSES)
     .order("created_at", { ascending: false })

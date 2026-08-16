@@ -12,10 +12,12 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
-function membershipTable(data: { tenant_id: string; role: string } | null = {
-  tenant_id: "tenant-1",
-  role: "owner",
-}) {
+function membershipTable(
+  data: { tenant_id: string; role: string } | null = {
+    tenant_id: "tenant-1",
+    role: "owner",
+  },
+) {
   return {
     select: () => ({
       eq: () => ({
@@ -94,7 +96,8 @@ describe("pollTenantOrders", () => {
   it("re-derives the tenant id from the caller's own session, ignoring any client-supplied value", async () => {
     let queriedTenantId: string | undefined;
     fromMock.mockImplementation((table: string) => {
-      if (table === "tenant_memberships") return membershipTable({ tenant_id: "tenant-1", role: "owner" });
+      if (table === "tenant_memberships")
+        return membershipTable({ tenant_id: "tenant-1", role: "owner" });
       if (table === "orders") {
         return {
           select: () => ({

@@ -9,10 +9,7 @@ import {
   type TenantOrderRow,
 } from "@/lib/orders/dashboard-service";
 import { describeOrderChanges } from "@/lib/orders/dashboard-diff";
-import {
-  paymentStatusLabel,
-  staffOrderStatusColumnLabel,
-} from "@/lib/orders/status-labels";
+import { paymentStatusLabel, staffOrderStatusColumnLabel } from "@/lib/orders/status-labels";
 import { formatOrderTimestamp } from "@/lib/orders/format";
 import { pollTenantOrders } from "./actions";
 
@@ -89,11 +86,7 @@ export function OrderBoard({ initialOrders, initialHasMore }: OrderBoardProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div
-        role="status"
-        aria-live="polite"
-        className="sr-only"
-      >
+      <div role="status" aria-live="polite" className="sr-only">
         {announcement}
       </div>
 
@@ -116,13 +109,7 @@ export function OrderBoard({ initialOrders, initialHasMore }: OrderBoardProps) {
   );
 }
 
-function OrderColumn({
-  status,
-  orders,
-}: {
-  status: OrderStatus;
-  orders: TenantOrderRow[];
-}) {
+function OrderColumn({ status, orders }: { status: OrderStatus; orders: TenantOrderRow[] }) {
   const headingId = `order-column-${status}-heading`;
 
   return (
