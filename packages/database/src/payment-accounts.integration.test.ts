@@ -411,4 +411,35 @@ describe.skipIf(!dbAvailable)("payment_accounts (Stripe Connect onboarding)", ()
     );
     expect(managerCan.rows[0]?.has_tenant_permission).toBe(true);
   });
+
+  // Regression test for issue #95: payments.connect (controls the tenant's
+  // Stripe payout destination) must be Owner-only, unlike payments.read --
+  // a Manager holding payments.read must NOT also hold payments.connect.
+  it("grants payments.connect to Owner only, not Manager", async () => {
+    const managerUserId = randomUUID();
+    fixture = await seedTwoTenantFixture(admin, {
+      tenantA: {
+        additionalMembers: [
+          { userId: managerUserId, email: "manager-connect@example.test", role: "manager" },
+        ],
+      },
+    });
+    const { tenantA } = fixture;
+
+    const ownerCan = await queryAsUser<{ has_tenant_permission: boolean }>(
+      admin,
+      tenantA.ownerId,
+      `select has_tenant_permission($1, 'payments.connect')`,
+      [tenantA.tenantId],
+    );
+    expect(ownerCan.rows[0]?.has_tenant_permission).toBe(true);
+
+    const managerCan = await queryAsUser<{ has_tenant_permission: boolean }>(
+      admin,
+      managerUserId,
+      `select has_tenant_permission($1, 'payments.connect')`,
+      [tenantA.tenantId],
+    );
+    expect(managerCan.rows[0]?.has_tenant_permission).toBe(false);
+  });
 });
