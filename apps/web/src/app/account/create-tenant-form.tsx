@@ -70,7 +70,7 @@ export function CreateTenantForm({
 
         <div className="flex flex-col gap-1">
           <label htmlFor="tenantSlug" className="text-sm font-medium text-foreground">
-            Restaurant-Slug (für Ihre öffentliche Speisekarten-URL)
+            Web-Adresse Ihres Restaurants (Teil des Links zu Ihrer Speisekarte)
           </label>
           <input
             id="tenantSlug"
