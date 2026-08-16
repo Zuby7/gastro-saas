@@ -2,10 +2,14 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { CreateTenantSchema, InviteMemberSchema } from "@/lib/auth/schemas";
 import { sendInvitationEmail } from "@/lib/invitations/email";
 import { createInvitationToken, hashInvitationToken } from "@/lib/invitations/tokens";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
+import { createSupabaseRateLimitStore } from "@/lib/auth/supabase-rate-limit-store";
+import { reserveAndCheckRateLimit } from "@/lib/auth/rate-limit";
+import { getClientIp } from "@/lib/auth/client-ip";
 
 export async function logoutAction(): Promise<void> {
   const supabase = await createSupabaseServerClient();
@@ -138,13 +142,12 @@ export async function inviteMemberAction(
     return { error: "Sie sind noch keinem Restaurant zugeordnet." };
   }
 
-  // Opus batch review (epic-3-5-batch, high, regression): the reordering
-  // below (send email before persisting) moved the send in front of the
-  // users.invite authorization check, which used to live only inside the
-  // create_invitation() RPC that ran *after* the email send -- any tenant
-  // member (even one with no invite permission) could trigger an arbitrary
-  // invitation email. This RLS-scoped permission check must happen before
-  // the send, not just before the persist.
+  // Opus batch review (epic-3-5-batch, high, regression): the users.invite
+  // authorization check must happen before anything else this action does
+  // (persisting OR emailing) -- it used to live only inside the
+  // create_invitation() RPC, which for a while ran *after* the email send,
+  // letting any tenant member (even one with no invite permission) trigger
+  // an arbitrary invitation email.
   try {
     await requireTenantPermission(supabase, membership.tenant_id, "users.invite");
   } catch (error) {
@@ -154,6 +157,38 @@ export async function inviteMemberAction(
     throw error;
   }
 
+  // Ticket #71 (Opus batch review, epic-3-5-batch, cycle 2): rate-limits
+  // invitation sending, reusing the same scope+ip+email fixed-window
+  // limiter already used for login/register/checkout (see
+  // lib/auth/rate-limit.ts). Keyed by the inviter's IP and the invited
+  // email -- this must run before create_invitation() persists anything,
+  // so a blocked attempt never touches the DB or sends an email.
+  const ip = await getClientIp();
+  const admin = createSupabaseAdminClient();
+  const rateLimitStore = createSupabaseRateLimitStore(admin);
+  const { limited, attemptId } = await reserveAndCheckRateLimit(rateLimitStore, {
+    scope: "invite",
+    ip,
+    email: parsed.data.email,
+    maxAttempts: 5,
+    // Explicit and deliberately wider than maxAttempts -- Opus review
+    // finding on PR #106: without an explicit value here, this scope would
+    // silently inherit whatever reserveAndCheckRateLimit's default IP-only
+    // multiplier resolves to (see rate-limit.ts). Inviting several
+    // employees from one shared office IP within an hour is a real,
+    // legitimate case (issue #62's own shared-IP/CGNAT concern applies here
+    // too, not just to login) -- 20 lets a manager invite a whole team in
+    // one sitting while still hard-blocking sustained invite spam from a
+    // single IP well before it could enumerate many distinct target emails.
+    maxIpAttempts: 20,
+    windowSeconds: 60 * 60,
+  });
+  if (limited) {
+    return {
+      error: "Zu viele Einladungen für diese Adresse. Bitte versuchen Sie es später erneut.",
+    };
+  }
+
   const token = createInvitationToken();
   const tokenHash = hashInvitationToken(token);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -161,27 +196,22 @@ export async function inviteMemberAction(
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const inviteUrl = `${origin}/invite/${token}`;
 
-  // Codex review fix: send the email BEFORE persisting the invitation. The
-  // raw token only ever exists in memory (only its hash is stored, per
-  // single-use-token best practice) -- persisting first and emailing second
-  // meant a failed send left a permanently unusable invite row with no way
-  // to recover or resend the token. Sending first means a failure leaves
-  // nothing behind to clean up; the admin just retries the action. The
-  // users.invite permission check above now runs before this send too, so
-  // an unauthorized caller can no longer trigger the email at all.
-  try {
-    await sendInvitationEmail({
-      to: parsed.data.email,
-      inviteUrl,
-      tenantName: membership.tenants?.name ?? "Ihrem Restaurant",
-    });
-  } catch {
-    return {
-      error: "Die Einladungs-E-Mail konnte nicht versendet werden. Bitte versuchen Sie es erneut.",
-    };
-  }
-
-  const { error: rpcError } = await supabase.rpc("create_invitation", {
+  // Ticket #71 fix: persist the invitation FIRST (this is also where
+  // create_invitation()'s own audit_logs entry is written), THEN send the
+  // email, THEN confirm the send via mark_invitation_email_sent(). The
+  // previous "send first" design left a real gap: if create_invitation()
+  // failed *after* an already-sent email (e.g. a transient DB error), the
+  // recipient held a legitimate-looking but completely unusable link, with
+  // no audit_logs entry and no rate limit ever applied to the send itself.
+  // Persisting first closes that gap -- every invite attempt that gets past
+  // the permission + rate-limit checks above is now audit-logged and
+  // rate-limit-counted regardless of whether the email send that follows
+  // succeeds. If the email send below fails, the invitation row is
+  // deliberately left in place with `email_sent_at` still null rather than
+  // deleted: nobody holds its raw token (only the hash is stored), so it
+  // cannot be exploited, and re-inviting the same email is unaffected (no
+  // unique constraint on tenant+email).
+  const { data: invitationId, error: rpcError } = await supabase.rpc("create_invitation", {
     p_tenant_id: membership.tenant_id,
     p_email: parsed.data.email,
     p_role_id: parsed.data.roleId,
@@ -191,10 +221,39 @@ export async function inviteMemberAction(
 
   if (rpcError) {
     return {
-      error:
-        "Die Einladungs-E-Mail wurde versendet, aber die Einladung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
+      error: "Die Einladung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
     };
   }
+
+  try {
+    await sendInvitationEmail({
+      to: parsed.data.email,
+      inviteUrl,
+      tenantName: membership.tenants?.name ?? "Ihrem Restaurant",
+    });
+  } catch {
+    return {
+      error:
+        "Die Einladung wurde gespeichert, aber die E-Mail konnte nicht versendet werden. Bitte versuchen Sie es erneut.",
+    };
+  }
+
+  const { error: markSentError } = await supabase.rpc("mark_invitation_email_sent", {
+    p_invitation_id: invitationId,
+  });
+  if (markSentError) {
+    // The email genuinely was sent (we're past sendInvitationEmail() above
+    // without throwing) -- a failure here only means our own bookkeeping
+    // (invitations.email_sent_at) didn't record that. Log loudly so this
+    // surfaces to monitoring instead of silently leaving a permanently
+    // "unconfirmed" invitation row with no record of the discrepancy
+    // (matching the finalize_refund() logging pattern in refund-service.ts).
+    console.error(
+      "[invitations] mark_invitation_email_sent failed after a successful email send -- email_sent_at left null",
+      { invitationId, error: markSentError },
+    );
+  }
+  await rateLimitStore.markSucceeded(attemptId);
 
   return { success: "Einladung wurde erstellt und versendet." };
 }

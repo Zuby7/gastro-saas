@@ -44,10 +44,13 @@
  *   a much looser backstop against IP-wide brute-forcing/credential
  *   stuffing across many accounts, while the tighter `maxAttempts`
  *   (IP, email) bucket still fully protects any single account from being
- *   brute-forced from that IP.
+ *   brute-forced from that IP. Every caller in this codebase (login,
+ *   register, checkout, invite) sets `maxIpAttempts` explicitly, so
+ *   widening this threshold for one scope never silently widens another
+ *   that never asked for it.
  */
 
-export type RateLimitScope = "login" | "register" | "checkout";
+export type RateLimitScope = "login" | "register" | "checkout" | "invite";
 
 export interface RateLimitReservation {
   /** Id of the just-recorded attempt row; `null` if the store failed open. */
@@ -84,16 +87,18 @@ export interface RateLimitStore {
 /**
  * Fallback multiplier applied to `maxAttempts` ONLY when a caller doesn't
  * supply an explicit `maxIpAttempts`. Opus review finding on PR #101: every
- * *existing* caller (login, register, checkout) now passes `maxIpAttempts`
- * explicitly, specifically so this default can never silently change their
- * behavior -- ticket #62's shared-IP/CGNAT concern was scoped to the login
- * lockout only, and login is the only scope that actually widens its
- * IP-only threshold (to `maxAttempts * 4` = 20, set explicitly in
- * `login/actions.ts`, not via this default). register/checkout instead pin
- * `maxIpAttempts` equal to their own `maxAttempts` (no widening). This
- * constant now only matters as a conservative fallback for a future caller
- * that forgets to set `maxIpAttempts` at all -- it should not be read as
- * "the IP-only threshold for any scope in this codebase today".
+ * *existing* caller (login, register, checkout, invite) now passes
+ * `maxIpAttempts` explicitly, specifically so this default can never
+ * silently change their behavior -- ticket #62's shared-IP/CGNAT concern was
+ * scoped to the login lockout only, and login is the only scope that
+ * actually widens its IP-only threshold (to `maxAttempts * 4` = 20, set
+ * explicitly in `login/actions.ts`, not via this default); the invite scope
+ * (ticket #71) also widens its own threshold explicitly for the same
+ * shared-office-IP reason. register/checkout instead pin `maxIpAttempts`
+ * equal to their own `maxAttempts` (no widening). This constant now only
+ * matters as a conservative fallback for a future caller that forgets to
+ * set `maxIpAttempts` at all -- it should not be read as "the IP-only
+ * threshold for any scope in this codebase today".
  */
 const DEFAULT_IP_THRESHOLD_MULTIPLIER = 4;
 
@@ -109,11 +114,13 @@ export interface RateLimitCheck {
   maxAttempts: number;
   /**
    * Attempts allowed per window for the IP alone (i.e. across any number of
-   * different emails attempted from that IP) before the IP itself is
-   * blocked. Deliberately looser than `maxAttempts` (ticket #62) so a
-   * shared/CGNAT IP with several legitimate users isn't hard-blocked by one
-   * user's failed attempts against their own account. Defaults to
-   * `maxAttempts * DEFAULT_IP_THRESHOLD_MULTIPLIER` if not given.
+   * different emails/targets attempted from that IP) before the IP itself
+   * is blocked. Set this explicitly for every scope -- deliberately looser
+   * than `maxAttempts` where a shared/CGNAT IP with several legitimate
+   * users is a real concern (login, invite), and pinned equal to
+   * `maxAttempts` (no widening) where it isn't (register, checkout).
+   * Defaults to `maxAttempts * DEFAULT_IP_THRESHOLD_MULTIPLIER` if not
+   * given.
    */
   maxIpAttempts?: number;
   windowSeconds: number;

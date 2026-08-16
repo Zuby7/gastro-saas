@@ -59,7 +59,8 @@ export async function registerAction(
     // scoped to the login lockout only. Relying on
     // reserveAndCheckRateLimit's default multiplier here would have
     // silently loosened this scope's IP-only threshold too, which was never
-    // part of that ticket.
+    // part of that ticket. The shared-IP/CGNAT concern for the invite scope
+    // (ticket #71) is handled separately in account/actions.ts.
     maxIpAttempts: 5,
     windowSeconds: 60 * 60,
   });
