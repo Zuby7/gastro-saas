@@ -144,6 +144,65 @@ describe.skipIf(!dbAvailable)("invitations", () => {
     expect(created.rows).toHaveLength(0);
   });
 
+  // Regression tests for ticket #71 (Opus batch review, epic-3-5-batch,
+  // cycle 2): the invitation email must be sent AFTER create_invitation()
+  // persists the row, and mark_invitation_email_sent() confirms that send --
+  // gated on users.invite for the invitation's own tenant, not callable by
+  // an unrelated tenant's member.
+  it("marks an invitation's email as sent when the caller holds users.invite for its tenant", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const email = `pending-${randomUUID()}@example.test`;
+    const tokenHash = "d".repeat(64);
+
+    const created = await queryAsUser<{ create_invitation: string }>(
+      admin,
+      tenantA.ownerId,
+      `select create_invitation($1, $2, $3, $4, now() + interval '7 days')`,
+      [tenantA.tenantId, email, await roleId(tenantA.tenantId), tokenHash],
+    );
+    const invitationId = created.rows[0]!.create_invitation;
+
+    const beforeConfirm = await admin.query<{ email_sent_at: string | null }>(
+      `select email_sent_at from invitations where id = $1`,
+      [invitationId],
+    );
+    expect(beforeConfirm.rows[0]?.email_sent_at).toBeNull();
+
+    await queryAsUser(admin, tenantA.ownerId, `select mark_invitation_email_sent($1)`, [
+      invitationId,
+    ]);
+
+    const afterConfirm = await admin.query<{ email_sent_at: string | null }>(
+      `select email_sent_at from invitations where id = $1`,
+      [invitationId],
+    );
+    expect(afterConfirm.rows[0]?.email_sent_at).not.toBeNull();
+  });
+
+  it("rejects mark_invitation_email_sent from a different tenant's member", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA, tenantB } = fixture;
+    const tokenHash = "e".repeat(64);
+
+    const created = await queryAsUser<{ create_invitation: string }>(
+      admin,
+      tenantA.ownerId,
+      `select create_invitation($1, $2, $3, $4, now() + interval '7 days')`,
+      [
+        tenantA.tenantId,
+        `cross-tenant-${randomUUID()}@example.test`,
+        await roleId(tenantA.tenantId),
+        tokenHash,
+      ],
+    );
+    const invitationId = created.rows[0]!.create_invitation;
+
+    await expect(
+      queryAsUser(admin, tenantB.ownerId, `select mark_invitation_email_sent($1)`, [invitationId]),
+    ).rejects.toThrow(/insufficient_privilege|permission|Missing permission/i);
+  });
+
   it("rejects expired invitations without creating a membership", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA } = fixture;

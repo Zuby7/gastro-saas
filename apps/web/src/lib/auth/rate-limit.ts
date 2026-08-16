@@ -36,7 +36,7 @@
  *   login from their own, different IP.
  */
 
-export type RateLimitScope = "login" | "register" | "checkout";
+export type RateLimitScope = "login" | "register" | "checkout" | "invite";
 
 export interface RateLimitReservation {
   /** Id of the just-recorded attempt row; `null` if the store failed open. */
