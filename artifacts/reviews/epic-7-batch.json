@@ -1,0 +1,216 @@
+{
+  "epic": "7",
+  "title": "Zahlungsabwicklung (Stripe Connect, Checkout, Webhooks, Rückerstattungen, Transaktions-E-Mails)",
+  "prs": [
+    { "ticket": "23", "pr": 81, "branch": "feat/23-stripe-connect-onboarding-test-modus" },
+    { "ticket": "24", "pr": 82, "branch": "feat/24-checkout-zahlungsabwicklung" },
+    { "ticket": "25", "pr": 85, "branch": "feat/25-webhook-verarbeitung-idempotenz" },
+    { "ticket": "26", "pr": 86, "branch": "feat/26-rueckerstattungen" },
+    { "ticket": "40", "pr": 87, "branch": "feat/40-transaktions-e-mails-bestellbestaetigung" }
+  ],
+  "cycles": [
+    {
+      "cycle": 1,
+      "verdict": "CHANGES_REQUESTED",
+      "review_findings": [
+        {
+          "severity": "high",
+          "area": "payments / payout-account ownership (#23)",
+          "reason": "`payment_accounts` allowed an `authenticated` INSERT gated only on `payments.read`, with `stripe_account_id` supplied by the client -- a Manager could point a tenant's payout destination at a Stripe account they control before the real Owner ever connected Stripe."
+        },
+        {
+          "severity": "high",
+          "area": "webhooks / dedup-retry self-contradiction (#23, shared primitive later reused by #25)",
+          "reason": "The Connect webhook inserted its dedup row before processing, so a genuine mid-processing failure left a claimed-but-unprocessed row that a legitimate Stripe retry of the same event id could never reprocess (a plain unique-violation was always read as already-handled)."
+        },
+        {
+          "severity": "low",
+          "area": "webhooks / out-of-order events (#23)",
+          "reason": "A delayed/out-of-order account.updated event could clobber newer, already-known account status."
+        },
+        {
+          "severity": "medium/low (batch)",
+          "area": "various (#24, #25, #26, #40)",
+          "reason": "Several smaller findings across the remaining tickets, resolved alongside the two HIGH findings in the same repair pass."
+        }
+      ],
+      "required_actions": [
+        "Remove the client-writable payment_accounts INSERT path; create the row only via service-role code immediately after the Stripe Express account is created server-side.",
+        "Make the webhook dedup claim reclaimable so a genuine retry of an unprocessed event can succeed.",
+        "Add an event-timestamp ordering guard against out-of-order account.updated events.",
+        "Resolve the remaining medium/low findings across #24/#25/#26/#40."
+      ]
+    },
+    {
+      "cycle": 2,
+      "verdict": "CHANGES_REQUESTED",
+      "review_findings": [
+        {
+          "severity": "high",
+          "area": "payments / refund double-refund gap (#26)",
+          "reason": "An 'unconfirmed' refund (ambiguous Stripe failure, e.g. network timeout -- Stripe may or may not have actually processed it) only blocked further refund attempts against the same payment via the aggregate amount-headroom check, not via its own existence. A second, smaller refund attempt could still reach Stripe with a fresh idempotency key while the first attempt's real outcome was unknown -- a genuine double-refund risk."
+        },
+        {
+          "severity": "should-fix",
+          "area": "webhooks (#23)",
+          "reason": "claim_payment_webhook_event() had only mock-level test coverage in the two webhook route test files, never exercised against a live database."
+        },
+        {
+          "severity": "should-fix",
+          "area": "payments / Connect account state (#23)",
+          "reason": "apply_connect_account_snapshot() overwrote onboarding_completed_at on every 'enabled' snapshot and nulled it on any later non-'enabled' status, losing the original completion time."
+        },
+        {
+          "severity": "should-fix",
+          "area": "payments / refund error classification (#26)",
+          "reason": "isDefinitiveStripeFailure() miscategorized a 429 StripeRateLimitError as ambiguous rather than definitive."
+        }
+      ],
+      "required_actions": [
+        "Reject any further refunds INSERT for a payment while an 'unconfirmed' row exists, at both the DB trigger and application layer, with a dedicated typed error and translated message.",
+        "Add a live-database integration test for claim_payment_webhook_event().",
+        "Fix onboarding_completed_at to be preserved via coalesce across snapshots.",
+        "Classify StripeRateLimitError as a definitive Stripe failure."
+      ],
+      "resolved_by": "Fixes applied on feat/23 and feat/26 (lowest branches owning each fix), merged forward sequentially through feat/24 -> feat/25 -> feat/26 -> feat/40, each merge point re-verified CI-green. Two smaller residual findings (no explicit mutual-exclusion lock for claim_payment_webhook_event(), currently harmless due to idempotent downstream operations; possible orphaned Stripe Express account on a DB-insert failure after account creation) were deliberately not fixed in-place and are tracked as issues #91 and #92 instead, recorded in docs/decisions/assumptions.md."
+    },
+    {
+      "cycle": 3,
+      "note": "FINAL cycle per 3-cycle-max policy.",
+      "verdict": "APPROVED",
+      "acceptance_criteria": [
+        {
+          "criterion": "#23 Onboarding status stored/displayed correctly",
+          "status": "PASS",
+          "evidence": "payment_accounts + apply_connect_account_snapshot(); status rendered in /account/payments/page.tsx; snapshot written only via service_role (no authenticated INSERT/UPDATE grant)."
+        },
+        {
+          "criterion": "#23 No verification documents handled server-side",
+          "status": "PASS",
+          "evidence": "lib/stripe/connect.ts uses accountLinks.create(type=account_onboarding); server only reads Account objects."
+        },
+        {
+          "criterion": "#23 Secret keys server-side only",
+          "status": "PASS",
+          "evidence": "lib/stripe/client.ts (no NEXT_PUBLIC_), hard sk_test_/rk_test_ gate; .env.example documents server-only; CI Secret Scan green."
+        },
+        {
+          "criterion": "#24 Payment amount comes solely from server recalculation",
+          "status": "PASS",
+          "evidence": "fetchOrderPaymentSnapshot() re-reads orders.total_cents; ensure_payment_matches_order() trigger re-verifies amount/currency/account/charges_enabled at INSERT."
+        },
+        {
+          "criterion": "#24 Client success redirect never marks an order paid",
+          "status": "PASS",
+          "evidence": "success_url/cancel_url both point at the guest status page; only webhook-service.ts writes status='paid'."
+        },
+        {
+          "criterion": "#25 Invalid signature rejected",
+          "status": "PASS",
+          "evidence": "constructEvent() before any DB access, 400 without leaking internals (route.test.ts)."
+        },
+        {
+          "criterion": "#25 Duplicate events change state only once",
+          "status": "PASS",
+          "evidence": "claim_payment_webhook_event() + processed_at; live-DB test payment-webhook-events.integration.test.ts (3 tests, green in CI)."
+        },
+        {
+          "criterion": "#25 Delayed/out-of-order events cause no inconsistent state",
+          "status": "PASS",
+          "evidence": "order.status !== 'awaiting_payment' early-returns; last_event_at monotonicity guard in apply_connect_account_snapshot()."
+        },
+        {
+          "criterion": "#26 Refund requires payments.refund",
+          "status": "PASS",
+          "evidence": "requireTenantPermission + refunds_insert/update_payments_refund RLS; denied-case and cross-tenant tests in refunds.integration.test.ts."
+        },
+        {
+          "criterion": "#26 Refund can never exceed the paid amount",
+          "status": "PASS",
+          "evidence": "ensure_refund_matches_payment_and_within_limit() with SELECT ... FOR UPDATE on payments; pending+succeeded+unconfirmed counted; integration tests incl. the cycle-2 regression test."
+        },
+        {
+          "criterion": "#26 Every refund writes a full audit entry",
+          "status": "PASS",
+          "evidence": "recordMenuAdminAuditEvent on succeeded/failed/unconfirmed paths with actor, amount, reason, Stripe ref."
+        },
+        {
+          "criterion": "#40 Customer receives confirmation email with correct items/prices",
+          "status": "PASS",
+          "evidence": "sendOrderConfirmationEmail built from order_items/*_selections snapshots; order-confirmation-email.test.ts."
+        },
+        {
+          "criterion": "#40 Failed send never blocks payment processing",
+          "status": "PASS",
+          "evidence": "module never throws + defensive try/catch in markOrderReceived, called after the received transition is committed."
+        },
+        {
+          "criterion": "#40 Resend daily limit produces a visible error",
+          "status": "PASS",
+          "evidence": "429 -> tagged console.error + email_sends row status='failed', failure_reason='resend_rate_limited'."
+        }
+      ],
+      "deterministic_checks": {
+        "format": "PASS",
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "unit_tests": "PASS (227 tests / 38 files)",
+        "integration_tests": "PASS (CI Migration Check: 15 files / 100 tests incl. refunds 10, payment-webhook-events 3)",
+        "e2e_tests": "NOT_RUN (no Playwright suite exists in repo)",
+        "build": "PASS",
+        "security": "PASS (Gitleaks green)"
+      },
+      "review_findings": [
+        {
+          "severity": "medium",
+          "area": "payments / RLS -- refund finalization is client-reachable",
+          "reason": "`grant update on refunds to authenticated` + refunds_update_payments_refund let a payments.refund holder finalize rows via PostgREST directly. A row still 'pending' because its finalize UPDATE was lost can be flipped to 'failed' from a raw client call, releasing its reservation.",
+          "required_correction": "Move finalization into a service_role SECURITY DEFINER RPC (finalize_refund(id, status, stripe_refund_id)) and drop the authenticated UPDATE grant/policy.",
+          "outcome": "not fixed in this cycle -- filed as issue #93, does not block merge"
+        },
+        {
+          "severity": "medium",
+          "area": "payments -- unchecked finalize writes / no exit from terminal 'unconfirmed'",
+          "reason": "Both finalize updates in issueRefundForOrder ignore the returned error. A lost update leaves a permanently 'pending' row reserving the amount with no reconciliation path; symmetrically, 'unconfirmed' is terminal and unreachable for app-facing roles, so one unconfirmed refund permanently blocks all further refunds for that payment until direct DB access intervenes -- no runbook documents this.",
+          "required_correction": "Check/log the update errors, and document (or build) the reconciliation procedure for 'unconfirmed'/stuck-'pending' refunds in docs/operations.",
+          "outcome": "not fixed in this cycle -- filed as issue #94, does not block merge"
+        },
+        {
+          "severity": "low",
+          "area": "authorization granularity -- onboarding initiation",
+          "reason": "startStripeOnboardingAction (creates the Express account and every subsequent Account Link, i.e. controls the payout destination) is gated on the read-shaped payments.read, held by Manager. Consistent with the documented threat model, but the sensitivity warrants its own permission before production activation.",
+          "required_correction": "Introduce an Owner-only payments.connect permission for onboarding/account-link creation before real payouts are enabled.",
+          "outcome": "not fixed in this cycle -- filed as issue #95, must resolve before production Stripe activation"
+        },
+        {
+          "severity": "low",
+          "area": "error shape -- guest checkout",
+          "reason": "checkoutAction's catch returns raw error.message to the guest, now including internal payment-layer/Stripe SDK messages, contrary to the repo's error-shape rule.",
+          "required_correction": "Map known domain errors to translated messages and return a generic message for everything else.",
+          "outcome": "not fixed in this cycle -- filed as issue #96"
+        },
+        {
+          "severity": "low",
+          "area": "refunds -- no request-level idempotency",
+          "reason": "Two rapid submissions of a partial refund create two independent, individually-within-headroom refunds (client-side disabling only). Bounded by the paid amount, so not an over-refund, but a double-partial-refund by double-click is possible.",
+          "required_correction": "Optional: carry a client-generated request token and reject a repeat within a short window.",
+          "outcome": "not fixed in this cycle -- filed as issue #97, optional polish"
+        }
+      ],
+      "tenant_isolation": "PASS",
+      "authorization": "PASS",
+      "payment_safety": "PASS",
+      "accessibility": "PASS",
+      "data_integrity": "PASS",
+      "maintainability": "PASS",
+      "residual_risks": [
+        "markOrderReceived() is not transactional -- crash between the received transition and the payments update leaves payment 'pending' and the order non-refundable via the UI (tracked: #90).",
+        "No awaiting_payment timeout sweep (#88); Sentry not wired (#89); claim_payment_webhook_event() concurrency relies on downstream idempotency, not an explicit lock (#91); orphaned Stripe Express account possible on insert failure (#92).",
+        "Integration/RLS tests could not be executed locally (no Docker/Postgres available on this dev machine); evidence is the CI Migration Check run at the exact head sha of each merged branch."
+      ],
+      "required_actions": [],
+      "merge_guidance": "Approved to merge in stacked order: PR #81 -> PR #82 -> PR #85 -> PR #86 -> PR #87."
+    }
+  ],
+  "final_verdict": "APPROVED"
+}
