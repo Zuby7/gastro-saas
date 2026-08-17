@@ -177,6 +177,18 @@ select r.id, 'menu.availability.manage'
  where r.key in ('owner', 'manager', 'kitchen', 'service')
 on conflict do nothing;
 
+-- CI migration-validation follow-up fix: this `create or replace` originally
+-- reconstructed the function body from 20260801080000's original VALUES list
+-- instead of from 20260808130000_stripe_connect_payment_accounts.sql's
+-- version (the actual latest one at the time), silently dropping Manager's
+-- `payments.read` grant for every tenant created after this migration. That
+-- regressed refunds.integration.test.ts (Manager-role RLS insert into
+-- `refunds` relies on the surrounding payments.* grant set behaving as
+-- documented). Fixed by carrying `payments.read` forward below alongside
+-- `menu.availability.manage`. Same fragility as the pattern already flagged
+-- in 20260808130000: each migration that touches this function must
+-- reconstruct the FULL accumulated grant set from the actual latest version,
+-- not just the ticket's own new permission.
 create or replace function seed_standard_roles_for_tenant()
 returns trigger
 language plpgsql
@@ -220,6 +232,7 @@ begin
     (v_manager_role_id, 'menu.availability.manage'),
     (v_manager_role_id, 'orders.cancel'),
     (v_manager_role_id, 'payments.refund'),
+    (v_manager_role_id, 'payments.read'),
     (v_manager_role_id, 'analytics.read'),
     (v_manager_role_id, 'audit.read'),
     (v_kitchen_role_id, 'orders.cancel'),
