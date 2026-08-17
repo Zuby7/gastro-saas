@@ -173,6 +173,41 @@ declare
   v_now timestamptz := now();
 begin
   -- ---------------------------------------------------------------------
+  -- Epic 8 Opus batch review, finding 8: this script creates real
+  -- auth.users rows with a shared, publicly-documented password
+  -- (v_password above) and, before this fix, had no guard beyond the
+  -- "already seeded?" check below -- which does NOT protect against running
+  -- it against a hosted/staging project that happens not to have this slug
+  -- yet. `[db.seed] enabled = true` in supabase/config.toml already means
+  -- `supabase db reset` runs this automatically; this guard adds a second,
+  -- independent check so a plain `psql -f supabase/seed.sql "$DATABASE_URL"`
+  -- against anything other than an explicitly-opted-in connection refuses
+  -- to run at all. Follows this repo's existing custom-GUC opt-in
+  -- convention (`gastro_saas.allow_order_status_change`,
+  -- `gastro_saas.allow_menu_version_status_change` -- see
+  -- 20260801110000_restaurant_profile_and_menu_management.sql/
+  -- 20260804090000_orders_state_machine_and_checkout.sql), except this one
+  -- is a per-*session* opt-in the operator sets on their own connection
+  -- (e.g. `PGOPTIONS="-c gastro_saas.allow_demo_seed=on"` in the shell that
+  -- invokes `supabase db reset`/`supabase start`, or a `SET` issued before
+  -- `\i seed.sql` in an interactive local psql session) -- documented in
+  -- docs/decisions/assumptions.md. Deliberately NOT set inside this file
+  -- itself (that would make the guard a no-op) and deliberately NOT set via
+  -- a migration/`ALTER DATABASE ... SET` (that would persist the opt-in
+  -- for every future connection to whatever database the migration was
+  -- ever applied against, including a hosted one).
+  -- ---------------------------------------------------------------------
+  if coalesce(current_setting('gastro_saas.allow_demo_seed', true), '') <> 'on' then
+    raise exception
+      'supabase/seed.sql refuses to run: the gastro_saas.allow_demo_seed session '
+      'setting is not "on". This script creates real auth.users rows with a shared, '
+      'publicly-documented password and must never run against anything but a local, '
+      'throwaway database. Set PGOPTIONS="-c gastro_saas.allow_demo_seed=on" (see '
+      'docs/decisions/assumptions.md) before running supabase db reset/start locally.'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  -- ---------------------------------------------------------------------
   -- Idempotency guard: if the demo tenant already exists, this whole seed
   -- has already run -- do nothing further (see header note on why a coarse
   -- guard was chosen over per-row ON CONFLICT here).
