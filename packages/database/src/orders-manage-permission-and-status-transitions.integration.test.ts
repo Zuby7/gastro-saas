@@ -330,6 +330,81 @@ describe.skipIf(!dbAvailable)(
       });
     });
 
+    // Epic 8 Opus batch review, finding 4: cancellation is gated on
+    // orders.manage AND orders.cancel -- previously orders.manage alone was
+    // sufficient, even though orders.cancel exists specifically to scope
+    // this action separately.
+    describe("transition_order_status: cancellation additionally requires orders.cancel (finding 4)", () => {
+      it("denies '-> cancelled' for a member with orders.manage but not orders.cancel, while other transitions still work", async () => {
+        const seed = await seedFixtureWithStaff();
+        fixture = seed.fixture;
+        await reassignToRole(fixture.tenantA.tenantId, seed.staffAId, "kitchen");
+        // Kitchen holds both orders.manage and orders.cancel by default --
+        // strip orders.cancel specifically so only orders.manage remains.
+        await admin.query(
+          `delete from role_permissions
+            where permission_key = 'orders.cancel'
+              and role_id in (select id from roles where tenant_id = $1 and key = 'kitchen')`,
+          [fixture.tenantA.tenantId],
+        );
+
+        const hasManage = await queryAsUser<{ has_tenant_permission: boolean }>(
+          admin,
+          seed.staffAId,
+          `select has_tenant_permission($1, 'orders.manage') as has_tenant_permission`,
+          [fixture.tenantA.tenantId],
+        );
+        expect(hasManage.rows[0]?.has_tenant_permission).toBe(true);
+        const hasCancel = await queryAsUser<{ has_tenant_permission: boolean }>(
+          admin,
+          seed.staffAId,
+          `select has_tenant_permission($1, 'orders.cancel') as has_tenant_permission`,
+          [fixture.tenantA.tenantId],
+        );
+        expect(hasCancel.rows[0]?.has_tenant_permission).toBe(false);
+
+        const orderId = await seedOrder(admin, fixture.tenantA.tenantId, "received");
+
+        await expect(
+          queryAsUser(admin, seed.staffAId, `select transition_order_status($1, $2, 'cancelled')`, [
+            fixture.tenantA.tenantId,
+            orderId,
+          ]),
+        ).rejects.toThrow(/insufficient_privilege|Missing permission/i);
+
+        const stillReceived = await admin.query<{ status: string }>(
+          `select status from orders where id = $1`,
+          [orderId],
+        );
+        expect(stillReceived.rows[0]!.status).toBe("received");
+
+        // Other transitions (gated on orders.manage alone) still succeed for
+        // this same member.
+        const accepted = await queryAsUser(
+          admin,
+          seed.staffAId,
+          `select transition_order_status($1, $2, 'accepted') ->> 'status' as status`,
+          [fixture.tenantA.tenantId, orderId],
+        );
+        expect(accepted.rows[0]!.status).toBe("accepted");
+      });
+
+      it("allows '-> cancelled' for a member holding both orders.manage and orders.cancel", async () => {
+        const seed = await seedFixtureWithStaff();
+        fixture = seed.fixture;
+        await reassignToRole(fixture.tenantA.tenantId, seed.staffAId, "kitchen");
+        const orderId = await seedOrder(admin, fixture.tenantA.tenantId, "received");
+
+        const cancelled = await queryAsUser(
+          admin,
+          seed.staffAId,
+          `select transition_order_status($1, $2, 'cancelled') ->> 'status' as status`,
+          [fixture.tenantA.tenantId, orderId],
+        );
+        expect(cancelled.rows[0]!.status).toBe("cancelled");
+      });
+    });
+
     describe("transition_order_status: invalid transitions rejected (state machine enforcement)", () => {
       it("rejects skipping straight from 'received' to 'ready'", async () => {
         const seed = await seedFixtureWithStaff();

@@ -98,6 +98,14 @@ export async function transitionOrderStatusAction(
 
   try {
     await requireTenantPermission(supabase, membership.tenantId, "orders.manage");
+    // Epic 8 Opus batch review, finding 4: cancellation is a distinct,
+    // separately-scoped action from the rest of the kitchen-workflow
+    // preparation lifecycle -- require orders.cancel in addition to
+    // orders.manage. transition_order_status() independently re-checks the
+    // same thing server-side; this is only the cheaper first layer.
+    if (toStatus === "cancelled") {
+      await requireTenantPermission(supabase, membership.tenantId, "orders.cancel");
+    }
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return {

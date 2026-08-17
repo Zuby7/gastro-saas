@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getUserMock = vi.fn();
 const rpcMock = vi.fn();
 const fromMock = vi.fn();
+const transitionOrderStatusMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
@@ -11,6 +12,24 @@ vi.mock("@/lib/supabase/server", () => ({
     rpc: rpcMock,
   }),
 }));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
+vi.mock("@/lib/audit/record-menu-admin-audit-event", () => ({
+  recordMenuAdminAuditEvent: vi.fn(),
+}));
+
+vi.mock("@/lib/orders/status-service", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/orders/status-service")>(
+    "@/lib/orders/status-service",
+  );
+  return {
+    ...actual,
+    transitionOrderStatus: (...args: unknown[]) => transitionOrderStatusMock(...args),
+  };
+});
 
 function membershipTable(
   data: { tenant_id: string; role: string } | null = {
@@ -59,6 +78,7 @@ beforeEach(() => {
     if (fn === "get_tenant_order_payment_statuses") return { data: [], error: null };
     throw new Error(`unexpected rpc: ${fn}`);
   });
+  transitionOrderStatusMock.mockResolvedValue("accepted");
 });
 
 describe("pollTenantOrders", () => {
@@ -247,5 +267,66 @@ describe("pollTenantOrders", () => {
     const result = await pollTenantOrders();
 
     expect(result?.orders[0]?.totalCents).toBe(1290);
+  });
+});
+
+// Epic 8 Opus batch review, finding 4: cancellation requires orders.cancel
+// in addition to orders.manage -- previously orders.manage alone was
+// sufficient, even though the board's UI never actually renders a cancel
+// button here (UI hiding is never authorization).
+describe("transitionOrderStatusAction", () => {
+  it("requires orders.cancel (in addition to orders.manage) when transitioning to 'cancelled'", async () => {
+    const requestedPermissions: string[] = [];
+    rpcMock.mockImplementation(async (fn: string, args: { p_permission_key: string }) => {
+      if (fn === "require_tenant_permission") {
+        requestedPermissions.push(args.p_permission_key);
+        if (args.p_permission_key === "orders.cancel") {
+          return { data: null, error: { message: "insufficient_privilege" } };
+        }
+        return { data: null, error: null };
+      }
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+
+    const { transitionOrderStatusAction } = await import("./actions");
+    const result = await transitionOrderStatusAction("order-1", "cancelled");
+
+    expect(requestedPermissions).toEqual(["orders.manage", "orders.cancel"]);
+    expect(result.error).toBeDefined();
+    expect(transitionOrderStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("does not require orders.cancel for a non-cancellation transition", async () => {
+    const requestedPermissions: string[] = [];
+    rpcMock.mockImplementation(async (fn: string, args: { p_permission_key: string }) => {
+      if (fn === "require_tenant_permission") {
+        requestedPermissions.push(args.p_permission_key);
+        return { data: null, error: null };
+      }
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+
+    const { transitionOrderStatusAction } = await import("./actions");
+    const result = await transitionOrderStatusAction("order-1", "accepted");
+
+    expect(requestedPermissions).toEqual(["orders.manage"]);
+    expect(result.status).toBe("accepted");
+    expect(transitionOrderStatusMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ orderId: "order-1", toStatus: "accepted" }),
+    );
+  });
+
+  it("succeeds cancelling when the caller holds both orders.manage and orders.cancel", async () => {
+    transitionOrderStatusMock.mockResolvedValue("cancelled");
+
+    const { transitionOrderStatusAction } = await import("./actions");
+    const result = await transitionOrderStatusAction("order-1", "cancelled");
+
+    expect(result.status).toBe("cancelled");
+    expect(transitionOrderStatusMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ orderId: "order-1", toStatus: "cancelled" }),
+    );
   });
 });
