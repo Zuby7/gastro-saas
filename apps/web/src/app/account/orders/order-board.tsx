@@ -224,9 +224,14 @@ function OrderColumn({
                       ? "Abholung"
                       : order.fulfillmentType}
                 </span>
-                <span>
-                  {(order.totalCents / 100).toFixed(2)} {order.currency}
-                </span>
+                {/* Epic 8 Opus batch review, finding 7: totalCents is null
+                    (server-omitted, not merely hidden) for a viewer without
+                    payments.read -- render nothing rather than crash/leak. */}
+                {order.totalCents !== null ? (
+                  <span>
+                    {(order.totalCents / 100).toFixed(2)} {order.currency}
+                  </span>
+                ) : null}
               </div>
               <span className="w-fit rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-foreground">
                 {paymentStatusLabel(order.paymentStatus)}
