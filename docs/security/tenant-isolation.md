@@ -32,6 +32,6 @@ Every ticket touching a tenant-scoped table needs a cross-tenant test: create tw
 ## Known risk areas
 
 - Insecure direct object references (guessable/sequential order or dish IDs used without a membership check).
-- Storage objects (media assets) — signed URLs / storage RLS must scope to the owning tenant's path, never a globally-readable bucket.
+- Storage objects (media assets) — signed URLs / storage RLS must scope to the owning tenant's path, never a globally-readable bucket. Exception, intentional: the public menu's `/media/[...path]` proxy (`apps/web/src/app/media/[...path]/route.ts`) uses the service-role client to sign URLs for anonymous guests, bypassing Storage RLS by design — this is safe only because the route re-derives authorization from the database before signing anything, requiring a `media_assets` row for the exact path that is referenced by a non-archived dish on that tenant's currently *published* `menu_versions` row. Draft/archived dish media and other tenants' assets 404. This is not an oversight; do not remove the DB-backed check to "simplify" the route.
 - Analytics aggregates — a bug here is easy to miss because the numbers "look plausible" for the wrong tenant; analytics queries must always filter by tenant first, not last.
 - Integration sync jobs — a shared mock/real provider must never leak one tenant's menu/order data into another tenant's sync payload.
