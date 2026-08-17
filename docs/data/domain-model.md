@@ -57,6 +57,8 @@ Ticket #21 (Epic 6) implements the order state machine and guest checkout on top
 
 `analytics_events`, `daily_analytics_aggregates`.
 
+Ticket #30 (Epic 9) implements the Analytics-Grunddashboard: revenue today (net of same-day refunds), paid order count, average order value, open orders, and payment failures today, computed live from the tenant's own `orders`/`payments`/`refunds` rows (no third-party product analytics for revenue figures) via the timezone-aware `get_analytics_dashboard_summary()` RPC (`supabase/migrations/20260818090000_analytics_dashboard_summary.sql`), which enforces `analytics.read` itself. `daily_analytics_aggregates` remains an unimplemented, documented target shape for a later ticket if incremental pre-aggregation is ever needed for performance -- today's live-query approach (backed by a `payments (tenant_id, status, created_at)` index) is deliberately simpler and always correct. Admin UI: `apps/web/src/app/account/analytics` (dashboard tiles with honest empty states -- average order value renders as "–", never a fabricated 0, when there is no data yet).
+
 ## Reviews
 
 `ratings`, `rating_moderation`.
