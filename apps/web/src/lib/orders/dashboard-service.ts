@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { OrderStatus } from "@gastro-saas/domain";
+import { hasTenantPermission } from "@/lib/auth/permissions";
 
 /**
  * Staff order dashboard (Epic 8, ticket #27). Statuses shown on the board --
@@ -34,7 +35,15 @@ export interface TenantOrderRow {
   fulfillmentType: string;
   customerName: string;
   tableIdentifier: string | null;
-  totalCents: number;
+  /**
+   * Epic 8 Opus batch review, finding 7: `null` when the viewer lacks
+   * `payments.read` (e.g. Kitchen/Service, who hold `orders.read` but not
+   * `payments.read`) -- revenue figures are a payments.read-gated concern,
+   * not implied by `orders.read` alone. The board must render the row
+   * without a total in that case, not merely hide it visually (UI-only
+   * hiding is never authorization -- this is a server-side omission).
+   */
+  totalCents: number | null;
   currency: string;
   createdAt: string;
   paymentStatus: OrderPaymentStatus;
@@ -86,11 +95,24 @@ export interface ListTenantOrdersForDashboardResult {
  * `/account/orders/[orderId]` already exists for looking up one specific
  * historical order directly by id.
  */
+/** Hard upper bound on the requested page size (Epic 8 Opus batch review, finding 9) -- see `listTenantOrdersForDashboard`'s own clamp below. */
+export const MAX_ORDER_DASHBOARD_PAGE_SIZE = 500;
+
 export async function listTenantOrdersForDashboard(
   supabase: SupabaseClient,
   options: ListTenantOrdersForDashboardOptions,
 ): Promise<ListTenantOrdersForDashboardResult> {
-  const limit = options.limit ?? DEFAULT_ORDER_DASHBOARD_PAGE_SIZE;
+  // Finding 9: clamp server-side regardless of what the caller passed --
+  // `pollTenantOrders` (./actions.ts) forwards a client-controlled `limit`
+  // with no upper bound of its own.
+  const requestedLimit = options.limit ?? DEFAULT_ORDER_DASHBOARD_PAGE_SIZE;
+  const limit = Math.min(Math.max(1, requestedLimit), MAX_ORDER_DASHBOARD_PAGE_SIZE);
+
+  // Finding 7: revenue figures (total_cents) are a payments.read-gated
+  // concern, not implied by orders.read alone -- Kitchen/Service hold
+  // orders.read but not payments.read. Checked once per call (not per row)
+  // since it's the same tenant/viewer for the whole page.
+  const canViewPayments = await hasTenantPermission(supabase, options.tenantId, "payments.read");
 
   const { data, error } = await supabase
     .from("orders")
@@ -123,7 +145,7 @@ export async function listTenantOrdersForDashboard(
     fulfillmentType: row.fulfillment_type,
     customerName: row.customer_name,
     tableIdentifier: row.table_identifier,
-    totalCents: row.total_cents,
+    totalCents: canViewPayments ? row.total_cents : null,
     currency: row.currency,
     createdAt: row.created_at,
     paymentStatus: paymentStatuses.get(row.id) ?? "unpaid",
