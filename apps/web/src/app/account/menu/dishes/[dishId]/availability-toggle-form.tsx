@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { DishActionState } from "./actions";
 
 const initialState: DishActionState = {};
@@ -28,6 +28,15 @@ export interface AvailabilityToggleFormProps {
  * via visible text ("Ausverkauft" / "Verfügbar") plus an icon-free badge
  * with sufficient contrast, not a bare color change -- mirrors the public
  * menu's existing "Ausverkauft" text badge (`dish-card.tsx`).
+ *
+ * Epic 8 Opus batch review, finding 5: the badge and the toggle's target
+ * state must be derived from *effective* availability -- what
+ * `is_menu_item_available()` would return (`isAvailable` OR
+ * `availableAgainAt` has already passed) -- not the raw `isAvailable`
+ * column alone. Otherwise an item whose schedule has already lapsed still
+ * shows "Ausverkauft" in the admin UI (and toggling it would flip
+ * `isAvailable` to `true` a second time) even though it's already
+ * purchasable on the public menu.
  */
 export function AvailabilityToggleForm({
   action,
@@ -40,6 +49,19 @@ export function AvailabilityToggleForm({
   const [state, formAction, isPending] = useActionState(action, initialState);
   const dateTimeInputId = `${idPrefix}-available-again-at`;
 
+  // `Date.now()` is impure and may not be called directly during render
+  // (react-hooks/purity) -- snapshot it once per mount instead. This is a
+  // one-shot admin form (a full page load, per the migration's own "no
+  // cron/background job" design), so a mount-time snapshot is exactly as
+  // fresh as every other value on this page.
+  const [nowMs] = useState(() => Date.now());
+
+  // Mirrors is_menu_item_available()'s SQL formula exactly: effectively
+  // available if the raw column says so, OR a scheduled re-availability
+  // timestamp has already passed.
+  const isEffectivelyAvailable =
+    isAvailable || (availableAgainAt !== null && new Date(availableAgainAt).getTime() <= nowMs);
+
   // datetime-local inputs need "YYYY-MM-DDTHH:mm" with no timezone/seconds.
   const defaultDateTimeValue = availableAgainAt ? availableAgainAt.slice(0, 16) : "";
 
@@ -51,14 +73,16 @@ export function AvailabilityToggleForm({
       {Object.entries(hiddenFields).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      <input type="hidden" name="isAvailable" value={(!isAvailable).toString()} />
+      <input type="hidden" name="isAvailable" value={(!isEffectivelyAvailable).toString()} />
 
       <span
         className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold ${
-          isAvailable ? "border-success-500 text-success-700" : "border-danger-500 text-danger-600"
+          isEffectivelyAvailable
+            ? "border-success-500 text-success-700"
+            : "border-danger-500 text-danger-600"
         }`}
       >
-        {isAvailable ? "Verfügbar" : "Ausverkauft"}
+        {isEffectivelyAvailable ? "Verfügbar" : "Ausverkauft"}
       </span>
 
       <div className="flex flex-col gap-1">
@@ -78,17 +102,19 @@ export function AvailabilityToggleForm({
         type="submit"
         disabled={isPending}
         aria-label={
-          isAvailable
+          isEffectivelyAvailable
             ? `${itemLabel} als ausverkauft markieren`
             : `${itemLabel} als verfügbar markieren`
         }
-        className={`rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-60 ${
-          isAvailable ? "border-danger-500 text-danger-600" : "border-success-500 text-success-700"
+        className={`inline-flex min-h-12 items-center justify-center rounded-md border px-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 ${
+          isEffectivelyAvailable
+            ? "border-danger-500 text-danger-600 focus-visible:outline-danger-600"
+            : "border-success-500 text-success-700 focus-visible:outline-success-600"
         }`}
       >
         {isPending
           ? "Wird gespeichert…"
-          : isAvailable
+          : isEffectivelyAvailable
             ? "Als ausverkauft markieren"
             : "Als verfügbar markieren"}
       </button>

@@ -426,6 +426,136 @@ describe.skipIf(!dbAvailable)("dish/option availability and scheduling (ticket #
     expect(new Date(clonedVariant.rows[0]!.available_again_at).toISOString()).toBe(future);
   });
 
+  // Epic 8 Opus batch review, finding 5: is_available = false combined with
+  // an already-due available_again_at is a silent no-op per
+  // is_menu_item_available()'s own OR formula (the item reads as available
+  // immediately), which would otherwise leave the raw is_available column
+  // permanently diverged from what's actually purchasable. The three
+  // set_*_availability() RPCs now null out available_again_at whenever it's
+  // already due.
+  it("nulls out an already-due available_again_at instead of storing it alongside is_available = false (set_dish_availability)", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+    const past = new Date(Date.now() - 60_000).toISOString();
+
+    await queryAsUser(admin, tenantA.ownerId, `select set_dish_availability($1, $2, false, $3)`, [
+      menu.dishId,
+      tenantA.tenantId,
+      past,
+    ]);
+
+    const updated = await admin.query<{
+      is_available: boolean;
+      available_again_at: string | null;
+    }>(`select is_available, available_again_at from dishes where id = $1`, [menu.dishId]);
+    expect(updated.rows[0]?.is_available).toBe(false);
+    expect(updated.rows[0]?.available_again_at).toBeNull();
+  });
+
+  it("nulls out an already-due available_again_at instead of storing it alongside is_available = false (set_dish_variant_availability)", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+    const past = new Date(Date.now() - 60_000).toISOString();
+
+    await queryAsUser(
+      admin,
+      tenantA.ownerId,
+      `select set_dish_variant_availability($1, $2, false, $3)`,
+      [menu.variantId, tenantA.tenantId, past],
+    );
+
+    const updated = await admin.query<{
+      is_available: boolean;
+      available_again_at: string | null;
+    }>(`select is_available, available_again_at from dish_variants where id = $1`, [
+      menu.variantId,
+    ]);
+    expect(updated.rows[0]?.is_available).toBe(false);
+    expect(updated.rows[0]?.available_again_at).toBeNull();
+  });
+
+  it("nulls out an already-due available_again_at instead of storing it alongside is_available = false (set_option_availability)", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+    const past = new Date(Date.now() - 60_000).toISOString();
+
+    await queryAsUser(admin, tenantA.ownerId, `select set_option_availability($1, $2, false, $3)`, [
+      menu.optionId,
+      tenantA.tenantId,
+      past,
+    ]);
+
+    const updated = await admin.query<{
+      is_available: boolean;
+      available_again_at: string | null;
+    }>(`select is_available, available_again_at from options where id = $1`, [menu.optionId]);
+    expect(updated.rows[0]?.is_available).toBe(false);
+    expect(updated.rows[0]?.available_again_at).toBeNull();
+  });
+
+  it("still stores a future available_again_at alongside is_available = false (not cleared -- only already-due timestamps are)", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+    const future = new Date(Date.now() + 3600_000).toISOString();
+
+    await queryAsUser(admin, tenantA.ownerId, `select set_dish_availability($1, $2, false, $3)`, [
+      menu.dishId,
+      tenantA.tenantId,
+      future,
+    ]);
+
+    const updated = await admin.query<{
+      is_available: boolean;
+      available_again_at: string | null;
+    }>(`select is_available, available_again_at from dishes where id = $1`, [menu.dishId]);
+    expect(updated.rows[0]?.is_available).toBe(false);
+    expect(new Date(updated.rows[0]!.available_again_at!).toISOString()).toBe(future);
+  });
+
+  // Epic 8 Opus batch review, finding 6: a dish with a required option group
+  // (min_selections >= 1) whose only assigned option is sold out used to
+  // render as orderable (empty options array), then fail at add_cart_item().
+  // get_public_menu()'s soldOut now flags this case directly.
+  it("flags a dish soldOut once its required option group's only option is sold out, even though the dish and its variant are themselves available", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+
+    await admin.query(`update option_groups set min_selections = 1 where id = $1`, [
+      menu.optionGroupId,
+    ]);
+
+    const before = await admin.query<{
+      menu: { categories: { dishes: { soldOut: boolean }[] }[] };
+    }>(`select get_public_menu($1) as menu`, [tenantA.slug]);
+    expect(before.rows[0]!.menu.categories[0]!.dishes[0]!.soldOut).toBe(false);
+
+    await admin.query(`update options set is_available = false where id = $1`, [menu.optionId]);
+
+    const after = await admin.query<{
+      menu: { categories: { dishes: { soldOut: boolean }[] }[] };
+    }>(`select get_public_menu($1) as menu`, [tenantA.slug]);
+    expect(after.rows[0]!.menu.categories[0]!.dishes[0]!.soldOut).toBe(true);
+  });
+
+  it("does not flag a dish soldOut for an optional (min_selections = 0) option group with a sold-out option", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+    const menu = await seedPublishedMenu(admin, tenantA.tenantId);
+
+    // seedPublishedMenu's option group already has min_selections = 0.
+    await admin.query(`update options set is_available = false where id = $1`, [menu.optionId]);
+
+    const after = await admin.query<{
+      menu: { categories: { dishes: { soldOut: boolean }[] }[] };
+    }>(`select get_public_menu($1) as menu`, [tenantA.slug]);
+    expect(after.rows[0]!.menu.categories[0]!.dishes[0]!.soldOut).toBe(false);
+  });
+
   it("never lets one tenant read/toggle another tenant's dish availability directly (cross-tenant RLS)", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA, tenantB } = fixture;
