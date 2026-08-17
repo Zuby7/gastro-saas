@@ -169,11 +169,23 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
     );
 
     expect(grantsByRole.get("kitchen")).toEqual(
-      ["menu.availability.manage", "menu.read", "orders.cancel", "orders.manage", "orders.read"].sort(),
+      [
+        "menu.availability.manage",
+        "menu.read",
+        "orders.cancel",
+        "orders.manage",
+        "orders.read",
+      ].sort(),
     );
 
     expect(grantsByRole.get("service")).toEqual(
-      ["menu.availability.manage", "menu.read", "orders.cancel", "orders.manage", "orders.read"].sort(),
+      [
+        "menu.availability.manage",
+        "menu.read",
+        "orders.cancel",
+        "orders.manage",
+        "orders.read",
+      ].sort(),
     );
 
     expect(grantsByRole.get("marketing")).toEqual(
