@@ -37,7 +37,10 @@ describe("GET /media/[...path]", () => {
 
   it("redirects to a short-lived signed URL for a published dish's media", async () => {
     maybeSingleMock.mockResolvedValue({
-      data: { id: "asset-1", dishes: { id: "dish-1", archived_at: null, menu_versions: { status: "published" } } },
+      data: {
+        id: "asset-1",
+        dishes: { id: "dish-1", archived_at: null, menu_versions: { status: "published" } },
+      },
       error: null,
     });
     createSignedUrlMock.mockResolvedValue({
@@ -59,7 +62,10 @@ describe("GET /media/[...path]", () => {
 
   it("returns 404 when the storage object does not exist rather than leaking the Storage error", async () => {
     maybeSingleMock.mockResolvedValue({
-      data: { id: "asset-1", dishes: { id: "dish-1", archived_at: null, menu_versions: { status: "published" } } },
+      data: {
+        id: "asset-1",
+        dishes: { id: "dish-1", archived_at: null, menu_versions: { status: "published" } },
+      },
       error: null,
     });
     createSignedUrlMock.mockResolvedValue({
@@ -91,9 +97,12 @@ describe("GET /media/[...path]", () => {
     maybeSingleMock.mockResolvedValue({ data: null, error: null });
 
     const { GET } = await import("./route");
-    const response = await GET(new Request("http://localhost/media/tenant-2/dishes/other-tenant.jpg"), {
-      params: Promise.resolve({ path: ["tenant-2", "dishes", "other-tenant.jpg"] }),
-    });
+    const response = await GET(
+      new Request("http://localhost/media/tenant-2/dishes/other-tenant.jpg"),
+      {
+        params: Promise.resolve({ path: ["tenant-2", "dishes", "other-tenant.jpg"] }),
+      },
+    );
 
     expect(response.status).toBe(404);
     expect(createSignedUrlMock).not.toHaveBeenCalled();
@@ -101,9 +110,12 @@ describe("GET /media/[...path]", () => {
 
   it("returns 404 for a path containing a '..' segment without ever querying Storage", async () => {
     const { GET } = await import("./route");
-    const response = await GET(new Request("http://localhost/media/tenant-1/../tenant-2/secret.jpg"), {
-      params: Promise.resolve({ path: ["tenant-1", "..", "tenant-2", "secret.jpg"] }),
-    });
+    const response = await GET(
+      new Request("http://localhost/media/tenant-1/../tenant-2/secret.jpg"),
+      {
+        params: Promise.resolve({ path: ["tenant-1", "..", "tenant-2", "secret.jpg"] }),
+      },
+    );
 
     expect(response.status).toBe(404);
     expect(maybeSingleMock).not.toHaveBeenCalled();
