@@ -7,6 +7,7 @@ export type PermissionKey =
   | "tenant.settings.write"
   | "menu.write"
   | "menu.publish"
+  | "menu.availability.manage"
   | "orders.cancel"
   | "payments.read"
   | "payments.refund"
@@ -42,4 +43,26 @@ export async function requireTenantPermission(
   if (error) {
     throw new PermissionDeniedError(tenantId, permission);
   }
+}
+
+/**
+ * Non-throwing permission check, for UI gating decisions (e.g. "show the
+ * availability toggle") where a denial is an expected, silent case rather
+ * than an error path -- unlike `requireTenantPermission`, which is for
+ * mutation/read gates that should hard-fail. This is never itself an
+ * authorization check: any mutation this informs still calls
+ * `requireTenantPermission` (or an RPC that does so server-side) before
+ * writing.
+ */
+export async function hasTenantPermission(
+  supabase: SupabaseClient,
+  tenantId: string,
+  permission: PermissionKey,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("has_tenant_permission", {
+    p_tenant_id: tenantId,
+    p_permission_key: permission,
+  });
+
+  return !error && data === true;
 }
