@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { OrderStatus } from "@gastro-saas/domain";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { ORDER_STATUS_TRANSITIONS, type OrderStatus } from "@gastro-saas/domain";
 import {
   ORDER_DASHBOARD_STATUSES,
   DEFAULT_ORDER_DASHBOARD_PAGE_SIZE,
@@ -9,15 +9,38 @@ import {
   type TenantOrderRow,
 } from "@/lib/orders/dashboard-service";
 import { describeOrderChanges } from "@/lib/orders/dashboard-diff";
-import { paymentStatusLabel, staffOrderStatusColumnLabel } from "@/lib/orders/status-labels";
+import {
+  orderStatusActionLabel,
+  paymentStatusLabel,
+  staffOrderStatusColumnLabel,
+} from "@/lib/orders/status-labels";
 import { formatOrderTimestamp } from "@/lib/orders/format";
-import { pollTenantOrders } from "./actions";
+import { pollTenantOrders, transitionOrderStatusAction } from "./actions";
 
 const POLL_INTERVAL_MS = 10_000;
+
+/**
+ * Kitchen-workflow forward transitions offered as board buttons (ticket
+ * #28): the state machine's own `cancelled` branch is deliberately excluded
+ * here -- cancellation is a distinct, separately-scoped action (`orders.cancel`),
+ * not part of this ticket's "angenommen -> in Zubereitung -> fertig"
+ * preparation lifecycle.
+ */
+function nextForwardStatuses(status: OrderStatus): OrderStatus[] {
+  return ORDER_STATUS_TRANSITIONS[status].filter((next) => next !== "cancelled");
+}
 
 interface OrderBoardProps {
   initialOrders: TenantOrderRow[];
   initialHasMore: boolean;
+  /**
+   * Whether the current member holds `orders.manage` (resolved server-side
+   * in `page.tsx`). Purely a UX affordance -- hides the status-change
+   * buttons for a member who can't use them -- never the actual
+   * authorization boundary: `transitionOrderStatusAction` re-checks
+   * `orders.manage` server-side on every call regardless of this prop.
+   */
+  canManageOrders: boolean;
 }
 
 /**
@@ -36,13 +59,16 @@ interface OrderBoardProps {
  * something actually changed, so a screen reader announces each change once
  * instead of repeating the same text on every poll tick.
  */
-export function OrderBoard({ initialOrders, initialHasMore }: OrderBoardProps) {
+export function OrderBoard({ initialOrders, initialHasMore, canManageOrders }: OrderBoardProps) {
   const [orders, setOrders] = useState<TenantOrderRow[]>(initialOrders);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [limit, setLimit] = useState(
     Math.max(initialOrders.length, DEFAULT_ORDER_DASHBOARD_PAGE_SIZE),
   );
   const [announcement, setAnnouncement] = useState<string | null>(null);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+  const [isTransitionPending, startTransition] = useTransition();
   const ordersRef = useRef(orders);
   const limitRef = useRef(limit);
 
@@ -82,6 +108,26 @@ export function OrderBoard({ initialOrders, initialHasMore }: OrderBoardProps) {
     void refresh(nextLimit);
   }, [limit, refresh]);
 
+  const handleTransition = useCallback(
+    (orderId: string, toStatus: OrderStatus) => {
+      setTransitionError(null);
+      setPendingOrderId(orderId);
+      startTransition(async () => {
+        const result = await transitionOrderStatusAction(orderId, toStatus);
+        setPendingOrderId(null);
+        if (result.error) {
+          setTransitionError(result.error);
+          return;
+        }
+        setAnnouncement(
+          `Bestellung ${orderId} ist jetzt "${staffOrderStatusColumnLabel(toStatus)}".`,
+        );
+        await refresh();
+      });
+    },
+    [refresh],
+  );
+
   const grouped = groupOrdersByStatus(orders);
 
   return (
@@ -90,9 +136,26 @@ export function OrderBoard({ initialOrders, initialHasMore }: OrderBoardProps) {
         {announcement}
       </div>
 
+      {transitionError ? (
+        <p
+          role="alert"
+          className="rounded-md border border-danger-500 bg-neutral-0 p-3 text-sm text-danger-600"
+        >
+          {transitionError}
+        </p>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
         {ORDER_DASHBOARD_STATUSES.map((status) => (
-          <OrderColumn key={status} status={status} orders={grouped[status] ?? []} />
+          <OrderColumn
+            key={status}
+            status={status}
+            orders={grouped[status] ?? []}
+            canManageOrders={canManageOrders}
+            pendingOrderId={pendingOrderId}
+            isTransitionPending={isTransitionPending}
+            onTransition={handleTransition}
+          />
         ))}
       </div>
 
@@ -109,7 +172,23 @@ export function OrderBoard({ initialOrders, initialHasMore }: OrderBoardProps) {
   );
 }
 
-function OrderColumn({ status, orders }: { status: OrderStatus; orders: TenantOrderRow[] }) {
+interface OrderColumnProps {
+  status: OrderStatus;
+  orders: TenantOrderRow[];
+  canManageOrders: boolean;
+  pendingOrderId: string | null;
+  isTransitionPending: boolean;
+  onTransition: (orderId: string, toStatus: OrderStatus) => void;
+}
+
+function OrderColumn({
+  status,
+  orders,
+  canManageOrders,
+  pendingOrderId,
+  isTransitionPending,
+  onTransition,
+}: OrderColumnProps) {
   const headingId = `order-column-${status}-heading`;
 
   return (
@@ -152,6 +231,23 @@ function OrderColumn({ status, orders }: { status: OrderStatus; orders: TenantOr
               <span className="w-fit rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-foreground">
                 {paymentStatusLabel(order.paymentStatus)}
               </span>
+
+              {canManageOrders && nextForwardStatuses(order.status).length > 0 ? (
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {nextForwardStatuses(order.status).map((nextStatus) => (
+                    <button
+                      key={nextStatus}
+                      type="button"
+                      disabled={isTransitionPending && pendingOrderId === order.id}
+                      onClick={() => onTransition(order.id, nextStatus)}
+                      aria-label={`Bestellung von ${order.customerName}: ${orderStatusActionLabel(nextStatus)}`}
+                      className="min-h-12 min-w-12 flex-1 rounded-md bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {orderStatusActionLabel(nextStatus)}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

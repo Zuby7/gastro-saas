@@ -56,6 +56,28 @@ export function staffOrderStatusColumnLabel(status: OrderStatus): string {
   return STAFF_ORDER_STATUS_COLUMN_LABELS[status] ?? status;
 }
 
+/**
+ * Action-verb labels for the kitchen workflow's status-change buttons
+ * (ticket #28) -- keyed by the *target* status the button transitions an
+ * order into, distinct from `STAFF_ORDER_STATUS_COLUMN_LABELS` (which
+ * labels a column's current-state noun, not an action verb). `awaiting_payment`/
+ * `received`/`cancelled` have no entry: an order is never manually
+ * transitioned back into `awaiting_payment`/`received` (only creation/
+ * payment-webhook events produce those), and `cancelled` is a distinct,
+ * separately-scoped action (`orders.cancel`) not offered as a board button
+ * by this ticket (see `order-board.tsx`'s `nextForwardStatuses`).
+ */
+export const ORDER_STATUS_ACTION_LABELS: Partial<Record<OrderStatus, string>> = {
+  accepted: "Annehmen",
+  preparing: "Zubereitung starten",
+  ready: "Fertig melden",
+  completed: "Abschließen",
+};
+
+export function orderStatusActionLabel(toStatus: OrderStatus): string {
+  return ORDER_STATUS_ACTION_LABELS[toStatus] ?? toStatus;
+}
+
 /** German labels for the narrow `orders.read`-gated payment-status projection (see `dashboard-service.ts`). */
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   unpaid: "Nicht bezahlt",

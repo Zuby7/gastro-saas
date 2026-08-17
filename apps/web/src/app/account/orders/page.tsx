@@ -54,6 +54,23 @@ export default async function OrdersDashboardPage() {
 
   const initial = await listTenantOrdersForDashboard(supabase, { tenantId: membership.tenantId });
 
+  // Deliberately does not redirect/block the page if missing (unlike
+  // `orders.read` above): `orders.manage` only controls whether the
+  // status-change buttons render (ticket #28) -- a member with `orders.read`
+  // but not `orders.manage` should still be able to view the board. This is
+  // a UX affordance only; `transitionOrderStatusAction` re-checks
+  // `orders.manage` server-side regardless (see `./actions.ts`), so hiding
+  // the buttons here is never the actual authorization boundary.
+  let canManageOrders = false;
+  try {
+    await requireTenantPermission(supabase, membership.tenantId, "orders.manage");
+    canManageOrders = true;
+  } catch (error) {
+    if (!(error instanceof PermissionDeniedError)) {
+      throw error;
+    }
+  }
+
   return (
     <main className="min-h-screen bg-neutral-50">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 p-8">
@@ -67,7 +84,11 @@ export default async function OrdersDashboardPage() {
           </Link>
         </div>
 
-        <OrderBoard initialOrders={initial.orders} initialHasMore={initial.hasMore} />
+        <OrderBoard
+          initialOrders={initial.orders}
+          initialHasMore={initial.hasMore}
+          canManageOrders={canManageOrders}
+        />
       </div>
     </main>
   );

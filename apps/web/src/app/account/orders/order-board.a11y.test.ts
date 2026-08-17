@@ -27,4 +27,14 @@ describe("order board color contrast (WCAG AA)", () => {
     const result = validateContrastRatio(colors.neutral[900], colors.neutral[0]);
     expect(result.passesAA).toBe(true);
   });
+
+  it("ticket #28: status-change action button text (white) on its brand-600 background passes AA", () => {
+    const result = validateContrastRatio(colors.neutral[0], colors.brand[600]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("ticket #28: transition-error alert text (danger-600) on its neutral-0 background passes AA", () => {
+    const result = validateContrastRatio(colors.danger[600], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
 });
