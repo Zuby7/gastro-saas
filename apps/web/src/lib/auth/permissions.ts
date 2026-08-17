@@ -8,6 +8,7 @@ export type PermissionKey =
   | "menu.write"
   | "menu.publish"
   | "orders.cancel"
+  | "orders.read"
   | "payments.read"
   | "payments.refund"
   | "payments.connect"
@@ -42,4 +43,27 @@ export async function requireTenantPermission(
   if (error) {
     throw new PermissionDeniedError(tenantId, permission);
   }
+}
+
+/**
+ * Non-throwing permission check (Epic 8 Opus batch review, finding 7): used
+ * where a missing permission should narrow a response rather than deny the
+ * whole request -- e.g. the staff order dashboard, which every `orders.read`
+ * holder (including Kitchen/Service) may view, but only a `payments.read`
+ * holder should see revenue figures within.
+ */
+export async function hasTenantPermission(
+  supabase: SupabaseClient,
+  tenantId: string,
+  permission: PermissionKey,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("has_tenant_permission", {
+    p_tenant_id: tenantId,
+    p_permission_key: permission,
+  });
+
+  if (error) {
+    return false;
+  }
+  return Boolean(data);
 }
