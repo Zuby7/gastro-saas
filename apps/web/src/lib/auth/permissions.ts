@@ -10,6 +10,7 @@ export type PermissionKey =
   | "menu.availability.manage"
   | "orders.cancel"
   | "orders.read"
+  | "orders.manage"
   | "payments.read"
   | "payments.refund"
   | "payments.connect"
