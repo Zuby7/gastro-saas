@@ -7,6 +7,7 @@ export type PermissionKey =
   | "tenant.settings.write"
   | "menu.write"
   | "menu.publish"
+  | "menu.availability.manage"
   | "orders.cancel"
   | "orders.read"
   | "orders.manage"
@@ -47,11 +48,19 @@ export async function requireTenantPermission(
 }
 
 /**
- * Non-throwing permission check (Epic 8 Opus batch review, finding 7): used
- * where a missing permission should narrow a response rather than deny the
- * whole request -- e.g. the staff order dashboard, which every `orders.read`
- * holder (including Kitchen/Service) may view, but only a `payments.read`
- * holder should see revenue figures within.
+ * Non-throwing permission check, for UI gating decisions (e.g. "show the
+ * availability toggle") where a denial is an expected, silent case rather
+ * than an error path -- unlike `requireTenantPermission`, which is for
+ * mutation/read gates that should hard-fail. This is never itself an
+ * authorization check: any mutation this informs still calls
+ * `requireTenantPermission` (or an RPC that does so server-side) before
+ * writing.
+ *
+ * Also used (Epic 8 Opus batch review, finding 7) where a missing permission
+ * should narrow a response rather than deny the whole request -- e.g. the
+ * staff order dashboard, which every `orders.read` holder (including
+ * Kitchen/Service) may view, but only a `payments.read` holder should see
+ * revenue figures within.
  */
 export async function hasTenantPermission(
   supabase: SupabaseClient,

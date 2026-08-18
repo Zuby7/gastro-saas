@@ -10,6 +10,7 @@ import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-e
 import {
   ALLOWED_IMAGE_TYPES,
   AssignmentEntitySchema,
+  AvailabilitySchema,
   DishBasicsSchema,
   IMAGE_EXTENSION_BY_MIME,
   LookupNameSchema,
@@ -82,9 +83,50 @@ async function ensurePermission(
   }
 }
 
+async function ensureAvailabilityPermission(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  tenantId: string,
+): Promise<DishActionState | null> {
+  try {
+    await requireTenantPermission(supabase, tenantId, "menu.availability.manage");
+    return null;
+  } catch (error) {
+    if (error instanceof PermissionDeniedError) {
+      return {
+        error: "Sie haben nicht die erforderliche Berechtigung, die Verfügbarkeit zu ändern.",
+      };
+    }
+    throw error;
+  }
+}
+
 function revalidateDish(dishId: string) {
   revalidatePath(`/account/menu/dishes/${dishId}`);
   revalidatePath("/account/menu");
+}
+
+/**
+ * Ticket #29: parses the shared availability form fields (isAvailable +
+ * optional availableAgainAt datetime-local string) once for all three
+ * toggle actions below. Returns null on a validation failure.
+ */
+function parseAvailabilityInput(
+  formData: FormData,
+): { isAvailable: boolean; availableAgainAt: string | null } | null {
+  const parsed = AvailabilitySchema.safeParse({
+    isAvailable: formData.get("isAvailable"),
+    availableAgainAt: formData.get("availableAgainAt") ?? "",
+  });
+
+  if (!parsed.success) {
+    return null;
+  }
+
+  const availableAgainAt = parsed.data.availableAgainAt
+    ? new Date(parsed.data.availableAgainAt).toISOString()
+    : null;
+
+  return { isAvailable: parsed.data.isAvailable, availableAgainAt };
 }
 
 export async function updateDishBasicsAction(
@@ -155,6 +197,128 @@ export async function setAllergenReviewedAction(
 
   revalidateDish(dishId);
   return { success: reviewed ? "Als geprüft markiert." : "Prüfstatus zurückgesetzt." };
+}
+
+/**
+ * Ticket #29 ("Ausverkauft-Steuerung"): marks a dish itself sold out /
+ * available again, with an optional scheduled re-availability timestamp.
+ * Gated on `menu.availability.manage` (Owner/Manager/Kitchen/Service), NOT
+ * `menu.write` -- Kitchen/Service can toggle availability without full menu
+ * edit rights. Goes through `set_dish_availability()` (SECURITY DEFINER,
+ * re-checks the permission itself server-side, and is the only path allowed
+ * to write these two columns without also requiring `menu.write` -- see
+ * that migration's header comment) rather than a raw table `.update()`.
+ */
+export async function setDishAvailabilityAction(
+  _prevState: DishActionState,
+  formData: FormData,
+): Promise<DishActionState> {
+  const dishId = String(formData.get("dishId") ?? "");
+  const input = parseAvailabilityInput(formData);
+  if (!dishId || !input) return { error: "Ungültige Eingabe." };
+
+  const { supabase, tenantId, user } = await requireMenuWriteContext();
+  const denied = await ensureAvailabilityPermission(supabase, tenantId);
+  if (denied) return denied;
+
+  const { error } = await supabase.rpc("set_dish_availability", {
+    p_dish_id: dishId,
+    p_tenant_id: tenantId,
+    p_is_available: input.isAvailable,
+    p_available_again_at: input.availableAgainAt,
+  });
+
+  if (error) {
+    return { error: "Die Verfügbarkeit konnte nicht gespeichert werden." };
+  }
+
+  await recordMenuAdminAuditEvent(supabase, {
+    tenantId,
+    actorUserId: user?.id ?? null,
+    action: input.isAvailable ? "dish.marked_available" : "dish.marked_sold_out",
+    targetType: "dish",
+    targetId: dishId,
+    metadata: { isAvailable: input.isAvailable, availableAgainAt: input.availableAgainAt },
+  });
+
+  revalidateDish(dishId);
+  return { success: input.isAvailable ? "Als verfügbar markiert." : "Als ausverkauft markiert." };
+}
+
+/** Ticket #29: same as `setDishAvailabilityAction`, for one variant. */
+export async function setDishVariantAvailabilityAction(
+  _prevState: DishActionState,
+  formData: FormData,
+): Promise<DishActionState> {
+  const dishId = String(formData.get("dishId") ?? "");
+  const variantId = String(formData.get("variantId") ?? "");
+  const input = parseAvailabilityInput(formData);
+  if (!dishId || !variantId || !input) return { error: "Ungültige Eingabe." };
+
+  const { supabase, tenantId, user } = await requireMenuWriteContext();
+  const denied = await ensureAvailabilityPermission(supabase, tenantId);
+  if (denied) return denied;
+
+  const { error } = await supabase.rpc("set_dish_variant_availability", {
+    p_variant_id: variantId,
+    p_tenant_id: tenantId,
+    p_is_available: input.isAvailable,
+    p_available_again_at: input.availableAgainAt,
+  });
+
+  if (error) {
+    return { error: "Die Verfügbarkeit konnte nicht gespeichert werden." };
+  }
+
+  await recordMenuAdminAuditEvent(supabase, {
+    tenantId,
+    actorUserId: user?.id ?? null,
+    action: input.isAvailable ? "dish_variant.marked_available" : "dish_variant.marked_sold_out",
+    targetType: "dish_variant",
+    targetId: variantId,
+    metadata: { isAvailable: input.isAvailable, availableAgainAt: input.availableAgainAt },
+  });
+
+  revalidateDish(dishId);
+  return { success: input.isAvailable ? "Als verfügbar markiert." : "Als ausverkauft markiert." };
+}
+
+/** Ticket #29: same as `setDishAvailabilityAction`, for one option. */
+export async function setOptionAvailabilityAction(
+  _prevState: DishActionState,
+  formData: FormData,
+): Promise<DishActionState> {
+  const dishId = String(formData.get("dishId") ?? "");
+  const optionId = String(formData.get("optionId") ?? "");
+  const input = parseAvailabilityInput(formData);
+  if (!dishId || !optionId || !input) return { error: "Ungültige Eingabe." };
+
+  const { supabase, tenantId, user } = await requireMenuWriteContext();
+  const denied = await ensureAvailabilityPermission(supabase, tenantId);
+  if (denied) return denied;
+
+  const { error } = await supabase.rpc("set_option_availability", {
+    p_option_id: optionId,
+    p_tenant_id: tenantId,
+    p_is_available: input.isAvailable,
+    p_available_again_at: input.availableAgainAt,
+  });
+
+  if (error) {
+    return { error: "Die Verfügbarkeit konnte nicht gespeichert werden." };
+  }
+
+  await recordMenuAdminAuditEvent(supabase, {
+    tenantId,
+    actorUserId: user?.id ?? null,
+    action: input.isAvailable ? "option.marked_available" : "option.marked_sold_out",
+    targetType: "option",
+    targetId: optionId,
+    metadata: { isAvailable: input.isAvailable, availableAgainAt: input.availableAgainAt },
+  });
+
+  revalidateDish(dishId);
+  return { success: input.isAvailable ? "Als verfügbar markiert." : "Als ausverkauft markiert." };
 }
 
 export async function createVariantAction(
