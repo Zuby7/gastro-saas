@@ -9,6 +9,7 @@ export type PermissionKey =
   | "menu.publish"
   | "menu.availability.manage"
   | "orders.cancel"
+  | "orders.read"
   | "payments.read"
   | "payments.refund"
   | "payments.connect"
@@ -53,6 +54,12 @@ export async function requireTenantPermission(
  * authorization check: any mutation this informs still calls
  * `requireTenantPermission` (or an RPC that does so server-side) before
  * writing.
+ *
+ * Also used (Epic 8 Opus batch review, finding 7) where a missing permission
+ * should narrow a response rather than deny the whole request -- e.g. the
+ * staff order dashboard, which every `orders.read` holder (including
+ * Kitchen/Service) may view, but only a `payments.read` holder should see
+ * revenue figures within.
  */
 export async function hasTenantPermission(
   supabase: SupabaseClient,
@@ -64,5 +71,8 @@ export async function hasTenantPermission(
     p_permission_key: permission,
   });
 
-  return !error && data === true;
+  if (error) {
+    return false;
+  }
+  return Boolean(data);
 }
