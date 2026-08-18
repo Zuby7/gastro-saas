@@ -97,10 +97,12 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
     expect(result.rows.map((row) => row.key)).toEqual([
       "analytics.read",
       "audit.read",
+      "menu.availability.manage",
       "menu.publish",
       "menu.read",
       "menu.write",
       "orders.cancel",
+      "orders.manage",
       "orders.read",
       "payments.connect",
       "payments.read",
@@ -110,6 +112,85 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
       "users.invite",
       "users.manage",
     ]);
+  });
+
+  // Regression test for the Epic 8 Opus batch review, CRITICAL finding 1:
+  // 20260817110000_dish_option_availability_and_scheduling.sql's
+  // `create or replace function seed_standard_roles_for_tenant()` was
+  // reconstructed from an older version of the function and silently
+  // dropped orders.read/orders.manage (added by sibling tickets #27/#28) and
+  // menu.read (an older residual gap) from every newly created tenant's
+  // default grants.
+  // 20260817120000_fix_seed_standard_roles_permission_regression.sql fixes
+  // this -- pin the exact expected grant set per system role here so any
+  // future accidental drop is caught immediately by this test, not by an
+  // Opus review cycle later.
+  it("grants the exact expected default permission set per system role for a freshly seeded tenant", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+
+    const result = await admin.query<{ role_key: string; permission_key: string }>(
+      `select r.key as role_key, rp.permission_key
+         from roles r
+         join role_permissions rp on rp.role_id = r.id
+        where r.tenant_id = $1
+        order by r.key, rp.permission_key`,
+      [tenantA.tenantId],
+    );
+
+    const grantsByRole = new Map<string, string[]>();
+    for (const row of result.rows) {
+      const bucket = grantsByRole.get(row.role_key) ?? [];
+      bucket.push(row.permission_key);
+      grantsByRole.set(row.role_key, bucket);
+    }
+
+    const allPermissions = await admin.query<{ key: string }>(
+      `select key from permissions order by key`,
+    );
+
+    expect(grantsByRole.get("owner")).toEqual(allPermissions.rows.map((row) => row.key));
+
+    expect(grantsByRole.get("manager")).toEqual(
+      [
+        "analytics.read",
+        "audit.read",
+        "menu.availability.manage",
+        "menu.publish",
+        "menu.read",
+        "orders.cancel",
+        "orders.manage",
+        "orders.read",
+        "payments.read",
+        "payments.refund",
+        "users.invite",
+        "users.manage",
+      ].sort(),
+    );
+
+    expect(grantsByRole.get("kitchen")).toEqual(
+      [
+        "menu.availability.manage",
+        "menu.read",
+        "orders.cancel",
+        "orders.manage",
+        "orders.read",
+      ].sort(),
+    );
+
+    expect(grantsByRole.get("service")).toEqual(
+      [
+        "menu.availability.manage",
+        "menu.read",
+        "orders.cancel",
+        "orders.manage",
+        "orders.read",
+      ].sort(),
+    );
+
+    expect(grantsByRole.get("marketing")).toEqual(
+      ["analytics.read", "menu.publish", "menu.read"].sort(),
+    );
   });
 
   it("grants Owner all permissions and denies Kitchen revenue/analytics reads", async () => {

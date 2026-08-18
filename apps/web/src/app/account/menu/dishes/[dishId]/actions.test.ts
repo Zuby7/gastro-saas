@@ -314,3 +314,86 @@ describe("uploadDishImageAction", () => {
     expect(uploadedPath.startsWith("tenant-1/")).toBe(true);
   });
 });
+
+describe("setDishAvailabilityAction", () => {
+  it("denies the toggle when the caller lacks menu.availability.manage", async () => {
+    denyPermission();
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("isAvailable", "false");
+    fd.set("availableAgainAt", "");
+
+    const { setDishAvailabilityAction } = await import("./actions");
+    const result = await setDishAvailabilityAction({}, fd);
+
+    expect(result.error).toContain("nicht die erforderliche Berechtigung");
+    expect(rpcMock).not.toHaveBeenCalledWith("set_dish_availability", expect.anything());
+  });
+
+  it("calls set_dish_availability with the parsed availability fields and records an audit event", async () => {
+    let auditRow: Record<string, unknown> | undefined;
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") return membershipTable();
+      if (table === "audit_logs") {
+        return {
+          insert: async (row: Record<string, unknown>) => {
+            auditRow = row;
+            return { error: null };
+          },
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+    rpcMock.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn === "require_tenant_permission") return { data: null, error: null };
+      if (fn === "set_dish_availability") {
+        expect(args).toMatchObject({
+          p_dish_id: "dish-1",
+          p_tenant_id: "tenant-1",
+          p_is_available: false,
+          p_available_again_at: null,
+        });
+        return { data: null, error: null };
+      }
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("isAvailable", "false");
+    fd.set("availableAgainAt", "");
+
+    const { setDishAvailabilityAction } = await import("./actions");
+    const result = await setDishAvailabilityAction({}, fd);
+
+    expect(result.success).toBeDefined();
+    expect(auditRow).toMatchObject({
+      tenant_id: "tenant-1",
+      action: "dish.marked_sold_out",
+      target_type: "dish",
+      target_id: "dish-1",
+    });
+  });
+
+  it("returns an error when set_dish_availability fails", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") return membershipTable();
+      throw new Error(`unexpected table: ${table}`);
+    });
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "require_tenant_permission") return { data: null, error: null };
+      if (fn === "set_dish_availability") return { data: null, error: { message: "not found" } };
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("isAvailable", "true");
+    fd.set("availableAgainAt", "");
+
+    const { setDishAvailabilityAction } = await import("./actions");
+    const result = await setDishAvailabilityAction({}, fd);
+
+    expect(result.error).toBeDefined();
+  });
+});
