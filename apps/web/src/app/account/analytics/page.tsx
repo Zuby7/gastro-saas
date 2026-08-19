@@ -96,6 +96,13 @@ export default async function AnalyticsDashboardPage() {
           Topseller &amp; Low Performer ansehen
         </Link>
 
+        <Link
+          href="/account/analytics/trends"
+          className="w-fit text-sm font-medium text-link-foreground underline hover:text-brand-700"
+        >
+          Trends &amp; Extras ansehen
+        </Link>
+
         <div
           className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
           role="list"
