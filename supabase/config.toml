@@ -64,8 +64,16 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# Epic 8 Opus batch review, finding 8: disabled on purpose. seed.sql now
+# refuses to run at all unless the caller's own session has explicitly set
+# `gastro_saas.allow_demo_seed = 'on'` (see that file's own guard comment) --
+# the CLI's built-in auto-seed step has no way to set that first, so it
+# would just fail every time it ran. Local seeding goes through
+# `pnpm --filter database db:reset`/`db:seed` instead (`supabase db reset
+# --no-seed` + packages/database/scripts/run-local-seed.mjs, a small
+# companion script that opens its own session, sets the opt-in, and runs
+# seed.sql in it) -- see docs/decisions/assumptions.md.
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]

@@ -262,7 +262,11 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
     expect(itemsRow.rows[0].quantity).toBe(2);
 
     const selectionsRow = await admin.query(
-      `select option_name_snapshot, price_delta_cents_snapshot from order_item_selections`,
+      `select s.option_name_snapshot, s.price_delta_cents_snapshot
+         from order_item_selections s
+         join order_items i on i.id = s.order_item_id
+        where i.order_id = $1`,
+      [order.orderId],
     );
     expect(selectionsRow.rows).toHaveLength(1);
     expect(selectionsRow.rows[0].option_name_snapshot).toBe("Extra Käse");
@@ -313,7 +317,11 @@ describe.skipIf(!dbAvailable)("orders: state machine + checkout (ticket #21)", (
     expect(itemsRow.rows[0].unit_price_cents_snapshot).toBe(1200);
 
     const selectionsRow = await admin.query(
-      `select option_name_snapshot, price_delta_cents_snapshot from order_item_selections`,
+      `select s.option_name_snapshot, s.price_delta_cents_snapshot
+         from order_item_selections s
+         join order_items i on i.id = s.order_item_id
+        where i.order_id = $1`,
+      [order.orderId],
     );
     expect(selectionsRow.rows[0].option_name_snapshot).toBe("Extra Käse");
     expect(selectionsRow.rows[0].price_delta_cents_snapshot).toBe(150);

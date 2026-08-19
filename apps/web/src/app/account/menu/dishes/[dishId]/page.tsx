@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
+import { hasTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { DishBasicsForm } from "./dish-basics-form";
 import { VariantsSection, type VariantRecord } from "./variants-section";
@@ -21,12 +21,22 @@ interface DishRow {
   price_cents: number | null;
   allergen_reviewed: boolean;
   media_asset_id: string | null;
+  is_available: boolean;
+  available_again_at: string | null;
 }
 
 /**
  * Ticket #13/#14 admin surface: per-dish editor for variants, option
  * groups/extras, allergen/additive/dietary-label assignment, and image
- * upload. Gated on `menu.write` server-side.
+ * upload.
+ *
+ * Ticket #29: entry to this page now also accepts `menu.availability.manage`
+ * (held by Kitchen/Service, who don't have `menu.write`) in addition to
+ * `menu.write` -- those roles only get to see/use the availability toggles
+ * (`canEditMenu` gates the rest of the editing UI below; the individual
+ * server actions each still re-check their own required permission
+ * server-side, so this page-level gate is a UX convenience, not the
+ * authorization boundary).
  */
 export default async function DishPage({ params }: DishPageProps) {
   const { dishId } = await params;
@@ -44,30 +54,32 @@ export default async function DishPage({ params }: DishPageProps) {
     redirect("/account");
   }
 
-  try {
-    await requireTenantPermission(supabase, membership.tenantId, "menu.write");
-  } catch (error) {
-    if (error instanceof PermissionDeniedError) {
-      return (
-        <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-neutral-50 p-8">
-          <p role="alert" className="text-foreground">
-            Sie haben nicht die erforderliche Berechtigung, um dieses Gericht zu bearbeiten.
-          </p>
-          <Link
-            href="/account/menu"
-            className="font-medium text-link-foreground underline hover:text-brand-700"
-          >
-            Zurück
-          </Link>
-        </main>
-      );
-    }
-    throw error;
+  const [canEditMenu, canManageAvailability] = await Promise.all([
+    hasTenantPermission(supabase, membership.tenantId, "menu.write"),
+    hasTenantPermission(supabase, membership.tenantId, "menu.availability.manage"),
+  ]);
+
+  if (!canEditMenu && !canManageAvailability) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-neutral-50 p-8">
+        <p role="alert" className="text-foreground">
+          Sie haben nicht die erforderliche Berechtigung, um dieses Gericht zu bearbeiten.
+        </p>
+        <Link
+          href="/account/menu"
+          className="font-medium text-link-foreground underline hover:text-brand-700"
+        >
+          Zurück
+        </Link>
+      </main>
+    );
   }
 
   const { data: dish } = await supabase
     .from("dishes")
-    .select("id, category_id, name, description, price_cents, allergen_reviewed, media_asset_id")
+    .select(
+      "id, category_id, name, description, price_cents, allergen_reviewed, media_asset_id, is_available, available_again_at",
+    )
     .eq("id", dishId)
     .eq("tenant_id", membership.tenantId)
     .maybeSingle<DishRow>();
@@ -90,7 +102,7 @@ export default async function DishPage({ params }: DishPageProps) {
   ] = await Promise.all([
     supabase
       .from("dish_variants")
-      .select("id, name, price_cents")
+      .select("id, name, price_cents, is_available, available_again_at")
       .eq("dish_id", dishId)
       .order("sort_order")
       .returns<VariantRecord[]>(),
@@ -102,11 +114,18 @@ export default async function DishPage({ params }: DishPageProps) {
       .returns<{ id: string; name: string; min_selections: number; max_selections: number }[]>(),
     supabase
       .from("options")
-      .select("id, option_group_id, name, price_delta_cents")
+      .select("id, option_group_id, name, price_delta_cents, is_available, available_again_at")
       .eq("tenant_id", membership.tenantId)
       .order("sort_order")
       .returns<
-        { id: string; option_group_id: string; name: string; price_delta_cents: number }[]
+        {
+          id: string;
+          option_group_id: string;
+          name: string;
+          price_delta_cents: number;
+          is_available: boolean;
+          available_again_at: string | null;
+        }[]
       >(),
     supabase
       .from("dish_option_group_assignments")
@@ -150,11 +169,23 @@ export default async function DishPage({ params }: DishPageProps) {
 
   const optionsByGroup = new Map<
     string,
-    { id: string; name: string; price_delta_cents: number }[]
+    {
+      id: string;
+      name: string;
+      price_delta_cents: number;
+      is_available: boolean;
+      available_again_at: string | null;
+    }[]
   >();
   for (const option of options ?? []) {
     const bucket = optionsByGroup.get(option.option_group_id) ?? [];
-    bucket.push({ id: option.id, name: option.name, price_delta_cents: option.price_delta_cents });
+    bucket.push({
+      id: option.id,
+      name: option.name,
+      price_delta_cents: option.price_delta_cents,
+      is_available: option.is_available,
+      available_again_at: option.available_again_at,
+    });
     optionsByGroup.set(option.option_group_id, bucket);
   }
 
@@ -226,43 +257,60 @@ export default async function DishPage({ params }: DishPageProps) {
           description={dish.description}
           priceCents={dish.price_cents}
           allergenReviewed={dish.allergen_reviewed}
+          isAvailable={dish.is_available}
+          availableAgainAt={dish.available_again_at}
+          canEditMenu={canEditMenu}
+          canManageAvailability={canManageAvailability}
         />
 
-        <ImageUploadForm
+        {canEditMenu ? (
+          <ImageUploadForm
+            dishId={dish.id}
+            currentImageUrl={currentImageUrl}
+            currentAltText={currentAltText}
+          />
+        ) : null}
+
+        <VariantsSection
           dishId={dish.id}
-          currentImageUrl={currentImageUrl}
-          currentAltText={currentAltText}
+          variants={variants ?? []}
+          canEditMenu={canEditMenu}
+          canManageAvailability={canManageAvailability}
         />
-
-        <VariantsSection dishId={dish.id} variants={variants ?? []} />
 
         <OptionGroupsSection
           dishId={dish.id}
           allOptionGroups={allOptionGroups}
           assignedGroupIds={assignedGroupIds}
+          canEditMenu={canEditMenu}
+          canManageAvailability={canManageAvailability}
         />
 
-        <AssignableLookupSection
-          dishId={dish.id}
-          entity="allergen"
-          heading="Allergene"
-          newItemLabel="Neues Allergen"
-          items={allergenItems}
-        />
-        <AssignableLookupSection
-          dishId={dish.id}
-          entity="additive"
-          heading="Zusatzstoffe"
-          newItemLabel="Neuer Zusatzstoff"
-          items={additiveItems}
-        />
-        <AssignableLookupSection
-          dishId={dish.id}
-          entity="dietary_label"
-          heading="Ernährungslabels"
-          newItemLabel="Neues Label"
-          items={dietaryLabelItems}
-        />
+        {canEditMenu ? (
+          <>
+            <AssignableLookupSection
+              dishId={dish.id}
+              entity="allergen"
+              heading="Allergene"
+              newItemLabel="Neues Allergen"
+              items={allergenItems}
+            />
+            <AssignableLookupSection
+              dishId={dish.id}
+              entity="additive"
+              heading="Zusatzstoffe"
+              newItemLabel="Neuer Zusatzstoff"
+              items={additiveItems}
+            />
+            <AssignableLookupSection
+              dishId={dish.id}
+              entity="dietary_label"
+              heading="Ernährungslabels"
+              newItemLabel="Neues Label"
+              items={dietaryLabelItems}
+            />
+          </>
+        ) : null}
       </div>
     </main>
   );
