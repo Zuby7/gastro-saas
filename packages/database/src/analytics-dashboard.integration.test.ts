@@ -459,6 +459,80 @@ describe.skipIf(!dbAvailable)("get_analytics_dashboard_summary() (ticket #30)", 
     expect(summary.grossRevenueTodayCents).toBe(5500);
   });
 
+  it("excludes a payment made just after local midnight on the far side of the spring-forward transition from the PREVIOUS local day's summary (day_end must be computed via local calendar arithmetic, not a fixed 24h offset)", async () => {
+    const seed = await seedFixtureWithManager();
+    fixture = seed.fixture;
+    await admin.query(
+      `insert into restaurant_profiles (tenant_id, display_name, timezone) values ($1, 'Test Restaurant', 'Europe/Berlin')`,
+      [fixture.tenantA.tenantId],
+    );
+    const accountId = await ensurePaymentAccount(admin, fixture.tenantA.tenantId);
+
+    // 2026-03-29T22:30:00Z = 2026-03-30T00:30:00+02:00 (CEST) -- i.e. just
+    // after local midnight, already on the local calendar day 2026-03-30.
+    // 2026-03-29 is the spring-forward day itself (only 23h long in local
+    // wall-clock time: 02:00 -> 03:00 CEST). A buggy `day_start + interval
+    // '1 day'` day_end (fixed 24h in UTC) would incorrectly place this
+    // payment's day_end boundary one hour too late and wrongly include it
+    // in the 2026-03-29 summary.
+    const orderId = await seedOrder(admin, {
+      tenantId: fixture.tenantA.tenantId,
+      totalCents: 6600,
+    });
+    await seedPayment(admin, accountId, {
+      tenantId: fixture.tenantA.tenantId,
+      orderId,
+      amountCents: 6600,
+      status: "paid",
+      createdAt: new Date("2026-03-29T22:30:00Z"),
+    });
+
+    const summary = await getSummary(
+      seed.managerId,
+      fixture.tenantA.tenantId,
+      new Date("2026-03-29T12:00:00Z"),
+    );
+
+    expect(summary.paidOrdersTodayCount).toBe(0);
+    expect(summary.grossRevenueTodayCents).toBe(0);
+  });
+
+  it("includes a payment made late in the local day during the fall-back transition (the local day is 25h long, so day_end must extend an hour past a fixed 24h offset)", async () => {
+    const seed = await seedFixtureWithManager();
+    fixture = seed.fixture;
+    await admin.query(
+      `insert into restaurant_profiles (tenant_id, display_name, timezone) values ($1, 'Test Restaurant', 'Europe/Berlin')`,
+      [fixture.tenantA.tenantId],
+    );
+    const accountId = await ensurePaymentAccount(admin, fixture.tenantA.tenantId);
+
+    // 2026-10-25T22:30:00Z = 2026-10-25T23:30:00+01:00 (CET, after the
+    // fall-back) -- still within the local calendar day 2026-10-25, which is
+    // 25h long (03:00 -> 02:00 CET). A buggy `day_start + interval '1 day'`
+    // day_end (fixed 24h in UTC) would end the "today" window one hour too
+    // early and wrongly EXCLUDE this payment from the 2026-10-25 summary.
+    const orderId = await seedOrder(admin, {
+      tenantId: fixture.tenantA.tenantId,
+      totalCents: 7700,
+    });
+    await seedPayment(admin, accountId, {
+      tenantId: fixture.tenantA.tenantId,
+      orderId,
+      amountCents: 7700,
+      status: "paid",
+      createdAt: new Date("2026-10-25T22:30:00Z"),
+    });
+
+    const summary = await getSummary(
+      seed.managerId,
+      fixture.tenantA.tenantId,
+      new Date("2026-10-25T12:00:00Z"),
+    );
+
+    expect(summary.paidOrdersTodayCount).toBe(1);
+    expect(summary.grossRevenueTodayCents).toBe(7700);
+  });
+
   it("denies a member without analytics.read (permission-denied case)", async () => {
     const seed = await seedFixtureWithManager();
     fixture = seed.fixture;

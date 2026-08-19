@@ -66,6 +66,31 @@ export const LookupNameSchema = z.object({
 export const AssignmentEntitySchema = z.enum(["allergen", "additive", "dietary_label"]);
 export type AssignmentEntity = z.infer<typeof AssignmentEntitySchema>;
 
+/**
+ * Ticket #29: shared shape for the dish/variant/option availability toggle
+ * forms. `availableAgainAt` is an optional `datetime-local` input value
+ * (empty string means "no schedule, is_available is the sole source of
+ * truth" -- see the migration header comment for the exact evaluation
+ * rule); when provided it's parsed as a local wall-clock time and converted
+ * to an ISO timestamp before being sent to the RPC.
+ */
+export const AvailabilitySchema = z.object({
+  // NOT z.coerce.boolean(): that coerces via JS `Boolean(value)`, so the
+  // literal string "false" (truthy as a non-empty string) would coerce to
+  // `true` -- exactly backwards for a hidden `<input value="false">`. Parse
+  // the two literal string values this form ever sends instead.
+  isAvailable: z.enum(["true", "false"]).transform((value) => value === "true"),
+  availableAgainAt: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .refine(
+      (value) => !value || !Number.isNaN(new Date(value).getTime()),
+      "Bitte geben Sie ein gültiges Datum/Uhrzeit an.",
+    ),
+});
+
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 

@@ -90,6 +90,13 @@ export default async function AnalyticsDashboardPage() {
         </p>
 
         <Link
+          href="/account/analytics/dishes"
+          className="w-fit text-sm font-medium text-link-foreground underline hover:text-brand-700"
+        >
+          Topseller &amp; Low Performer ansehen
+        </Link>
+
+        <Link
           href="/account/analytics/trends"
           className="w-fit text-sm font-medium text-link-foreground underline hover:text-brand-700"
         >

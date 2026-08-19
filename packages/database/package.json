@@ -10,7 +10,8 @@
     "test:integration": "vitest run",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
-    "db:reset": "supabase db reset",
+    "db:reset": "supabase db reset --no-seed && node ./scripts/run-local-seed.mjs",
+    "db:seed": "node ./scripts/run-local-seed.mjs",
     "db:lint": "supabase db lint"
   },
   "devDependencies": {
