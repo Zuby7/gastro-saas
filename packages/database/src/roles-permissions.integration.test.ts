@@ -110,6 +110,7 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
       "reviews.moderate",
       "reviews.read",
       "roles.manage",
+      "tenant.data.delete",
       "tenant.settings.write",
       "users.invite",
       "users.manage",
