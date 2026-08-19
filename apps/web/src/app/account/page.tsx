@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { roleLabel } from "@/lib/auth/role-labels";
@@ -95,6 +96,15 @@ export default async function AccountPage() {
         />
       ) : null}
       {membership ? <InviteMemberForm roles={roles ?? []} /> : null}
+
+      {membership ? (
+        <Link
+          href="/account/privacy"
+          className="w-fit text-sm font-medium text-link-foreground underline hover:text-brand-700"
+        >
+          Datenschutz-Einstellungen (Export/Loeschantrag)
+        </Link>
+      ) : null}
 
       <form action={logoutAction}>
         <button

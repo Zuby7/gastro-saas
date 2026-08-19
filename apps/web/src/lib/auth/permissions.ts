@@ -5,6 +5,7 @@ export type PermissionKey =
   | "users.manage"
   | "roles.manage"
   | "tenant.settings.write"
+  | "tenant.data.delete"
   | "menu.write"
   | "menu.publish"
   | "menu.availability.manage"
