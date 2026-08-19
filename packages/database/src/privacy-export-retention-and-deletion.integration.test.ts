@@ -70,6 +70,10 @@ describe.skipIf(!dbAvailable)(
           fixture.tenantA.tenantId,
           fixture.tenantB.tenantId,
         ]);
+        await admin.query(`delete from payment_accounts where tenant_id in ($1, $2)`, [
+          fixture.tenantA.tenantId,
+          fixture.tenantB.tenantId,
+        ]);
       }
       await fixture?.cleanup();
     });
@@ -534,6 +538,16 @@ describe.skipIf(!dbAvailable)(
       oldOrderCutoff.setFullYear(oldOrderCutoff.getFullYear() - 12);
       const oldOrderId = await seedOrder(tenantA.tenantId, { createdAt: oldOrderCutoff });
 
+      // `ensure_payment_matches_order()` requires payments.stripe_account_id
+      // to match the tenant's own connected account in payment_accounts.
+      const stripeAccountId = `acct_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+      await admin.query(
+        `insert into payment_accounts (tenant_id, stripe_account_id, status, charges_enabled, payouts_enabled)
+         values ($1, $2, 'enabled', true, true)
+         on conflict (tenant_id) do update set stripe_account_id = excluded.stripe_account_id, charges_enabled = true`,
+        [tenantA.tenantId, stripeAccountId],
+      );
+
       const paymentId = randomUUID();
       await admin.query(
         `insert into payments (
@@ -545,7 +559,7 @@ describe.skipIf(!dbAvailable)(
           tenantA.tenantId,
           oldOrderId,
           `cs_test_${paymentId.replace(/-/g, "")}`,
-          "acct_test123456789",
+          stripeAccountId,
           1500,
           "EUR",
           "paid",
