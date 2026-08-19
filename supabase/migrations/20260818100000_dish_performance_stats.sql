@@ -106,9 +106,25 @@ begin
         from public.dishes d
         left join lateral (
           select sum(oi.quantity)::int as units_sold,
-                 sum(oi.quantity * oi.unit_price_cents_snapshot)::bigint as revenue_cents
+                 -- Revenue includes both the base price (unit_price_cents_snapshot,
+                 -- multiplied by quantity) AND each order item's selected
+                 -- paid options/extras (order_item_selections.price_delta_cents_snapshot,
+                 -- also multiplied by quantity -- an extra applies per unit
+                 -- of the dish ordered). Without the selections contribution
+                 -- this figure would silently under-count revenue and not
+                 -- reconcile with the payments-derived dashboard total (#30).
+                 sum(
+                   oi.quantity * oi.unit_price_cents_snapshot
+                   + oi.quantity * coalesce(sel.selections_total, 0)
+                 )::bigint as revenue_cents
             from public.order_items oi
             join public.orders o on o.id = oi.order_id
+            left join lateral (
+              select sum(ois.price_delta_cents_snapshot)::bigint as selections_total
+                from public.order_item_selections ois
+               where ois.order_item_id = oi.id
+                 and ois.tenant_id = p_tenant_id
+            ) sel on true
            where oi.dish_id = d.id
              and oi.tenant_id = p_tenant_id
              -- Only orders that actually moved past the payment step count

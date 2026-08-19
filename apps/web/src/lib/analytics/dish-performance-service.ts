@@ -49,6 +49,7 @@ export async function getDishPerformanceAnalysis(
     dishName: row.dishName,
     unitsSold: row.unitsSold,
     revenueCents: row.revenueCents,
+    currency: row.currency,
     viewsCount: row.viewsCount,
     addToCartCount: row.addToCartCount,
   }));

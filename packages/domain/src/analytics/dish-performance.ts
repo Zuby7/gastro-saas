@@ -22,8 +22,10 @@ export interface DishPerformanceInput {
   dishName: string;
   /** Sum of order_items.quantity across non-cancelled, non-awaiting-payment orders in the window. */
   unitsSold: number;
-  /** Sum of quantity * unit_price_cents_snapshot across those same order_items. */
+  /** Sum of quantity * (unit_price_cents_snapshot + selected options' price_delta_cents_snapshot) across those same order_items. */
   revenueCents: number;
+  /** ISO 4217 currency code this dish's prices/revenue are denominated in (from `get_dish_performance_stats()`'s per-dish `currency`, i.e. `dishes.currency`). */
+  currency: string;
   /** Count of `dish_view` analytics_events in the window (0 if none were ever recorded -- honest, not fabricated). */
   viewsCount: number;
   /** Count of `add_to_cart` analytics_events in the window. */
@@ -142,24 +144,33 @@ export function classifyDishPerformance(
   );
 
   // Topseller: top `topsellerShare` of ALL dishes by quantity, but only
-  // among dishes that actually sold at least one unit -- a dish with zero
-  // sales is never a "topseller" merely because the list is short.
-  const dishesWithSales = byQuantity.filter((d) => d.unitsSold > 0);
+  // among dishes that actually sold at least one unit AND have accumulated
+  // at least `minSampleSize` combined evidence -- the same minimum-sample-
+  // size gate as `low_performer` (a single lucky sale, with nothing else
+  // ever recorded for that dish, must never be enough evidence to call it a
+  // "Topseller" any more than it would be enough to call it a "Low
+  // Performer"). A dish with zero sales, or with sales but insufficient
+  // overall evidence, is never a "topseller".
+  const dishesEligibleForTopseller = byQuantity.filter(
+    (d) => d.unitsSold > 0 && (evidenceCountByDishId.get(d.dishId) ?? 0) >= options.minSampleSize,
+  );
   const topsellerCount =
-    dishesWithSales.length > 0
-      ? Math.max(1, Math.ceil(dishesWithSales.length * topsellerShare))
+    dishesEligibleForTopseller.length > 0
+      ? Math.max(1, Math.ceil(dishesEligibleForTopseller.length * topsellerShare))
       : 0;
-  const topsellerDishIds = new Set(dishesWithSales.slice(0, topsellerCount).map((d) => d.dishId));
+  const topsellerDishIds = new Set(
+    dishesEligibleForTopseller.slice(0, topsellerCount).map((d) => d.dishId),
+  );
 
   return dishes.map((d) => {
     const evidenceCount = evidenceCountByDishId.get(d.dishId) ?? 0;
     const sufficientData = evidenceCount >= options.minSampleSize;
 
     let label: DishPerformanceLabel;
-    if (topsellerDishIds.has(d.dishId)) {
-      label = "topseller";
-    } else if (!sufficientData) {
+    if (!sufficientData) {
       label = "insufficient_data";
+    } else if (topsellerDishIds.has(d.dishId)) {
+      label = "topseller";
     } else if (lowPerformerDishIds.has(d.dishId)) {
       label = "low_performer";
     } else {

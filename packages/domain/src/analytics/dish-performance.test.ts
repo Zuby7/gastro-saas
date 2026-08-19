@@ -6,6 +6,7 @@ function dish(overrides: Partial<DishPerformanceInput> & { dishId: string }): Di
     dishName: overrides.dishId,
     unitsSold: 0,
     revenueCents: 0,
+    currency: "EUR",
     viewsCount: 0,
     addToCartCount: 0,
     ...overrides,
@@ -144,6 +145,25 @@ describe("classifyDishPerformance (ticket #31)", () => {
 
     expect(results.find((r) => r.dishId === "bestseller")!.label).toBe("topseller");
     expect(results.find((r) => r.dishId === "unsold")!.label).not.toBe("topseller");
+  });
+
+  it("never labels a dish 'topseller' from a single sale below the minimum sample size, even when nothing else sold (finding 8)", () => {
+    // A single lucky sale, with no other evidence for this dish and no other
+    // dish having sold anything either -- it would top the quantity ranking
+    // trivially, but must not clear the same minSampleSize gate that
+    // low_performer is held to.
+    const luckyOneSale = dish({ dishId: "lucky", unitsSold: 1 });
+    const others = Array.from({ length: 4 }, (_, i) => dish({ dishId: `nosale-${i}` }));
+
+    const results = classifyDishPerformance([luckyOneSale, ...others], {
+      minSampleSize: 10,
+      topsellerShare: 0.2,
+    });
+
+    const luckyResult = results.find((r) => r.dishId === "lucky")!;
+    expect(luckyResult.evidenceCount).toBe(1);
+    expect(luckyResult.label).not.toBe("topseller");
+    expect(luckyResult.label).toBe("insufficient_data");
   });
 
   it("returns an empty array for an empty input (honest empty state, no fabricated ranking)", () => {

@@ -99,6 +99,8 @@ interface SeedOrderItemInput {
   quantity: number;
   unitPriceCentsSnapshot: number;
   dishName: string;
+  /** Optional paid-option selections (order_item_selections), each applied once per unit of `quantity` -- mirrors real checkout snapshotting. */
+  selections?: Array<{ optionNameSnapshot: string; priceDeltaCentsSnapshot: number }>;
 }
 
 /** Seeds an order (walking the real state machine to `status`) with order_items for `items`, bypassing the cart/checkout flow (out of this ticket's scope). */
@@ -120,11 +122,19 @@ async function seedOrderWithItems(
   );
 
   for (const item of items) {
-    await admin.query(
+    const orderItemResult = await admin.query(
       `insert into order_items (tenant_id, order_id, dish_id, quantity, dish_name_snapshot, unit_price_cents_snapshot, currency)
-       values ($1, $2, $3, $4, $5, $6, 'EUR')`,
+       values ($1, $2, $3, $4, $5, $6, 'EUR') returning id`,
       [tenantId, orderId, item.dishId, item.quantity, item.dishName, item.unitPriceCentsSnapshot],
     );
+    const orderItemId = orderItemResult.rows[0]!.id as string;
+    for (const selection of item.selections ?? []) {
+      await admin.query(
+        `insert into order_item_selections (tenant_id, order_item_id, option_name_snapshot, price_delta_cents_snapshot)
+         values ($1, $2, $3, $4)`,
+        [tenantId, orderItemId, selection.optionNameSnapshot, selection.priceDeltaCentsSnapshot],
+      );
+    }
   }
 
   await admin.query(
@@ -254,6 +264,38 @@ describe.skipIf(!dbAvailable)("get_dish_performance_stats() (ticket #31)", () =>
     expect(unsold.revenueCents).toBe(0);
     expect(unsold.viewsCount).toBe(0);
     expect(unsold.addToCartCount).toBe(0);
+  });
+
+  it("includes selected paid options' price deltas in revenue, reconciling with the actual amount charged (finding 6)", async () => {
+    const seed = await seedFixtureWithManager();
+    fixture = seed.fixture;
+    const { dishIds } = await seedPublishedMenu(admin, fixture.tenantA.tenantId, [
+      { name: "Margherita" },
+    ]);
+    const dishId = dishIds[0]!;
+
+    // 2 units at 1000 cents base price, each with a +150 cents extra
+    // (e.g. extra cheese) -- total should be 2 * 1000 + 2 * 150 = 2300, not
+    // just the base-price-only 2000.
+    await seedOrderWithItems(
+      admin,
+      fixture.tenantA.tenantId,
+      [
+        {
+          dishId,
+          quantity: 2,
+          unitPriceCentsSnapshot: 1000,
+          dishName: "Margherita",
+          selections: [{ optionNameSnapshot: "Extra Käse", priceDeltaCentsSnapshot: 150 }],
+        },
+      ],
+      { status: "completed" },
+    );
+
+    const stats = await getStats(seed.managerId, fixture.tenantA.tenantId);
+    const margherita = stats.find((s) => s.dishId === dishId)!;
+    expect(margherita.unitsSold).toBe(2);
+    expect(margherita.revenueCents).toBe(2300);
   });
 
   it("excludes orders still awaiting_payment or cancelled -- those never counted as a real sale", async () => {

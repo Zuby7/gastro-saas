@@ -13,8 +13,8 @@ const LABEL_TEXT: Record<DishPerformanceLabel, string> = {
   normal: "—",
 };
 
-function formatMoney(cents: number): string {
-  return `${(cents / 100).toFixed(2)} EUR`;
+function formatMoney(cents: number, currency: string): string {
+  return `${(cents / 100).toFixed(2)} ${currency}`;
 }
 
 function formatConversion(rate: number | null): string {
@@ -112,6 +112,18 @@ export default async function DishPerformancePage() {
           </p>
         ) : (
           <>
+            {dishes.every((dish) => dish.viewsCount === 0 && dish.addToCartCount === 0) ? (
+              <p
+                role="status"
+                className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-foreground"
+              >
+                Die Spalten &quot;Aufrufe&quot; und &quot;Warenkorb-Hinzufügungen&quot; sind noch
+                nicht verfügbar: Es gibt aktuell keine Erfassung von Gericht-Aufrufen oder
+                Warenkorb-Hinzufügungen, daher zeigen diese Spalten für alle Gerichte 0 an, statt
+                einer echten Messung. Verkaufte Menge und Umsatz basieren dagegen auf echten
+                Bestelldaten und sind zuverlässig.
+              </p>
+            ) : null}
             <DishPerformanceTable
               headingId="by-quantity-heading"
               heading="Ranking nach verkaufter Menge"
@@ -179,7 +191,7 @@ function DishPerformanceTable({
               <td className="py-1">{dish.dishName}</td>
               <td className="py-1">{LABEL_TEXT[dish.label]}</td>
               <td className="py-1">{dish.unitsSold}</td>
-              <td className="py-1">{formatMoney(dish.revenueCents)}</td>
+              <td className="py-1">{formatMoney(dish.revenueCents, dish.currency)}</td>
               <td className="py-1">{dish.viewsCount}</td>
               <td className="py-1">{dish.addToCartCount}</td>
               <td className="py-1">{formatConversion(dish.conversionRate)}</td>
