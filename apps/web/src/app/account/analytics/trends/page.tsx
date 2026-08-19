@@ -18,8 +18,30 @@ const PERIOD_LABEL: Record<TrendPeriodType, string> = {
   custom: "Freier Zeitraum vs. gleich langer Vorzeitraum",
 };
 
-function formatMoney(cents: number, currency = "EUR"): string {
+function formatMoney(cents: number, currency: string): string {
   return `${(cents / 100).toFixed(2)} ${currency}`;
+}
+
+/**
+ * Maps known, expected validation failures from `get_trend_period_stats()`
+ * to fixed German messages. Never renders a raw Postgres/DB error message to
+ * the user (information disclosure) -- the raw error is logged server-side
+ * instead (see the catch block below).
+ */
+function mapTrendErrorToMessage(error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : "";
+
+  if (/p_period_type must be one of/i.test(rawMessage)) {
+    return "Ungültiger Zeitraumtyp. Bitte wählen Sie Tag, Woche, Monat oder einen freien Zeitraum.";
+  }
+  if (/p_custom_start and p_custom_end/i.test(rawMessage)) {
+    return "Bitte geben Sie ein gültiges Start- und Enddatum an (Enddatum nach Startdatum).";
+  }
+  if (/insufficient_privilege|permission/i.test(rawMessage)) {
+    return "Sie haben nicht die erforderliche Berechtigung, um diesen Zeitraumvergleich einzusehen.";
+  }
+
+  return "Der Zeitraumvergleich konnte nicht geladen werden.";
 }
 
 function formatPercent(value: number | null): string {
@@ -123,14 +145,18 @@ export default async function TrendsAndExtrasPage({
         customEnd,
       });
     } catch (error) {
-      trendError =
-        error instanceof Error
-          ? error.message
-          : "Der Zeitraumvergleich konnte nicht geladen werden.";
+      // Log the raw error server-side only -- never render a raw DB error
+      // message to the user (information disclosure).
+      console.error("[TrendsAndExtrasPage] getTrendComparison failed", error);
+      trendError = mapTrendErrorToMessage(error);
     }
   }
 
   const extras = await getExtrasPerformance(supabase, membership.tenantId);
+  // Extras revenue is denominated in the same tenant currency as the trend
+  // comparison above (both ultimately derive from `payments.currency`) --
+  // fall back to EUR only when the trend comparison itself failed/is unset.
+  const currency = trend?.currency ?? "EUR";
 
   return (
     <main className="min-h-screen bg-neutral-50">
@@ -220,9 +246,9 @@ export default async function TrendsAndExtrasPage({
 
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-foreground sm:grid-cols-4">
                 <dt>Umsatz (netto), aktuell</dt>
-                <dd>{formatMoney(trend.current.netRevenueCents)}</dd>
+                <dd>{formatMoney(trend.current.netRevenueCents, trend.currency)}</dd>
                 <dt>Umsatz (netto), Vorzeitraum</dt>
-                <dd>{formatMoney(trend.previous.netRevenueCents)}</dd>
+                <dd>{formatMoney(trend.previous.netRevenueCents, trend.currency)}</dd>
                 <dt>Veränderung Umsatz</dt>
                 <dd>{formatPercent(trend.netRevenueChangePercent)}</dd>
                 <dt>Stichprobengröße (bezahlte Bestellungen)</dt>
@@ -258,7 +284,7 @@ export default async function TrendsAndExtrasPage({
               Keine Extras auf dem aktuell veröffentlichten Menü.
             </p>
           ) : (
-            <ExtrasTable extras={extras} />
+            <ExtrasTable extras={extras} currency={currency} />
           )}
         </section>
 
@@ -280,7 +306,13 @@ export default async function TrendsAndExtrasPage({
   );
 }
 
-function ExtrasTable({ extras }: { extras: ExtraPerformanceResult[] }) {
+function ExtrasTable({
+  extras,
+  currency,
+}: {
+  extras: ExtraPerformanceResult[];
+  currency: string;
+}) {
   return (
     <table className="w-full text-left text-sm text-foreground">
       <caption className="sr-only">Extras-Auswertung</caption>
@@ -308,7 +340,7 @@ function ExtrasTable({ extras }: { extras: ExtraPerformanceResult[] }) {
             <td className="py-1">
               {extra.selectionCount} / {extra.eligibleOrderItemCount}
             </td>
-            <td className="py-1">{formatMoney(extra.additionalRevenueCents)}</td>
+            <td className="py-1">{formatMoney(extra.additionalRevenueCents, currency)}</td>
           </tr>
         ))}
       </tbody>

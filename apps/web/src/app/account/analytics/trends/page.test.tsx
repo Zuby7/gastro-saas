@@ -48,6 +48,7 @@ function membershipQueryChain(result: { data: unknown }) {
 function baseTrend(overrides: Record<string, unknown> = {}) {
   return {
     timezone: "Europe/Berlin",
+    currency: "EUR",
     periodType: "day",
     current: {
       start: "2026-08-18T00:00:00+02:00",

@@ -103,10 +103,18 @@ revoke all on function compute_period_order_stats(uuid, timestamptz, timestamptz
 -- ----------------------------------------------------------------------------
 -- get_trend_period_stats -- timezone-aware period-vs-prior-period comparison.
 -- Period boundaries are computed with Postgres's own IANA-tz-database-backed
--- `date_trunc(..., ... at time zone tz)`, the same DST-correct technique
--- #30's `get_analytics_dashboard_summary()` uses for "today" -- verified
--- across the actual 2026 Europe/Berlin DST transitions in this migration's
--- own integration tests
+-- `date_trunc(...)`, but the actual period-length arithmetic (+1 day/+7
+-- days/+1 month, and the equivalent subtraction for the previous period) is
+-- ALWAYS done on the naive local timestamp (`date_trunc('day'/'week'/'month',
+-- p_as_of at time zone tz)`, a `timestamp without time zone`) and only
+-- converted back to an instant via `at time zone tz` afterwards -- never by
+-- adding/subtracting an interval to/from an already-resolved `timestamptz`.
+-- The latter would silently resolve in the session TimeZone (UTC) and
+-- produce always-exactly-24h/168h/730h windows that are wrong across a DST
+-- transition (a "day" is 23h or 25h in local time on the transition day
+-- itself). Verified across the actual 2026 Europe/Berlin DST transitions
+-- (spring-forward 2026-03-29, fall-back 2026-10-25) in this migration's own
+-- integration tests
 -- (`packages/database/src/trend-and-extras-analytics.integration.test.ts`).
 -- `date_trunc('week', ...)` is ISO 8601 (Monday-start) in Postgres, matching
 -- this app's Europe/Berlin default.
@@ -135,11 +143,13 @@ stable
 as $$
 declare
   v_timezone text;
+  v_currency text;
   v_current_start timestamptz;
   v_current_end timestamptz;
   v_previous_start timestamptz;
   v_previous_end timestamptz;
-  v_period_length interval;
+  v_local_as_of timestamp;
+  v_previous_days integer;
 begin
   perform public.require_tenant_permission(p_tenant_id, 'analytics.read');
 
@@ -154,43 +164,60 @@ begin
 
   v_timezone := coalesce(v_timezone, 'Europe/Berlin');
 
+  select currency into v_currency
+    from public.payments
+   where tenant_id = p_tenant_id
+   order by created_at desc
+   limit 1;
+
+  v_currency := coalesce(v_currency, 'EUR');
+
+  v_local_as_of := p_as_of at time zone v_timezone;
+
   if p_period_type = 'day' then
-    v_current_start := date_trunc('day', p_as_of at time zone v_timezone) at time zone v_timezone;
-    v_current_end := v_current_start + interval '1 day';
+    v_current_start := date_trunc('day', v_local_as_of) at time zone v_timezone;
+    v_current_end := (date_trunc('day', v_local_as_of) + interval '1 day') at time zone v_timezone;
     v_previous_end := v_current_start;
-    v_previous_start := v_previous_end - interval '1 day';
+    v_previous_start := (date_trunc('day', v_local_as_of) - interval '1 day') at time zone v_timezone;
   elsif p_period_type = 'week' then
-    v_current_start := date_trunc('week', p_as_of at time zone v_timezone) at time zone v_timezone;
-    v_current_end := v_current_start + interval '7 days';
+    v_current_start := date_trunc('week', v_local_as_of) at time zone v_timezone;
+    v_current_end := (date_trunc('week', v_local_as_of) + interval '7 days') at time zone v_timezone;
     v_previous_end := v_current_start;
-    v_previous_start := v_previous_end - interval '7 days';
+    v_previous_start := (date_trunc('week', v_local_as_of) - interval '7 days') at time zone v_timezone;
   elsif p_period_type = 'month' then
-    v_current_start := date_trunc('month', p_as_of at time zone v_timezone) at time zone v_timezone;
-    v_current_end := (date_trunc('month', p_as_of at time zone v_timezone) + interval '1 month')
+    v_current_start := date_trunc('month', v_local_as_of) at time zone v_timezone;
+    v_current_end := (date_trunc('month', v_local_as_of) + interval '1 month')
       at time zone v_timezone;
     v_previous_end := v_current_start;
-    v_previous_start := (date_trunc('month', p_as_of at time zone v_timezone) - interval '1 month')
+    v_previous_start := (date_trunc('month', v_local_as_of) - interval '1 month')
       at time zone v_timezone;
   else
     -- custom: an explicit [p_custom_start, p_custom_end) date range (end
     -- exclusive -- e.g. a UI "from 2026-08-01 to 2026-08-14 inclusive" picker
     -- passes p_custom_end = 2026-08-15), compared against the immediately
     -- preceding period of the SAME length (ticket #32: "freier Zeitraum vs.
-    -- gleich langer Vorzeitraum").
+    -- gleich langer Vorzeitraum"). The previous window is derived via whole-
+    -- day arithmetic on the local calendar DATEs (p_custom_start/p_custom_end
+    -- are `date`, so subtraction yields an integer day count), never via a
+    -- timestamptz difference -- a timestamptz difference across a DST
+    -- transition is a day-time interval that, when subtracted back from an
+    -- instant, lands on a non-midnight local clock time.
     if p_custom_start is null or p_custom_end is null or p_custom_end <= p_custom_start then
       raise exception 'p_custom_start and p_custom_end are required for period_type=''custom'', and p_custom_end must be after p_custom_start'
         using errcode = 'invalid_parameter_value';
     end if;
 
+    v_previous_days := p_custom_end - p_custom_start;
+
     v_current_start := p_custom_start::timestamp at time zone v_timezone;
     v_current_end := p_custom_end::timestamp at time zone v_timezone;
-    v_period_length := v_current_end - v_current_start;
     v_previous_end := v_current_start;
-    v_previous_start := v_current_start - v_period_length;
+    v_previous_start := (p_custom_start - v_previous_days)::timestamp at time zone v_timezone;
   end if;
 
   return jsonb_build_object(
     'timezone', v_timezone,
+    'currency', v_currency,
     'periodType', p_period_type,
     'asOf', p_as_of,
     'currentPeriod', public.compute_period_order_stats(p_tenant_id, v_current_start, v_current_end)
@@ -210,7 +237,7 @@ end;
 $$;
 
 comment on function get_trend_period_stats(uuid, text, timestamptz, date, date) is
-  'Ticket #32: timezone-aware period-vs-prior-period revenue/order comparison (day/week/month/custom). Enforces analytics.read itself via require_tenant_permission. Each period carries isComplete (p_as_of at/past that period''s own end) -- presentation of an incomplete-vs-complete comparison is decided by packages/domain/src/analytics/trend-comparison.ts''s compareTrendPeriods(), not here.';
+  'Ticket #32: timezone-aware period-vs-prior-period revenue/order comparison (day/week/month/custom). Enforces analytics.read itself via require_tenant_permission. Each period carries isComplete (p_as_of at/past that period''s own end) -- presentation of an incomplete-vs-complete comparison is decided by packages/domain/src/analytics/trend-comparison.ts''s compareTrendPeriods(), not here. Returns currency (most recent payment''s currency, defaulting to EUR) so callers never hardcode a currency label.';
 
 revoke all on function get_trend_period_stats(uuid, text, timestamptz, date, date) from public;
 grant execute on function get_trend_period_stats(uuid, text, timestamptz, date, date) to authenticated, service_role;
@@ -233,6 +260,23 @@ grant execute on function get_trend_period_stats(uuid, text, timestamptz, date, 
 -- presented to this guest" log (that would need real event instrumentation,
 -- the same #6/#31 analytics_events gap), so "currently assigned" is the best
 -- available proxy for "eligible", not a perfect historical reconstruction.
+--
+-- eligibleOrderItemCount/selectionCount are deliberately COUNTED PER ORDER
+-- ITEM (one row of `order_items`), NOT per unit of quantity --
+-- `order_item_selections` stores exactly one row per (order_item, option)
+-- regardless of that order item's `quantity` (see
+-- `20260804090000_orders_state_machine_and_checkout.sql`), i.e. a guest
+-- picks "extra cheese" once for the whole line, not once per pizza in it.
+-- additionalRevenueCents, in contrast, MUST be quantity-weighted
+-- (`price_delta_cents_snapshot * oi.quantity`) to match actual checkout
+-- pricing (`(unitPriceCents + selectionsTotalCents) * quantity`, see
+-- `packages/domain/src/cart/pricing.ts`) -- an extra selected once on a
+-- quantity-3 line item generated 3x that extra's price delta in real
+-- revenue. selectionRate itself therefore answers "on what fraction of
+-- order-item lines was this extra chosen", not "what fraction of individual
+-- units carried it" -- the UI's "Auswahlen / Gelegenheiten" column reflects
+-- that (order-item counts), while its adjacent revenue column is
+-- quantity-weighted money.
 -- ----------------------------------------------------------------------------
 create or replace function get_extras_performance_stats(
   p_tenant_id uuid,
@@ -301,7 +345,7 @@ begin
         ) eligible on true
         left join lateral (
           select count(*)::int as selection_count,
-                 sum(ois.price_delta_cents_snapshot)::bigint as revenue_cents
+                 sum(ois.price_delta_cents_snapshot * oi.quantity)::bigint as revenue_cents
             from public.order_item_selections ois
             join public.order_items oi on oi.id = ois.order_item_id
             join public.orders ord on ord.id = oi.order_id

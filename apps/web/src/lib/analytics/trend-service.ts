@@ -26,6 +26,7 @@ export interface TrendComparisonOptions {
 
 export interface TrendComparison extends TrendComparisonResult {
   timezone: string;
+  currency: string;
   periodType: TrendPeriodType;
 }
 
@@ -47,6 +48,7 @@ export async function getTrendComparison(
 
   const raw = data as {
     timezone: string;
+    currency: string;
     periodType: TrendPeriodType;
     currentPeriod: PeriodStats;
     previousPeriod: PeriodStats;
@@ -54,5 +56,10 @@ export async function getTrendComparison(
 
   const comparison = compareTrendPeriods(raw.currentPeriod, raw.previousPeriod);
 
-  return { ...comparison, timezone: raw.timezone, periodType: raw.periodType };
+  return {
+    ...comparison,
+    timezone: raw.timezone,
+    currency: raw.currency,
+    periodType: raw.periodType,
+  };
 }

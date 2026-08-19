@@ -182,12 +182,13 @@ async function addOrderItemWithSelection(
   orderId: string,
   menu: SeededMenu,
   withSelection: boolean,
+  quantity = 1,
 ): Promise<void> {
   const orderItemId = randomUUID();
   await admin.query(
     `insert into order_items (id, tenant_id, order_id, dish_id, quantity, dish_name_snapshot, unit_price_cents_snapshot, currency)
-     values ($1, $2, $3, $4, 1, 'Margherita', 1000, 'EUR')`,
-    [orderItemId, tenantId, orderId, menu.dishId],
+     values ($1, $2, $3, $4, $5, 'Margherita', 1000, 'EUR')`,
+    [orderItemId, tenantId, orderId, menu.dishId, quantity],
   );
   if (withSelection) {
     await admin.query(
@@ -522,6 +523,125 @@ describe.skipIf(!dbAvailable)(
         expect((stats.currentPeriod as Record<string, unknown>).grossRevenueCents).toBe(4400);
       });
 
+      it("does not include a payment made just before the 2026-03-29 spring-forward transition in the 2026-03-29 day/week window (DST correctness)", async () => {
+        const seed = await seedFixtureWithManager();
+        fixture = seed.fixture;
+        await admin.query(
+          `insert into restaurant_profiles (tenant_id, display_name, timezone) values ($1, 'Test Restaurant', 'Europe/Berlin')`,
+          [fixture.tenantA.tenantId],
+        );
+        const accountId = await ensurePaymentAccount(admin, fixture.tenantA.tenantId);
+
+        // 2026-03-29T22:30:00Z = 2026-03-30T00:30:00 CEST (Europe/Berlin,
+        // already in DST since 02:00 CET -> 03:00 CEST at 01:00Z that same
+        // day) -- i.e. this instant is inside 2026-03-30's local day, NOT
+        // 2026-03-29's. A day/week window for as_of=2026-03-29 must exclude
+        // it. Computing the day-end as `v_current_start + interval '1 day'`
+        // (session TimeZone/UTC arithmetic) would wrongly include an extra
+        // (or fewer) hour(s) across this transition and could leak it in.
+        const orderId = await seedOrder(admin, {
+          tenantId: fixture.tenantA.tenantId,
+          totalCents: 2500,
+        });
+        await seedPayment(admin, accountId, {
+          tenantId: fixture.tenantA.tenantId,
+          orderId,
+          amountCents: 2500,
+          status: "paid",
+          createdAt: new Date("2026-03-29T22:30:00Z"),
+        });
+
+        const dayStats = await getTrendStats(
+          seed.managerId,
+          fixture.tenantA.tenantId,
+          "day",
+          new Date("2026-03-29T12:00:00Z"),
+        );
+        expect((dayStats.currentPeriod as Record<string, unknown>).grossRevenueCents).toBe(0);
+
+        const weekStats = await getTrendStats(
+          seed.managerId,
+          fixture.tenantA.tenantId,
+          "week",
+          new Date("2026-03-29T12:00:00Z"),
+        );
+        // 2026-03-29 is the Sunday closing the ISO week starting 2026-03-23 --
+        // the payment above (2026-03-30 local) falls in the FOLLOWING week,
+        // so it must not appear in this week's total either.
+        expect((weekStats.currentPeriod as Record<string, unknown>).grossRevenueCents).toBe(0);
+      });
+
+      it("includes a payment made just before the 2026-10-25 fall-back transition in the 2026-10-25 day/week window (DST correctness)", async () => {
+        const seed = await seedFixtureWithManager();
+        fixture = seed.fixture;
+        await admin.query(
+          `insert into restaurant_profiles (tenant_id, display_name, timezone) values ($1, 'Test Restaurant', 'Europe/Berlin')`,
+          [fixture.tenantA.tenantId],
+        );
+        const accountId = await ensurePaymentAccount(admin, fixture.tenantA.tenantId);
+
+        // 2026-10-25T22:30:00Z = 2026-10-25T23:30:00 CET (Europe/Berlin has
+        // already fallen back from CEST to CET by 01:00Z that day) -- i.e.
+        // this instant is inside 2026-10-25's local day and must be included
+        // in a day/week window for as_of=2026-10-25.
+        const orderId = await seedOrder(admin, {
+          tenantId: fixture.tenantA.tenantId,
+          totalCents: 1800,
+        });
+        await seedPayment(admin, accountId, {
+          tenantId: fixture.tenantA.tenantId,
+          orderId,
+          amountCents: 1800,
+          status: "paid",
+          createdAt: new Date("2026-10-25T22:30:00Z"),
+        });
+
+        const dayStats = await getTrendStats(
+          seed.managerId,
+          fixture.tenantA.tenantId,
+          "day",
+          new Date("2026-10-25T12:00:00Z"),
+        );
+        expect((dayStats.currentPeriod as Record<string, unknown>).grossRevenueCents).toBe(1800);
+
+        const weekStats = await getTrendStats(
+          seed.managerId,
+          fixture.tenantA.tenantId,
+          "week",
+          new Date("2026-10-25T12:00:00Z"),
+        );
+        expect((weekStats.currentPeriod as Record<string, unknown>).grossRevenueCents).toBe(1800);
+      });
+
+      it("derives a custom range's previous period via local calendar-date arithmetic, not a DST-shifted timestamptz difference", async () => {
+        const seed = await seedFixtureWithManager();
+        fixture = seed.fixture;
+        await admin.query(
+          `insert into restaurant_profiles (tenant_id, display_name, timezone) values ($1, 'Test Restaurant', 'Europe/Berlin')`,
+          [fixture.tenantA.tenantId],
+        );
+
+        // Custom range 2026-03-25 (inclusive) through 2026-04-01 (exclusive
+        // end) straddles the 2026-03-29 spring-forward transition. The
+        // equal-length previous period must be exactly 2026-03-18 through
+        // 2026-03-25 in LOCAL calendar days (both 00:00 Europe/Berlin), not a
+        // timestamptz-difference-derived instant that lands off local
+        // midnight because that 7-day span itself crosses the transition.
+        const stats = await getTrendStats(
+          seed.managerId,
+          fixture.tenantA.tenantId,
+          "custom",
+          new Date("2026-08-18T00:00:00Z"),
+          "2026-03-25",
+          "2026-04-01",
+        );
+        const previous = stats.previousPeriod as Record<string, unknown>;
+        const expectedPreviousStart = new Date(
+          "2026-03-18T00:00:00+01:00",
+        ).toISOString();
+        expect(new Date(previous.start as string).toISOString()).toBe(expectedPreviousStart);
+      });
+
       it("denies a member without analytics.read (permission-denied case)", async () => {
         const seed = await seedFixtureWithManager();
         fixture = seed.fixture;
@@ -529,6 +649,24 @@ describe.skipIf(!dbAvailable)(
         await expect(
           getTrendStats(seed.staffId, fixture.tenantB.tenantId, "day", new Date()),
         ).rejects.toThrow(/insufficient_privilege|permission/i);
+      });
+
+      it("does not expose compute_period_order_stats() as a directly callable RPC to an authenticated tenant member (internal-helper lockdown)", async () => {
+        const seed = await seedFixtureWithManager();
+        fixture = seed.fixture;
+
+        await expect(
+          queryAsUser(
+            admin,
+            seed.managerId,
+            `select compute_period_order_stats($1, $2, $3) as stats`,
+            [
+              fixture.tenantA.tenantId,
+              new Date("2026-08-18T00:00:00Z").toISOString(),
+              new Date("2026-08-19T00:00:00Z").toISOString(),
+            ],
+          ),
+        ).rejects.toThrow(/permission denied/i);
       });
 
       it("never leaks another tenant's trend stats via a client-supplied tenant_id (cross-tenant isolation)", async () => {
@@ -604,6 +742,30 @@ describe.skipIf(!dbAvailable)(
         expect(extraCheese.eligibleOrderItemCount).toBe(2);
         expect(extraCheese.selectionCount).toBe(1);
         expect(extraCheese.additionalRevenueCents).toBe(150);
+      });
+
+      it("quantity-weights additionalRevenueCents (an extra selected once on a quantity-3 line item counts 3x its price delta)", async () => {
+        const seed = await seedFixtureWithManager();
+        fixture = seed.fixture;
+        const menu = await seedPublishedMenuWithOption(admin, fixture.tenantA.tenantId);
+
+        const orderId = await seedOrder(admin, {
+          tenantId: fixture.tenantA.tenantId,
+          totalCents: 3450,
+          status: "completed",
+        });
+        await addOrderItemWithSelection(admin, fixture.tenantA.tenantId, orderId, menu, true, 3);
+
+        const stats = await getExtrasStats(seed.managerId, fixture.tenantA.tenantId);
+        const extraCheese = stats.find((s) => s.optionId === menu.optionId)!;
+
+        // One selection row (order_item_selections has exactly one row per
+        // (order_item, option) regardless of quantity), but the revenue must
+        // be quantity-weighted: 150 cents * quantity 3 = 450 cents, matching
+        // checkout pricing (packages/domain/src/cart/pricing.ts:
+        // (unitPriceCents + selectionsTotalCents) * quantity).
+        expect(extraCheese.selectionCount).toBe(1);
+        expect(extraCheese.additionalRevenueCents).toBe(450);
       });
 
       it("excludes orders still awaiting_payment or cancelled from both eligible and selection counts", async () => {
