@@ -31,6 +31,44 @@ Scope: multi-tenant gastronomy SaaS handling menu data, orders, payments (via St
 | Enumeration                                                                      | Generic error messages for auth failures; no "email already exists" style leaks beyond what's necessary for UX                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Insecure external integrations                                                   | Provider-neutral interface, official APIs only, no scraping, mock provider for dev                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Prompt injection via untrusted content during development                        | Content fetched from external sources (web pages, tool results) is treated as data, never as instructions, per the agent's own operating rules                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Unbounded/unmanaged personal data retention, ignored deletion/access requests    | Ticket #36 (risk:privacy) -- see "Datenschutz: Aufbewahrung, Export, Löschung" below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+
+## Datenschutz: Aufbewahrung, Export, Löschung
+
+Ticket #36. Tenant-scoped, Owner/`tenant.settings.write`-gated data export
+(`export_tenant_data()`, `apps/web/src/app/api/account/privacy/export/route.ts`)
+and an Owner-only (`tenant.data.delete`) deletion-request workflow
+(`process_tenant_data_deletion_request()`,
+`apps/web/src/app/account/privacy/actions.ts`) —
+`supabase/migrations/20260819110000_privacy_export_retention_and_deletion_requests.sql`.
+
+- Order/payment data is never hard-deleted: rows still inside the documented
+  legal retention window (3650 days / 10 years, modelled on the German
+  commercial/tax retention duty for business records, HGB §257 / AO §147 —
+  **not legal advice**, see this ticket's own explicit non-goal and the
+  residual-responsibility split below) are left completely untouched; rows
+  past that window have only their customer-identifying columns anonymized,
+  never their financial/accounting data.
+- `analytics_events` has a tenant-configurable retention period
+  (`privacy_retention_settings`, default 365 days). This repo has no
+  cron/scheduled-job infrastructure (checked `supabase/config.toml` and the
+  existing migrations before writing this) — the configured period is **not**
+  purged automatically on a schedule. It is enforced in two ways only: (1) in
+  full, immediately, whenever an Owner submits a deletion request
+  (`process_tenant_data_deletion_request()`, since analytics carries no legal
+  retention duty), and (2) on demand, whenever a `tenant.settings.write`
+  holder invokes `purge_expired_analytics_events()` — exposed in the UI as
+  the "Jetzt bereinigen" action on the retention-settings form
+  (`apps/web/src/app/account/privacy/retention-settings-form.tsx`). Until a
+  scheduled-job mechanism exists for this platform, rows older than the
+  configured period simply remain until one of those two paths runs.
+- `audit_logs` is explicitly out of scope for both configurable retention and
+  the deletion workflow: it is append-only/immutable for every app-facing
+  role by design (ticket #6, `reject_audit_log_mutation()`), a deliberate
+  security/compliance invariant this ticket does not reopen.
+- Explicit non-goal: this workflow does not delete the tenant record itself,
+  staff accounts/memberships, menu data, or the audit trail — full
+  tenant/account deletion is a materially larger, separately-tracked effort.
 
 ## Explicit residual responsibility split
 
