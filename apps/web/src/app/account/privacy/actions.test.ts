@@ -143,3 +143,46 @@ describe("requestTenantDataDeletionAction", () => {
     expect(result.success).toBeUndefined();
   });
 });
+
+describe("purgeExpiredAnalyticsEventsAction", () => {
+  it("denies the purge when the caller lacks tenant.settings.write", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: { message: "insufficient_privilege" } });
+
+    const { purgeExpiredAnalyticsEventsAction } = await import("./actions");
+    const result = await purgeExpiredAnalyticsEventsAction({}, new FormData());
+
+    expect(result.error).toContain("nicht die erforderliche Berechtigung");
+  });
+
+  it("calls purge_expired_analytics_events scoped to the caller's own tenant when authorized", async () => {
+    rpcMock.mockImplementation((name: string) => {
+      if (name === "require_tenant_permission") {
+        return Promise.resolve({ data: null, error: null });
+      }
+      return Promise.resolve({ data: 3, error: null });
+    });
+
+    const { purgeExpiredAnalyticsEventsAction } = await import("./actions");
+    const result = await purgeExpiredAnalyticsEventsAction({}, new FormData());
+
+    expect(result.success).toContain("3");
+    expect(rpcMock).toHaveBeenCalledWith("purge_expired_analytics_events", {
+      p_tenant_id: "tenant-1",
+    });
+  });
+
+  it("surfaces a friendly error when the RPC itself fails (permission check passed)", async () => {
+    rpcMock.mockImplementation((name: string) => {
+      if (name === "require_tenant_permission") {
+        return Promise.resolve({ data: null, error: null });
+      }
+      return Promise.resolve({ data: null, error: { message: "unexpected" } });
+    });
+
+    const { purgeExpiredAnalyticsEventsAction } = await import("./actions");
+    const result = await purgeExpiredAnalyticsEventsAction({}, new FormData());
+
+    expect(result.error).toBeDefined();
+    expect(result.success).toBeUndefined();
+  });
+});

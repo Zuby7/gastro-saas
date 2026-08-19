@@ -18,6 +18,11 @@ export interface DeletionRequestFormState {
   success?: string;
 }
 
+export interface PurgeAnalyticsEventsFormState {
+  error?: string;
+  success?: string;
+}
+
 /**
  * Ticket #36: saves the tenant's configurable analytics_events retention
  * period. Gated on `tenant.settings.write` -- audit_logs has no configurable
@@ -90,6 +95,60 @@ export async function saveRetentionSettingsAction(
 }
 
 /**
+ * Ticket #36 follow-up (Opus review, PR #122): `purge_expired_analytics_events()`
+ * previously had no reachable caller anywhere in the app -- this repo has no
+ * cron/scheduled-job infrastructure (checked `supabase/config.toml` and the
+ * existing migrations), so the configured retention period was never actually
+ * enforced. This on-demand action calls the RPC directly, gated on the same
+ * `tenant.settings.write` permission that configures the retention period.
+ * It is a manual purge, not a scheduled one -- the UI copy says so explicitly.
+ */
+export async function purgeExpiredAnalyticsEventsAction(
+  _prevState: PurgeAnalyticsEventsFormState,
+  _formData: FormData,
+): Promise<PurgeAnalyticsEventsFormState> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const membership = await getCurrentMembership(supabase, user.id);
+  if (!membership) {
+    return { error: "Sie sind noch keinem Restaurant zugeordnet." };
+  }
+
+  try {
+    await requireTenantPermission(supabase, membership.tenantId, "tenant.settings.write");
+  } catch (error) {
+    if (error instanceof PermissionDeniedError) {
+      return {
+        error: "Sie haben nicht die erforderliche Berechtigung, um Analytics-Events zu bereinigen.",
+      };
+    }
+    throw error;
+  }
+
+  const { data, error: rpcError } = await supabase.rpc("purge_expired_analytics_events", {
+    p_tenant_id: membership.tenantId,
+  });
+
+  if (rpcError) {
+    return {
+      error: "Die Bereinigung konnte nicht ausgeführt werden. Bitte versuchen Sie es erneut.",
+    };
+  }
+
+  revalidatePath("/account/privacy");
+  return {
+    success: `Bereinigung abgeschlossen: ${typeof data === "number" ? data : 0} Analytics-Event(s) wurden gelöscht.`,
+  };
+}
+
+/**
  * Ticket #36 (risk:privacy): Owner-only deletion request. Gated on the new
  * `tenant.data.delete` permission -- two enforcement layers: this
  * `requireTenantPermission` call AND `process_tenant_data_deletion_request()`'s
@@ -107,7 +166,7 @@ export async function requestTenantDataDeletionAction(
   });
 
   if (!parsed.success) {
-    return { error: "Bitte korrigieren Sie die Begruendung (max. 500 Zeichen)." };
+    return { error: "Bitte korrigieren Sie die Begründung (max. 500 Zeichen)." };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -129,7 +188,7 @@ export async function requestTenantDataDeletionAction(
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return {
-        error: "Nur der Owner kann einen Loeschantrag stellen.",
+        error: "Nur der Owner kann einen Löschantrag stellen.",
       };
     }
     throw error;
@@ -142,13 +201,13 @@ export async function requestTenantDataDeletionAction(
 
   if (rpcError) {
     return {
-      error: "Der Loeschantrag konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.",
+      error: "Der Löschantrag konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.",
     };
   }
 
   revalidatePath("/account/privacy");
   return {
     success:
-      "Loeschantrag wurde verarbeitet: Bestell-/Zahlungsdaten innerhalb der gesetzlichen Aufbewahrungsfrist bleiben erhalten, Kundendaten aelterer Bestellungen wurden anonymisiert, Analytics-Events wurden geloescht.",
+      "Löschantrag wurde verarbeitet: Bestell-/Zahlungsdaten innerhalb der gesetzlichen Aufbewahrungsfrist bleiben erhalten, Kundendaten älterer Bestellungen wurden anonymisiert, Analytics-Events wurden gelöscht.",
   };
 }

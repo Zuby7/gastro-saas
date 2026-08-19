@@ -62,7 +62,7 @@ export default async function PrivacyPage() {
             href="/account"
             className="font-medium text-link-foreground underline hover:text-brand-700"
           >
-            Zurueck
+            Zurück
           </Link>
         </main>
       );
@@ -102,14 +102,14 @@ export default async function PrivacyPage() {
             href="/account"
             className="text-sm font-medium text-link-foreground underline hover:text-brand-700"
           >
-            Zurueck
+            Zurück
           </Link>
         </div>
 
         <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground">Tenant-Datenexport</h2>
           <p className="text-sm text-foreground">
-            Exportiert die wesentlichen Tenant-Daten (Profil, Oeffnungszeiten, Team, Speisekarte,
+            Exportiert die wesentlichen Tenant-Daten (Profil, Öffnungszeiten, Team, Speisekarte,
             Bestellungen, Zahlungen) als JSON-Datei.
           </p>
           <a
@@ -130,7 +130,7 @@ export default async function PrivacyPage() {
 
             {deletionRequests && deletionRequests.length > 0 ? (
               <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
-                <h2 className="text-lg font-semibold text-foreground">Bisherige Loeschantraege</h2>
+                <h2 className="text-lg font-semibold text-foreground">Bisherige Löschanträge</h2>
                 <ul className="flex flex-col gap-2 text-sm text-foreground">
                   {deletionRequests.map((request) => (
                     <li key={request.id} className="rounded-md border border-neutral-200 p-3">
@@ -142,7 +142,7 @@ export default async function PrivacyPage() {
                         <div className="text-neutral-600">
                           Erhalten (Aufbewahrungsfrist): {request.retained_orders_count ?? 0}{" "}
                           Bestellungen · Anonymisiert: {request.anonymized_orders_count ?? 0}{" "}
-                          Bestellungen · Geloescht: {request.analytics_events_purged_count ?? 0}{" "}
+                          Bestellungen · Gelöscht: {request.analytics_events_purged_count ?? 0}{" "}
                           Analytics-Events
                         </div>
                       ) : null}

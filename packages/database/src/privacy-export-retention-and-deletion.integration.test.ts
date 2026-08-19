@@ -56,11 +56,16 @@ describe.skipIf(!dbAvailable)(
 
     afterEach(async () => {
       if (fixture) {
-        // orders.tenant_id is `on delete restrict` (mirrors audit_logs'
-        // precedent), so any order this suite created must be explicitly
-        // removed before the fixture's own cleanup() deletes its tenants.
-        // Deleting `orders` cascades to order_items/order_item_selections/
+        // payments.order_id and orders.tenant_id are both `on delete
+        // restrict` (mirrors audit_logs' precedent), so any payment/order
+        // this suite created must be explicitly removed, payments first,
+        // before the fixture's own cleanup() deletes its tenants. Deleting
+        // `orders` cascades to order_items/order_item_selections/
         // order_status_events.
+        await admin.query(`delete from payments where tenant_id in ($1, $2)`, [
+          fixture.tenantA.tenantId,
+          fixture.tenantB.tenantId,
+        ]);
         await admin.query(`delete from orders where tenant_id in ($1, $2)`, [
           fixture.tenantA.tenantId,
           fixture.tenantB.tenantId,
@@ -193,6 +198,110 @@ describe.skipIf(!dbAvailable)(
         sql: `update privacy_retention_settings set analytics_events_retention_days = 30 where tenant_id = $1 returning tenant_id`,
         params: [tenantA.tenantId],
       });
+    });
+
+    // ---------------------------------------------------------------------
+    // purge_expired_analytics_events()
+    // ---------------------------------------------------------------------
+
+    it("denies a Kitchen-role member (no tenant.settings.write) from calling purge_expired_analytics_events()", async () => {
+      const kitchenUserId = randomUUID();
+      fixture = await seedTwoTenantFixture(admin, {
+        tenantA: {
+          additionalMembers: [
+            { userId: kitchenUserId, email: "kitchen-purge@example.test", role: "staff" },
+          ],
+        },
+      });
+      const { tenantA } = fixture;
+      await assignOnlySystemRole(kitchenUserId, tenantA.tenantId, "kitchen");
+
+      await expect(
+        queryAsUser(admin, kitchenUserId, `select purge_expired_analytics_events($1)`, [
+          tenantA.tenantId,
+        ]),
+      ).rejects.toThrow(/insufficient_privilege|permission/i);
+    });
+
+    it("purges only analytics_events past the configured retention window, keeping newer rows", async () => {
+      fixture = await seedTwoTenantFixture(admin);
+      const { tenantA } = fixture;
+
+      await admin.query(
+        `insert into privacy_retention_settings (tenant_id, analytics_events_retention_days) values ($1, $2)`,
+        [tenantA.tenantId, 30],
+      );
+
+      const keptEventId = randomUUID();
+      const purgedEventId = randomUUID();
+      const withinRetention = new Date();
+      withinRetention.setDate(withinRetention.getDate() - 29); // retention - 1 day
+      const pastRetention = new Date();
+      pastRetention.setDate(pastRetention.getDate() - 31); // retention + 1 day
+
+      await admin.query(
+        `insert into analytics_events (id, tenant_id, event_type, created_at) values ($1, $2, 'page_view', $3)`,
+        [keptEventId, tenantA.tenantId, withinRetention.toISOString()],
+      );
+      await admin.query(
+        `insert into analytics_events (id, tenant_id, event_type, created_at) values ($1, $2, 'page_view', $3)`,
+        [purgedEventId, tenantA.tenantId, pastRetention.toISOString()],
+      );
+
+      const result = await queryAsUser<{ purge_expired_analytics_events: number }>(
+        admin,
+        tenantA.ownerId,
+        `select purge_expired_analytics_events($1)`,
+        [tenantA.tenantId],
+      );
+      expect(result.rows[0]?.purge_expired_analytics_events).toBe(1);
+
+      const remaining = await admin.query<{ id: string }>(
+        `select id from analytics_events where tenant_id = $1`,
+        [tenantA.tenantId],
+      );
+      expect(remaining.rows.map((r) => r.id)).toEqual([keptEventId]);
+    });
+
+    it("falls back to the 365-day default retention when the tenant has no privacy_retention_settings row", async () => {
+      fixture = await seedTwoTenantFixture(admin);
+      const { tenantA } = fixture;
+
+      const keptEventId = randomUUID();
+      const purgedEventId = randomUUID();
+      const withinDefault = new Date();
+      withinDefault.setDate(withinDefault.getDate() - 364); // default - 1 day
+      const pastDefault = new Date();
+      pastDefault.setDate(pastDefault.getDate() - 366); // default + 1 day
+
+      await admin.query(
+        `insert into analytics_events (id, tenant_id, event_type, created_at) values ($1, $2, 'page_view', $3)`,
+        [keptEventId, tenantA.tenantId, withinDefault.toISOString()],
+      );
+      await admin.query(
+        `insert into analytics_events (id, tenant_id, event_type, created_at) values ($1, $2, 'page_view', $3)`,
+        [purgedEventId, tenantA.tenantId, pastDefault.toISOString()],
+      );
+
+      const settingsRow = await admin.query(
+        `select 1 from privacy_retention_settings where tenant_id = $1`,
+        [tenantA.tenantId],
+      );
+      expect(settingsRow.rows).toHaveLength(0);
+
+      const result = await queryAsUser<{ purge_expired_analytics_events: number }>(
+        admin,
+        tenantA.ownerId,
+        `select purge_expired_analytics_events($1)`,
+        [tenantA.tenantId],
+      );
+      expect(result.rows[0]?.purge_expired_analytics_events).toBe(1);
+
+      const remaining = await admin.query<{ id: string }>(
+        `select id from analytics_events where tenant_id = $1`,
+        [tenantA.tenantId],
+      );
+      expect(remaining.rows.map((r) => r.id)).toEqual([keptEventId]);
     });
 
     // ---------------------------------------------------------------------
@@ -417,6 +526,52 @@ describe.skipIf(!dbAvailable)(
       expect(auditRow.rows.length).toBeGreaterThan(0);
     });
 
+    it("never touches a payments row, even for an order past the retention period", async () => {
+      fixture = await seedTwoTenantFixture(admin);
+      const { tenantA } = fixture;
+
+      const oldOrderCutoff = new Date();
+      oldOrderCutoff.setFullYear(oldOrderCutoff.getFullYear() - 12);
+      const oldOrderId = await seedOrder(tenantA.tenantId, { createdAt: oldOrderCutoff });
+
+      const paymentId = randomUUID();
+      await admin.query(
+        `insert into payments (
+           id, tenant_id, order_id, stripe_checkout_session_id, stripe_account_id,
+           amount_cents, currency, status, created_at, updated_at
+         ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)`,
+        [
+          paymentId,
+          tenantA.tenantId,
+          oldOrderId,
+          `cs_test_${paymentId.replace(/-/g, "")}`,
+          "acct_test123456789",
+          1500,
+          "EUR",
+          "paid",
+          oldOrderCutoff.toISOString(),
+        ],
+      );
+
+      await queryAsUser(
+        admin,
+        tenantA.ownerId,
+        `select process_tenant_data_deletion_request($1, $2)`,
+        [tenantA.tenantId, null],
+      );
+
+      const payment = await admin.query<{
+        amount_cents: number;
+        status: string;
+        currency: string;
+      }>(`select amount_cents, status, currency from payments where id = $1`, [paymentId]);
+      expect(payment.rows[0]).toMatchObject({
+        amount_cents: 1500,
+        status: "paid",
+        currency: "EUR",
+      });
+    });
+
     it("never hard-deletes an order or its immutable line-item snapshots, even past the retention period", async () => {
       fixture = await seedTwoTenantFixture(admin);
       const { tenantA } = fixture;
@@ -447,6 +602,65 @@ describe.skipIf(!dbAvailable)(
         [orderItemId],
       );
       expect(orderItem.rows[0]?.dish_name_snapshot).toBe("Pizza Margherita");
+    });
+
+    // ---------------------------------------------------------------------
+    // data_deletion_requests SELECT RLS through an authenticated session
+    // (not just the RLS-bypassing admin client).
+    // ---------------------------------------------------------------------
+
+    it("denies a Manager (no tenant.data.delete) from reading data_deletion_requests via RLS", async () => {
+      const managerUserId = randomUUID();
+      fixture = await seedTwoTenantFixture(admin, {
+        tenantA: {
+          additionalMembers: [
+            { userId: managerUserId, email: "manager-select@example.test", role: "manager" },
+          ],
+        },
+      });
+      const { tenantA } = fixture;
+
+      await queryAsUser(
+        admin,
+        tenantA.ownerId,
+        `select process_tenant_data_deletion_request($1, $2)`,
+        [tenantA.tenantId, "test"],
+      );
+
+      const managerResult = await queryAsUser(
+        admin,
+        managerUserId,
+        `select id from data_deletion_requests where tenant_id = $1`,
+        [tenantA.tenantId],
+      );
+      expect(managerResult.rows).toHaveLength(0);
+
+      // Sanity check: the row genuinely exists (proving the zero rows above
+      // is RLS denial, not an empty table).
+      const adminCheck = await admin.query(
+        `select 1 from data_deletion_requests where tenant_id = $1`,
+        [tenantA.tenantId],
+      );
+      expect(adminCheck.rows.length).toBeGreaterThan(0);
+    });
+
+    it("denies tenant B's Owner from reading tenant A's data_deletion_requests via RLS", async () => {
+      fixture = await seedTwoTenantFixture(admin);
+      const { tenantA, tenantB } = fixture;
+
+      await queryAsUser(
+        admin,
+        tenantA.ownerId,
+        `select process_tenant_data_deletion_request($1, $2)`,
+        [tenantA.tenantId, "test"],
+      );
+
+      await expectCrossTenantDenied({
+        client: admin,
+        actorUserId: tenantB.ownerId,
+        sql: `select id from data_deletion_requests where tenant_id = $1`,
+        params: [tenantA.tenantId],
+      });
     });
   },
 );

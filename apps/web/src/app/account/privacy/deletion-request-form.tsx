@@ -14,12 +14,12 @@ export function DeletionRequestForm() {
 
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-danger-500/40 bg-danger-500/5 p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-foreground">Loeschantrag stellen</h2>
+      <h2 className="text-lg font-semibold text-foreground">Löschantrag stellen</h2>
       <p className="text-sm text-foreground">
         Bestell- und Zahlungsdaten innerhalb der gesetzlich dokumentierten Aufbewahrungsfrist (10
-        Jahre) werden dabei niemals geloescht -- nur Kundendaten aelterer Bestellungen werden
-        anonymisiert. Analytics-Events werden vollstaendig geloescht. Diese Aktion steht nur dem
-        Owner zur Verfuegung.
+        Jahre) werden dabei niemals gelöscht -- nur Kundendaten älterer Bestellungen werden
+        anonymisiert. Analytics-Events werden vollständig gelöscht. Diese Aktion steht nur dem
+        Owner zur Verfügung.
       </p>
 
       {state.error ? (
@@ -44,7 +44,7 @@ export function DeletionRequestForm() {
       <form action={formAction} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1">
           <label htmlFor="reason" className="text-sm font-medium text-foreground">
-            Begruendung (optional)
+            Begründung (optional)
           </label>
           <textarea
             id="reason"
@@ -62,7 +62,7 @@ export function DeletionRequestForm() {
             onChange={(event) => setConfirmed(event.target.checked)}
             className="h-4 w-4"
           />
-          Ich bestaetige, dass ich diesen Loeschantrag stellen moechte.
+          Ich bestätige, dass ich diesen Löschantrag stellen möchte.
         </label>
 
         <button
@@ -70,7 +70,7 @@ export function DeletionRequestForm() {
           disabled={isPending || !confirmed}
           className="w-fit rounded-md bg-danger-600 px-4 py-2 font-medium text-neutral-0 disabled:opacity-60"
         >
-          {isPending ? "Wird verarbeitet..." : "Loeschantrag stellen"}
+          {isPending ? "Wird verarbeitet..." : "Löschantrag stellen"}
         </button>
       </form>
     </section>

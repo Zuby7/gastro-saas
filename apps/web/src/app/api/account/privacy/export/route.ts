@@ -16,6 +16,13 @@ import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-e
  * `p_tenant_id` explicitly, mirroring `get_tenant_order_payment_statuses()`'s
  * precedent). Tenant context is always resolved from the caller's own
  * membership row, never from a client-supplied id.
+ *
+ * Known limitation (Opus review, PR #122): this export is unbounded --
+ * `export_tenant_data()` has no pagination/size cap on orders/order_items,
+ * so a tenant with a very large order history could produce a very large
+ * response. Accepted as a residual risk for this ticket's scope; not solved
+ * here to avoid over-engineering a pagination system for a single admin-only
+ * download endpoint.
  */
 export async function GET() {
   const supabase = await createSupabaseServerClient();

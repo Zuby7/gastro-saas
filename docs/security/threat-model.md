@@ -50,8 +50,18 @@ and an Owner-only (`tenant.data.delete`) deletion-request workflow
   past that window have only their customer-identifying columns anonymized,
   never their financial/accounting data.
 - `analytics_events` has a tenant-configurable retention period
-  (`privacy_retention_settings`, default 365 days) and is purged in full on a
-  deletion request, since it carries no legal retention duty.
+  (`privacy_retention_settings`, default 365 days). This repo has no
+  cron/scheduled-job infrastructure (checked `supabase/config.toml` and the
+  existing migrations before writing this) — the configured period is **not**
+  purged automatically on a schedule. It is enforced in two ways only: (1) in
+  full, immediately, whenever an Owner submits a deletion request
+  (`process_tenant_data_deletion_request()`, since analytics carries no legal
+  retention duty), and (2) on demand, whenever a `tenant.settings.write`
+  holder invokes `purge_expired_analytics_events()` — exposed in the UI as
+  the "Jetzt bereinigen" action on the retention-settings form
+  (`apps/web/src/app/account/privacy/retention-settings-form.tsx`). Until a
+  scheduled-job mechanism exists for this platform, rows older than the
+  configured period simply remain until one of those two paths runs.
 - `audit_logs` is explicitly out of scope for both configurable retention and
   the deletion workflow: it is append-only/immutable for every app-facing
   role by design (ticket #6, `reject_audit_log_mutation()`), a deliberate

@@ -68,6 +68,14 @@
 --        tracked as a residual follow-up, not silently done or silently
 --        skipped.
 --
+-- Explicit non-goal (Opus review, PR #122): `ratings.comment` and
+-- `order_status_events.note` are free-text fields not covered by
+-- `export_tenant_data()` or `process_tenant_data_deletion_request()`. Both
+-- predate this ticket and are out of its stated scope
+-- (orders/payments retention + logs/analytics retention); left as a
+-- documented gap rather than silently expanding this ticket's scope to add
+-- export/anonymization logic for them.
+--
 -- Rollback for local/throwaway DBs:
 --   revoke all on function process_tenant_data_deletion_request(uuid, text) from authenticated, service_role;
 --   drop function if exists process_tenant_data_deletion_request(uuid, text);
@@ -488,8 +496,8 @@ declare
   v_retained_count integer;
   v_anonymized_count integer;
   v_analytics_purged_count integer;
-  v_anonymized_name constant text := '[Geloescht - Aufbewahrungsfrist gemaess Dokumentation abgelaufen]';
-  v_anonymized_table_identifier constant text := '[geloescht]';
+  v_anonymized_name constant text := '[Gelöscht - Aufbewahrungsfrist gemäß Dokumentation abgelaufen]';
+  v_anonymized_table_identifier constant text := '[gelöscht]';
 begin
   perform public.require_tenant_permission(p_tenant_id, 'tenant.data.delete');
 
