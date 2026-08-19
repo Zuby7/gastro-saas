@@ -60,6 +60,17 @@ export interface OrderStatusHistoryEntryView {
   occurredAt: string;
 }
 
+/**
+ * This order's own rating, if the guest has already submitted one (ticket
+ * #33) -- `null` otherwise. Never any other guest's rating or a tenant-wide
+ * aggregate.
+ */
+export interface OrderRatingSummaryView {
+  stars: number;
+  comment: string;
+  createdAt: string;
+}
+
 export interface OrderStatusView {
   orderId: string;
   /**
@@ -81,4 +92,6 @@ export interface OrderStatusView {
   updatedAt: string;
   items: OrderStatusItemView[];
   statusHistory: OrderStatusHistoryEntryView[];
+  /** ticket #33 -- null until the guest submits a rating for this order. */
+  rating: OrderRatingSummaryView | null;
 }

@@ -50,7 +50,7 @@
  *   that never asked for it.
  */
 
-export type RateLimitScope = "login" | "register" | "checkout" | "invite";
+export type RateLimitScope = "login" | "register" | "checkout" | "invite" | "rating";
 
 export interface RateLimitReservation {
   /** Id of the just-recorded attempt row; `null` if the store failed open. */
