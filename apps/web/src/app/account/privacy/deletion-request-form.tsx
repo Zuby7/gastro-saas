@@ -18,8 +18,8 @@ export function DeletionRequestForm() {
       <p className="text-sm text-foreground">
         Bestell- und Zahlungsdaten innerhalb der gesetzlich dokumentierten Aufbewahrungsfrist (10
         Jahre) werden dabei niemals gelöscht -- nur Kundendaten älterer Bestellungen werden
-        anonymisiert. Analytics-Events werden vollständig gelöscht. Diese Aktion steht nur dem
-        Owner zur Verfügung.
+        anonymisiert. Analytics-Events werden vollständig gelöscht. Diese Aktion steht nur dem Owner
+        zur Verfügung.
       </p>
 
       {state.error ? (
