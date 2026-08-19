@@ -192,7 +192,30 @@ alter table privacy_retention_settings enable row level security;
 grant select, insert, update, delete on privacy_retention_settings to authenticated, service_role;
 revoke truncate on privacy_retention_settings from anon, authenticated, service_role;
 
-select apply_basic_tenant_policies('privacy_retention_settings', 'tenant.settings.write');
+create policy privacy_retention_settings_select_member
+  on privacy_retention_settings
+  for select
+  to authenticated
+  using (public.is_tenant_member(tenant_id));
+
+create policy privacy_retention_settings_insert_write
+  on privacy_retention_settings
+  for insert
+  to authenticated
+  with check (public.has_tenant_permission(tenant_id, 'tenant.settings.write'));
+
+create policy privacy_retention_settings_update_write
+  on privacy_retention_settings
+  for update
+  to authenticated
+  using (public.has_tenant_permission(tenant_id, 'tenant.settings.write'))
+  with check (public.has_tenant_permission(tenant_id, 'tenant.settings.write'));
+
+create policy privacy_retention_settings_delete_write
+  on privacy_retention_settings
+  for delete
+  to authenticated
+  using (public.has_tenant_permission(tenant_id, 'tenant.settings.write'));
 
 -- ----------------------------------------------------------------------------
 -- purge_expired_analytics_events -- manual/on-demand purge, callable by any
