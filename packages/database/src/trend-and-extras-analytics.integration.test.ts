@@ -636,9 +636,7 @@ describe.skipIf(!dbAvailable)(
           "2026-04-01",
         );
         const previous = stats.previousPeriod as Record<string, unknown>;
-        const expectedPreviousStart = new Date(
-          "2026-03-18T00:00:00+01:00",
-        ).toISOString();
+        const expectedPreviousStart = new Date("2026-03-18T00:00:00+01:00").toISOString();
         expect(new Date(previous.start as string).toISOString()).toBe(expectedPreviousStart);
       });
 

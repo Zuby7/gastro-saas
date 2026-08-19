@@ -306,13 +306,7 @@ export default async function TrendsAndExtrasPage({
   );
 }
 
-function ExtrasTable({
-  extras,
-  currency,
-}: {
-  extras: ExtraPerformanceResult[];
-  currency: string;
-}) {
+function ExtrasTable({ extras, currency }: { extras: ExtraPerformanceResult[]; currency: string }) {
   return (
     <table className="w-full text-left text-sm text-foreground">
       <caption className="sr-only">Extras-Auswertung</caption>
