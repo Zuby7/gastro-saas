@@ -22,3 +22,27 @@ export interface SubmitOrderRatingResult {
   comment: string;
   createdAt: string;
 }
+
+/**
+ * Moderation queue (ticket #34). `pending`: newly submitted, not yet
+ * reviewed. `released`: reviewed and safe to show publicly (once a future
+ * ticket adds a public display surface). `hidden`: reviewed and suppressed.
+ */
+export type RatingModerationStatus = "pending" | "released" | "hidden";
+
+/** One row of the `reviews.read`-gated admin moderation list. */
+export interface ModerationQueueRatingView {
+  ratingId: string;
+  stars: number;
+  comment: string;
+  ratedAt: string;
+  status: RatingModerationStatus;
+  moderatedByUserId: string | null;
+  moderatedAt: string | null;
+}
+
+/** Shape returned by the `moderate_rating` RPC. */
+export interface ModerateRatingResult {
+  ratingId: string;
+  status: RatingModerationStatus;
+}
