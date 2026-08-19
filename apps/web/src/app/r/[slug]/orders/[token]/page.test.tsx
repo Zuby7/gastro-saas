@@ -24,6 +24,13 @@ vi.mock("./actions", () => ({
   pollOrderStatus: vi.fn().mockResolvedValue(null),
 }));
 
+// The rating form's submission behavior is exercised separately in
+// `./rating-form.test.tsx`; keep this suite focused on which of the
+// form/already-rated/nothing states the page picks for a given order.
+vi.mock("./rating-actions", () => ({
+  submitRatingAction: vi.fn(),
+}));
+
 function buildOrder(overrides: Partial<OrderStatusView> = {}): OrderStatusView {
   return {
     orderId: "order-1",
@@ -39,6 +46,7 @@ function buildOrder(overrides: Partial<OrderStatusView> = {}): OrderStatusView {
     updatedAt: "2026-08-08T10:00:00.000Z",
     items: [],
     statusHistory: [],
+    rating: null,
     ...overrides,
   };
 }
@@ -109,5 +117,60 @@ describe("OrderStatusPage", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Bestellstatus" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Details" })).toBeInTheDocument();
     expect(screen.getByText("Bestellung eingegangen")).toBeInTheDocument();
+  });
+
+  it("does not render a rating form/summary for an order that isn't completed yet", async () => {
+    getOrderStatusByTokenMock.mockResolvedValue(buildOrder({ status: "preparing" }));
+    const { default: OrderStatusPage } = await import("./page");
+
+    render(
+      await OrderStatusPage({
+        params: Promise.resolve({ slug: "demo", token: "valid-token" }),
+      }),
+    );
+
+    expect(
+      screen.queryByRole("heading", { name: "Wie war Ihre Bestellung?" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Ihre Bewertung" })).not.toBeInTheDocument();
+  });
+
+  it("renders the rating form for a completed order that hasn't been rated yet", async () => {
+    getOrderStatusByTokenMock.mockResolvedValue(buildOrder({ status: "completed", rating: null }));
+    const { default: OrderStatusPage } = await import("./page");
+
+    render(
+      await OrderStatusPage({
+        params: Promise.resolve({ slug: "demo", token: "valid-token" }),
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Wie war Ihre Bestellung?" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Bewertung abschicken" })).toBeInTheDocument();
+  });
+
+  it("renders the already-submitted rating summary instead of the form for a completed, already-rated order", async () => {
+    getOrderStatusByTokenMock.mockResolvedValue(
+      buildOrder({
+        status: "completed",
+        rating: { stars: 4, comment: "Sehr lecker!", createdAt: "2026-08-10T10:00:00.000Z" },
+      }),
+    );
+    const { default: OrderStatusPage } = await import("./page");
+
+    render(
+      await OrderStatusPage({
+        params: Promise.resolve({ slug: "demo", token: "valid-token" }),
+      }),
+    );
+
+    expect(screen.getByRole("heading", { level: 2, name: "Ihre Bewertung" })).toBeInTheDocument();
+    expect(screen.getByText("4 Sterne")).toBeInTheDocument();
+    expect(screen.getByText("Sehr lecker!")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Wie war Ihre Bestellung?" }),
+    ).not.toBeInTheDocument();
   });
 });

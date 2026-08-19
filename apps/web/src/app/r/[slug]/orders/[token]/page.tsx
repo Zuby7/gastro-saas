@@ -6,6 +6,7 @@ import { getOrderStatusByToken } from "@/lib/orders/service";
 import { orderStatusLabel } from "@/lib/orders/status-labels";
 import { hashOrderAccessToken } from "@/lib/orders/token";
 import { OrderStatusLive } from "./order-status-live";
+import { RatingForm } from "./rating-form";
 
 interface OrderStatusPageProps {
   params: Promise<{ slug: string; token: string }>;
@@ -150,6 +151,22 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
               ))}
             </ol>
           </section>
+        ) : null}
+
+        {order.status === "completed" ? (
+          order.rating ? (
+            <section className="rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+              <h2 className="text-sm font-semibold text-foreground">Ihre Bewertung</h2>
+              <p className="mt-1 text-sm text-foreground">
+                {order.rating.stars} {order.rating.stars === 1 ? "Stern" : "Sterne"}
+              </p>
+              {order.rating.comment ? (
+                <p className="mt-1 text-sm text-foreground-secondary">{order.rating.comment}</p>
+              ) : null}
+            </section>
+          ) : (
+            <RatingForm tenantSlug={slug} token={token} />
+          )
         ) : null}
 
         <Link
