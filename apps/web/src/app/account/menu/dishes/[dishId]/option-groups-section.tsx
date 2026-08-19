@@ -5,9 +5,11 @@ import {
   assignOptionGroupAction,
   createOptionAction,
   createOptionGroupAction,
+  setOptionAvailabilityAction,
   unassignOptionGroupAction,
   type DishActionState,
 } from "./actions";
+import { AvailabilityToggleForm } from "./availability-toggle-form";
 
 const initialState: DishActionState = {};
 
@@ -15,6 +17,8 @@ export interface OptionRecord {
   id: string;
   name: string;
   price_delta_cents: number;
+  is_available: boolean;
+  available_again_at: string | null;
 }
 
 export interface OptionGroupRecord {
@@ -29,12 +33,16 @@ export interface OptionGroupsSectionProps {
   dishId: string;
   allOptionGroups: OptionGroupRecord[];
   assignedGroupIds: string[];
+  canEditMenu: boolean;
+  canManageAvailability: boolean;
 }
 
 export function OptionGroupsSection({
   dishId,
   allOptionGroups,
   assignedGroupIds,
+  canEditMenu,
+  canManageAvailability,
 }: OptionGroupsSectionProps) {
   const [assignState, assignFormAction] = useActionState(assignOptionGroupAction, initialState);
   const [unassignState, unassignFormAction] = useActionState(
@@ -68,27 +76,41 @@ export function OptionGroupsSection({
               <span className="font-medium text-foreground">
                 {group.name} (Min {group.min_selections} / Max {group.max_selections})
               </span>
-              <form action={unassignFormAction}>
-                <input type="hidden" name="dishId" value={dishId} />
-                <input type="hidden" name="optionGroupId" value={group.id} />
-                <button
-                  type="submit"
-                  className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-600"
-                >
-                  Entfernen
-                </button>
-              </form>
+              {canEditMenu ? (
+                <form action={unassignFormAction}>
+                  <input type="hidden" name="dishId" value={dishId} />
+                  <input type="hidden" name="optionGroupId" value={group.id} />
+                  <button
+                    type="submit"
+                    className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-600"
+                  >
+                    Entfernen
+                  </button>
+                </form>
+              ) : null}
             </div>
-            <ul className="mt-2 flex flex-wrap gap-2">
+            <ul className="mt-2 flex flex-col gap-2">
               {group.options.map((option) => (
                 <li
                   key={option.id}
-                  className="rounded-md border border-neutral-300 px-2 py-1 text-sm text-foreground"
+                  className="flex flex-col gap-1 rounded-md border border-neutral-300 px-2 py-1 text-sm text-foreground"
                 >
-                  {option.name}
-                  {option.price_delta_cents !== 0
-                    ? ` (+${(option.price_delta_cents / 100).toFixed(2)} €)`
-                    : ""}
+                  <span>
+                    {option.name}
+                    {option.price_delta_cents !== 0
+                      ? ` (+${(option.price_delta_cents / 100).toFixed(2)} €)`
+                      : ""}
+                  </span>
+                  {canManageAvailability ? (
+                    <AvailabilityToggleForm
+                      action={setOptionAvailabilityAction}
+                      hiddenFields={{ dishId, optionId: option.id }}
+                      isAvailable={option.is_available}
+                      availableAgainAt={option.available_again_at}
+                      idPrefix={`option-${option.id}`}
+                      itemLabel={option.name}
+                    />
+                  ) : null}
                 </li>
               ))}
               {group.options.length === 0 ? (
@@ -111,7 +133,7 @@ export function OptionGroupsSection({
         ) : null}
       </div>
 
-      {unassignedGroups.length > 0 ? (
+      {canEditMenu && unassignedGroups.length > 0 ? (
         <form action={assignFormAction} className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
@@ -139,60 +161,62 @@ export function OptionGroupsSection({
         </form>
       ) : null}
 
-      <form action={createGroupFormAction} className="flex flex-wrap items-end gap-2" noValidate>
-        <input type="hidden" name="dishId" value={dishId} />
-        <div className="flex flex-col gap-1">
-          <label htmlFor="new-group-name" className="text-sm font-medium text-foreground">
-            Neue Optionsgruppe
-          </label>
-          <input
-            id="new-group-name"
-            name="name"
-            required
-            className="rounded-md border border-neutral-300 px-2 py-1 text-foreground"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="new-group-min" className="text-sm font-medium text-foreground">
-            Min
-          </label>
-          <input
-            id="new-group-min"
-            name="minSelections"
-            type="number"
-            min={0}
-            defaultValue={0}
-            className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-foreground"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="new-group-max" className="text-sm font-medium text-foreground">
-            Max
-          </label>
-          <input
-            id="new-group-max"
-            name="maxSelections"
-            type="number"
-            min={1}
-            defaultValue={1}
-            className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-foreground"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={isCreateGroupPending}
-          className="rounded-md bg-brand-600 px-3 py-1.5 font-medium text-neutral-0 disabled:opacity-60"
-        >
-          {isCreateGroupPending ? "Wird angelegt…" : "Gruppe anlegen"}
-        </button>
-        {createGroupState.error ? (
-          <p role="alert" className="w-full text-sm text-danger-600">
-            {createGroupState.error}
-          </p>
-        ) : null}
-      </form>
+      {canEditMenu ? (
+        <form action={createGroupFormAction} className="flex flex-wrap items-end gap-2" noValidate>
+          <input type="hidden" name="dishId" value={dishId} />
+          <div className="flex flex-col gap-1">
+            <label htmlFor="new-group-name" className="text-sm font-medium text-foreground">
+              Neue Optionsgruppe
+            </label>
+            <input
+              id="new-group-name"
+              name="name"
+              required
+              className="rounded-md border border-neutral-300 px-2 py-1 text-foreground"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="new-group-min" className="text-sm font-medium text-foreground">
+              Min
+            </label>
+            <input
+              id="new-group-min"
+              name="minSelections"
+              type="number"
+              min={0}
+              defaultValue={0}
+              className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-foreground"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="new-group-max" className="text-sm font-medium text-foreground">
+              Max
+            </label>
+            <input
+              id="new-group-max"
+              name="maxSelections"
+              type="number"
+              min={1}
+              defaultValue={1}
+              className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-foreground"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isCreateGroupPending}
+            className="rounded-md bg-brand-600 px-3 py-1.5 font-medium text-neutral-0 disabled:opacity-60"
+          >
+            {isCreateGroupPending ? "Wird angelegt…" : "Gruppe anlegen"}
+          </button>
+          {createGroupState.error ? (
+            <p role="alert" className="w-full text-sm text-danger-600">
+              {createGroupState.error}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
 
-      {allOptionGroups.length > 0 ? (
+      {canEditMenu && allOptionGroups.length > 0 ? (
         <form action={createOptionFormAction} className="flex flex-wrap items-end gap-2" noValidate>
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
