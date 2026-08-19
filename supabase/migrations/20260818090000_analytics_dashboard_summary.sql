@@ -44,13 +44,21 @@
 -- (defaults to 'Europe/Berlin' both as that table's own column default AND
 -- here, since a tenant may not have created a restaurant_profiles row yet --
 -- ticket #11's admin UI creates it lazily, it is not auto-provisioned at
--- tenant creation). `date_trunc('day', p_as_of at time zone v_timezone) at
--- time zone v_timezone` correctly handles DST transitions because Postgres's
+-- tenant creation). Both `v_day_start` AND `v_day_end` are computed via
+-- `date_trunc('day', p_as_of at time zone v_timezone) [+ interval '1 day']
+-- at time zone v_timezone` -- i.e. calendar arithmetic is always done on the
+-- *local* (timezone-naive) wall-clock timestamp before converting back to
+-- timestamptz. This correctly handles DST transitions because Postgres's
 -- `at time zone` conversion always consults the IANA tz database for the
--- specific instant involved, rather than applying a fixed UTC offset --
--- verified by this migration's own tests around the actual 2026
--- spring-forward (2026-03-29 02:00 CEST) and fall-back (2026-10-25 03:00
--- CEST) transitions in `packages/database/src/analytics-dashboard.integration.test.ts`.
+-- specific instant involved, rather than applying a fixed UTC offset.
+-- Adding an interval directly to a timestamptz instead (as an earlier
+-- version of this migration did for `v_day_end`) resolves in the *session*
+-- TimeZone (UTC on Supabase) and silently produces a fixed 24h window --
+-- wrong on the DST-transition days themselves (23h/25h local days) even
+-- though it looks correct every other day of the year. Verified by this
+-- migration's own tests around the actual 2026 spring-forward
+-- (2026-03-29 02:00 CEST) and fall-back (2026-10-25 03:00 CEST) transitions
+-- in `packages/database/src/analytics-dashboard.integration.test.ts`.
 --
 -- `p_as_of` (defaults to `now()`) exists purely so tests can pin a
 -- deterministic instant instead of depending on the real wall-clock date --
@@ -126,8 +134,14 @@ begin
 
   v_timezone := coalesce(v_timezone, 'Europe/Berlin');
 
+  -- Calendar-day arithmetic must happen on the LOCAL (timezone-naive) wall
+  -- clock timestamp before converting back to timestamptz. Adding
+  -- `interval '1 day'` directly to a timestamptz instead resolves in the
+  -- *session* TimeZone (UTC on Supabase) and is therefore always exactly
+  -- 24h -- wrong on DST-transition days, which are 23h (spring-forward) or
+  -- 25h (fall-back) in local wall-clock time.
   v_day_start := date_trunc('day', p_as_of at time zone v_timezone) at time zone v_timezone;
-  v_day_end := v_day_start + interval '1 day';
+  v_day_end := (date_trunc('day', p_as_of at time zone v_timezone) + interval '1 day') at time zone v_timezone;
 
   select coalesce(sum(amount_cents), 0), count(*)
     into v_gross_revenue_cents, v_paid_orders_count
