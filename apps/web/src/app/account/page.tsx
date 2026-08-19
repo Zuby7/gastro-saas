@@ -102,7 +102,7 @@ export default async function AccountPage() {
           href="/account/privacy"
           className="w-fit text-sm font-medium text-link-foreground underline hover:text-brand-700"
         >
-          Datenschutz-Einstellungen (Export/Loeschantrag)
+          Datenschutz-Einstellungen (Export/Löschantrag)
         </Link>
       ) : null}
 
