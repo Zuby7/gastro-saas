@@ -45,7 +45,7 @@ See `docs/tickets/` for the ticket-level breakdown. Epics, in build order:
 6. Cart & ordering (server-side pricing, state machine)
 7. Payments (Stripe Connect, webhooks, refunds)
 8. Order operations (kitchen workflow, sold-out control)
-9. Analytics (topsellers, low performers, trends, extras, funnel)
+9. Analytics (topsellers, low performers, trends, extras, funnel) -- ticket #30 (revenue/order dashboard) and ticket #31 (topseller/low-performer analysis, ranked by quantity and revenue with a configurable minimum-data threshold before any "low performer" flag; see `docs/data/domain-model.md` "Analytics" and `packages/domain/src/analytics/dish-performance.ts`) are implemented; trends/extras/funnel analysis (ticket #32) remain open.
 10. Ratings & quality (verified ratings, compliance-oriented checks)
 11. Operations & hardening (monitoring, backups, privacy, readiness)
 12. Integration foundation (provider-neutral interface, mock provider)
