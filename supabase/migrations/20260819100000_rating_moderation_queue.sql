@@ -150,6 +150,8 @@ begin
     (v_manager_role_id, 'users.invite'),
     (v_manager_role_id, 'users.manage'),
     (v_manager_role_id, 'menu.publish'),
+    (v_manager_role_id, 'menu.read'),
+    (v_manager_role_id, 'menu.availability.manage'),
     (v_manager_role_id, 'orders.cancel'),
     (v_manager_role_id, 'orders.read'),
     (v_manager_role_id, 'orders.manage'),
@@ -159,13 +161,18 @@ begin
     (v_manager_role_id, 'audit.read'),
     (v_manager_role_id, 'reviews.read'),
     (v_manager_role_id, 'reviews.moderate'),
+    (v_kitchen_role_id, 'menu.read'),
+    (v_kitchen_role_id, 'menu.availability.manage'),
     (v_kitchen_role_id, 'orders.cancel'),
     (v_kitchen_role_id, 'orders.read'),
     (v_kitchen_role_id, 'orders.manage'),
+    (v_service_role_id, 'menu.read'),
+    (v_service_role_id, 'menu.availability.manage'),
     (v_service_role_id, 'orders.cancel'),
     (v_service_role_id, 'orders.read'),
     (v_service_role_id, 'orders.manage'),
     (v_marketing_role_id, 'menu.publish'),
+    (v_marketing_role_id, 'menu.read'),
     (v_marketing_role_id, 'analytics.read')
   on conflict do nothing;
 
