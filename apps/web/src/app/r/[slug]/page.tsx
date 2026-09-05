@@ -85,6 +85,24 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
           </section>
         ))}
       </div>
+
+      {/* Ticket #41: footer links to the tenant-maintained Impressum/Datenschutz pages. */}
+      <footer className="border-t border-neutral-200 px-5 py-6 sm:px-8">
+        <div className="mx-auto flex max-w-5xl flex-wrap gap-4 text-sm">
+          <Link
+            href={`/r/${slug}/impressum`}
+            className="font-medium text-link-foreground underline hover:text-brand-700"
+          >
+            Impressum
+          </Link>
+          <Link
+            href={`/r/${slug}/datenschutz`}
+            className="font-medium text-link-foreground underline hover:text-brand-700"
+          >
+            Datenschutz
+          </Link>
+        </div>
+      </footer>
     </main>
   );
 }

@@ -70,6 +70,39 @@ and an Owner-only (`tenant.data.delete`) deletion-request workflow
   staff accounts/memberships, menu data, or the audit trail — full
   tenant/account deletion is a materially larger, separately-tracked effort.
 
+## Impressum, Datenschutzhinweis & Consent (Ticket #41)
+
+Tenant-maintained, tenant.settings.write-gated free-text Impressum and
+Datenschutzerklärung fields on `restaurant_profiles`
+(`supabase/migrations/20260820100000_legal_pages_impressum_datenschutz_consent.sql`),
+rendered on dedicated public pages
+(`apps/web/src/app/r/[slug]/impressum/page.tsx`,
+`apps/web/src/app/r/[slug]/datenschutz/page.tsx`) linked from the public
+menu footer, plus a pre-submit checkout privacy notice
+(`apps/web/src/app/r/[slug]/checkout/checkout-form.tsx`) linking the full
+Datenschutzerklärung.
+
+- **XSS mitigation**: the free text is rendered as a plain React text node
+  only (never `dangerouslySetInnerHTML`, no markdown-to-HTML rendering
+  pipeline was added) — React's default output encoding is the sanitization
+  guarantee here, matching the "Stored/reflected XSS" row above.
+- **Publish-quality-check**: `run_menu_publish_checks()` emits a non-blocking
+  `warning` (`imprint-text-missing` / `privacy-text-missing`) when either
+  text is empty — never a `blocker`, per the ticket's acceptance criteria.
+- **Compliance scope**: exactly the same residual-responsibility split as
+  below applies — the platform provides the mechanism to publish this text
+  and a non-blocking reminder if it's missing; it does not verify the
+  text's legal accuracy/completeness and the product must never claim it
+  does.
+- **PostHog**: not yet integrated into this codebase at all (checked
+  `apps/web/package.json` and the repo for any `posthog` reference before
+  this ticket — none found). Since there is no init/config path to gate,
+  this ticket doesn't add a feature flag; it only records here that
+  whichever ticket first wires up PostHog must default it to **off** per
+  tenant until a documented lawful basis/consent flow exists
+  (`docs/platform/service-register.md`'s PostHog entry) — tracked as a
+  requirement for that future ticket, not solved here.
+
 ## Explicit residual responsibility split
 
 - **Enforced by software**: tenant isolation, payment integrity, webhook verification, auth/authorization, input validation, rate limiting, secret handling.
