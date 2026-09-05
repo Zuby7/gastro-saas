@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
+import { resolveTenantIdBySlug } from "@/lib/cart/service";
+import { recordMenuViewOnce } from "@/lib/menu-view/service";
 import { getPublicMenu } from "@/lib/public-menu/fetch";
 import { loadCartViewForDisplay } from "./cart/actions";
 import { CategoryNav } from "./category-nav";
@@ -19,6 +21,16 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
   }
 
   const cart = await loadCartViewForDisplay(slug);
+
+  // Ticket #67: record a rate-limited/deduplicated menu_viewed event for
+  // this tenant+session+day, resolving tenant_id server-side from the slug
+  // (never trusting a client-supplied value, per
+  // docs/security/tenant-isolation.md Layer 0). Best-effort -- never throws,
+  // never blocks rendering on a real failure.
+  const tenantId = await resolveTenantIdBySlug(slug);
+  if (tenantId) {
+    await recordMenuViewOnce(slug, tenantId);
+  }
 
   return (
     <main className="min-h-screen bg-neutral-50">
