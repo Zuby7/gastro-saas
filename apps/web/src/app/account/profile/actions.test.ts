@@ -49,6 +49,8 @@ function profileFormData(overrides: Partial<Record<string, string>> = {}): FormD
   fd.set("phone", overrides.phone ?? "");
   fd.set("timezone", overrides.timezone ?? "Europe/Berlin");
   fd.set("brandColor", overrides.brandColor ?? "#166534");
+  fd.set("legalImprintText", overrides.legalImprintText ?? "");
+  fd.set("legalPrivacyText", overrides.legalPrivacyText ?? "");
   return fd;
 }
 
@@ -114,6 +116,38 @@ describe("saveProfileAction", () => {
     expect(capturedUpsert).toMatchObject({
       tenant_id: "tenant-1",
       display_name: "Mario's Pizzeria",
+    });
+  });
+
+  it("saves the Impressum/Datenschutz free-text fields scoped to the caller's own tenant", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: null });
+    let capturedUpsert: unknown;
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") {
+        return membershipQueryBuilder({ data: { tenant_id: "tenant-1", role: "owner" } });
+      }
+      return {
+        upsert: async (payload: unknown) => {
+          capturedUpsert = payload;
+          return { error: null };
+        },
+      };
+    });
+
+    const { saveProfileAction } = await import("./actions");
+    const result = await saveProfileAction(
+      {},
+      profileFormData({
+        legalImprintText: "Musterfirma GmbH, Musterstraße 1",
+        legalPrivacyText: "Wir verarbeiten Ihre Daten gemäß DSGVO.",
+      }),
+    );
+
+    expect(result.success).toBeDefined();
+    expect(capturedUpsert).toMatchObject({
+      tenant_id: "tenant-1",
+      legal_imprint_text: "Musterfirma GmbH, Musterstraße 1",
+      legal_privacy_text: "Wir verarbeiten Ihre Daten gemäß DSGVO.",
     });
   });
 });
