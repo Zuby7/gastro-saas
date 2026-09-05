@@ -104,6 +104,21 @@ import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-e
  *     reconcile it. See `docs/operations/refund-reconciliation.md` for the
  *     manual procedure.
  *
+ * Request idempotency (issue #97, risk:payment): two rapid, identical
+ * double-clicks of the same partial-refund submission previously each
+ * individually passed the never-exceed-paid-amount check (as long as both
+ * fit under the remaining headroom) and so created two independent refunds
+ * for one intended user action -- only the client-side disabled button
+ * guarded against this, which cannot close the race between two requests
+ * both already in flight before the disabled state took effect. The caller
+ * (`.../actions.ts`) now generates one client-side request token
+ * (`crypto.randomUUID()`) per submission attempt and passes it through as
+ * `requestToken`; this module writes it into `refunds.request_token`, which
+ * is unique per `payment_id` (see the refunds-request-idempotency
+ * migration) -- a repeat INSERT with the same token for the same payment is
+ * rejected by the database (`DuplicateRefundRequestError`) before ever
+ * calling Stripe.
+ *
  * Finalization lockdown (issue #93, epic-7 cycle-3 fix): a refund row's
  * pending -> succeeded|failed|unconfirmed transition is no longer a plain
  * authenticated UPDATE -- `refunds` no longer grants `authenticated` UPDATE
@@ -172,6 +187,26 @@ export class RefundAwaitingReconciliationError extends Error {
     this.name = "RefundAwaitingReconciliationError";
   }
 }
+
+export class DuplicateRefundRequestError extends Error {
+  constructor(
+    message = "Diese Rückerstattung wurde bereits übermittelt. Bitte laden Sie die Seite neu, bevor Sie eine neue Rückerstattung auslösen.",
+  ) {
+    super(message);
+    this.name = "DuplicateRefundRequestError";
+  }
+}
+
+export class RefundInvalidRequestTokenError extends Error {
+  constructor(
+    message = "Ungültige Anfrage. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+  ) {
+    super(message);
+    this.name = "RefundInvalidRequestTokenError";
+  }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface PaymentRow {
   id: string;
@@ -285,6 +320,13 @@ export interface IssueRefundInput {
   actorUserId: string;
   amountCents: number;
   reason: string;
+  /**
+   * Client-generated (crypto.randomUUID()) idempotency token, one per
+   * refund submission attempt (issue #97, risk:payment) -- see module
+   * header. Required so a double-clicked submission cannot create two
+   * independent refund rows.
+   */
+  requestToken: string;
 }
 
 export interface IssueRefundResult {
@@ -318,6 +360,10 @@ export async function issueRefundForOrder(
 ): Promise<IssueRefundResult> {
   if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) {
     throw new RefundInvalidAmountError();
+  }
+
+  if (!UUID_RE.test(input.requestToken)) {
+    throw new RefundInvalidRequestTokenError();
   }
 
   const { data: payment } = await supabase
@@ -369,20 +415,27 @@ export async function issueRefundForOrder(
       currency: payment.currency,
       reason: input.reason,
       actor_user_id: input.actorUserId,
+      request_token: input.requestToken,
       status: "pending",
     })
     .select("id")
     .single<{ id: string }>();
 
   if (insertError || !reservedRefund) {
-    // The DB trigger is the race-proof source of truth (see module header):
-    // a concurrent request could have created the blocking unconfirmed row,
-    // or pushed the reserved total over the limit, between this module's own
-    // pre-checks above and this INSERT. `hint` is how the trigger marks the
-    // unconfirmed-reconciliation rejection specifically (epic-7 cycle-2
-    // fix); anything else mentioning "exceed" is the amount-limit rejection.
+    // The DB is the race-proof source of truth (see module header): a
+    // concurrent request could have created the blocking unconfirmed row,
+    // pushed the reserved total over the limit, or (issue #97) already
+    // reserved the exact same request_token for this payment, between this
+    // module's own pre-checks above and this INSERT. `hint` is how the
+    // unconfirmed-reconciliation rejection is marked specifically (epic-7
+    // cycle-2 fix); a unique-violation (23505) on `request_token` is a
+    // double-submit of the same client-generated token (issue #97); anything
+    // else mentioning "exceed" is the amount-limit rejection.
     if (insertError?.hint === "unconfirmed_refund_exists") {
       throw new RefundAwaitingReconciliationError();
+    }
+    if (insertError?.code === "23505") {
+      throw new DuplicateRefundRequestError();
     }
     if ((insertError?.message ?? "").toLowerCase().includes("exceed")) {
       throw new RefundExceedsRemainingAmountError();

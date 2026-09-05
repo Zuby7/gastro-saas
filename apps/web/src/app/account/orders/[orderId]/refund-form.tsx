@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { issueRefundAction, type RefundActionState } from "./actions";
 
 const initialState: RefundActionState = {};
@@ -13,6 +13,18 @@ export function RefundForm({
   remainingRefundableCents: number;
 }) {
   const [state, formAction, isPending] = useActionState(issueRefundAction, initialState);
+  // Request idempotency token (issue #97, risk:payment): one crypto.randomUUID()
+  // per submission attempt. A double-click before `isPending` flips true
+  // submits this SAME value twice -- the server rejects the repeat
+  // (see refund-service.ts's DuplicateRefundRequestError). Regenerated after
+  // every settled action so the next, genuinely new submission gets a fresh
+  // token rather than being permanently stuck reusing one.
+  const [requestToken, setRequestToken] = useState(() => crypto.randomUUID());
+  useEffect(() => {
+    if (state.success || state.error) {
+      setRequestToken(crypto.randomUUID());
+    }
+  }, [state.success, state.error]);
 
   return (
     <form
@@ -25,6 +37,7 @@ export function RefundForm({
         Rückerstattung auslösen
       </h3>
       <input type="hidden" name="orderId" value={orderId} />
+      <input type="hidden" name="requestToken" value={requestToken} />
 
       <div className="flex flex-col gap-1">
         <label htmlFor="refund-amount" className="text-sm font-medium text-foreground">
