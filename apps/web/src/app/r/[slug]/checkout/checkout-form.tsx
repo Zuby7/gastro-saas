@@ -136,8 +136,8 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
         toolkit beyond what Turnstile/PostHog need).
       */}
       <p className="text-sm text-foreground-secondary">
-        Mit dem Absenden der Bestellung werden Ihre Angaben (Name, Kontaktdaten, Bestellinhalt)
-        zur Abwicklung Ihrer Bestellung verarbeitet. Details finden Sie in unserer{" "}
+        Mit dem Absenden der Bestellung werden Ihre Angaben (Name, Kontaktdaten, Bestellinhalt) zur
+        Abwicklung Ihrer Bestellung verarbeitet. Details finden Sie in unserer{" "}
         <Link
           href={`/r/${tenantSlug}/datenschutz`}
           className="font-medium text-link-foreground underline hover:text-brand-700"

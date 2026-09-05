@@ -63,8 +63,8 @@ describe("DatenschutzPage", () => {
     getPublicLegalPageMock.mockResolvedValue(null);
     const { default: DatenschutzPage } = await import("./page");
 
-    await expect(
-      DatenschutzPage({ params: Promise.resolve({ slug: "unknown" }) }),
-    ).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(DatenschutzPage({ params: Promise.resolve({ slug: "unknown" }) })).rejects.toThrow(
+      "NEXT_NOT_FOUND",
+    );
   });
 });

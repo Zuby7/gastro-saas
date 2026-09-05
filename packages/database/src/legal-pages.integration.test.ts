@@ -113,19 +113,17 @@ describe.skipIf(!dbAvailable)("Impressum/Datenschutz legal pages", () => {
       [tenantB.tenantId],
     );
 
-    const imprint = await admin.query<{ get_public_legal_page: { tenantName: string; text: string } }>(
-      `select get_public_legal_page($1, 'imprint') as get_public_legal_page`,
-      [tenantA.slug],
-    );
+    const imprint = await admin.query<{
+      get_public_legal_page: { tenantName: string; text: string };
+    }>(`select get_public_legal_page($1, 'imprint') as get_public_legal_page`, [tenantA.slug]);
     expect(imprint.rows[0]?.get_public_legal_page).toEqual({
       tenantName: "Mario",
       text: "Mario GmbH, Musterstr. 1",
     });
 
-    const privacy = await admin.query<{ get_public_legal_page: { tenantName: string; text: string } }>(
-      `select get_public_legal_page($1, 'privacy') as get_public_legal_page`,
-      [tenantB.slug],
-    );
+    const privacy = await admin.query<{
+      get_public_legal_page: { tenantName: string; text: string };
+    }>(`select get_public_legal_page($1, 'privacy') as get_public_legal_page`, [tenantB.slug]);
     expect(privacy.rows[0]?.get_public_legal_page).toEqual({
       tenantName: "Luigi",
       text: "Datenschutz-Text B",

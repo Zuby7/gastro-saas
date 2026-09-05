@@ -56,7 +56,9 @@ describe("ImpressumPage", () => {
     getPublicLegalPageMock.mockResolvedValue({ tenantName: "Evil Tenant", text: maliciousText });
     const { default: ImpressumPage } = await import("./page");
 
-    const { container } = render(await ImpressumPage({ params: Promise.resolve({ slug: "demo" }) }));
+    const { container } = render(
+      await ImpressumPage({ params: Promise.resolve({ slug: "demo" }) }),
+    );
 
     // The literal markup must appear as plain visible text, not be parsed
     // into a real <img> element -- proving React's text-node escaping (not
@@ -70,8 +72,8 @@ describe("ImpressumPage", () => {
     getPublicLegalPageMock.mockResolvedValue(null);
     const { default: ImpressumPage } = await import("./page");
 
-    await expect(
-      ImpressumPage({ params: Promise.resolve({ slug: "unknown" }) }),
-    ).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(ImpressumPage({ params: Promise.resolve({ slug: "unknown" }) })).rejects.toThrow(
+      "NEXT_NOT_FOUND",
+    );
   });
 });

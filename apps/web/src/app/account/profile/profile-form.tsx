@@ -176,8 +176,8 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
             Datenschutzerklärung
           </label>
           <p className="text-sm text-neutral-500">
-            Freitext, wird 1:1 (ohne HTML-Formatierung) auf der öffentlichen
-            Datenschutz-Seite und im Checkout-Hinweis verlinkt angezeigt.
+            Freitext, wird 1:1 (ohne HTML-Formatierung) auf der öffentlichen Datenschutz-Seite und
+            im Checkout-Hinweis verlinkt angezeigt.
           </p>
           <textarea
             id="legalPrivacyText"
