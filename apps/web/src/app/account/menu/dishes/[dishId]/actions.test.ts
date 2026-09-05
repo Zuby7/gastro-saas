@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PhotonImage } from "@cf-wasm/photon";
 
 const getUserMock = vi.fn();
 const rpcMock = vi.fn();
@@ -64,13 +65,24 @@ function allowPermission() {
 // empirically against this repo's jsdom version) even though real Node/edge
 // runtimes do -- this fake stands in only where the action actually reads
 // the file's bytes.
-function fakeImageFile(name: string, type: string, sizeBytes: number): File {
-  const bytes = new Uint8Array(sizeBytes);
+function fakeFile(name: string, type: string, bytes: Uint8Array): File {
   const file = new File([bytes], name, { type });
   Object.defineProperty(file, "arrayBuffer", {
     value: async () => bytes.buffer,
   });
   return file;
+}
+
+/**
+ * Ticket #72: `uploadDishImageAction` now decodes/re-encodes the upload via
+ * `reEncodeDishImage`, so tests that need the action to reach the storage
+ * upload step must pass real, decodable image bytes -- a zero-filled buffer
+ * (as used pre-#72) is correctly rejected as an invalid image now.
+ */
+function makeValidJpegBytes(width = 4, height = 4): Uint8Array {
+  const pixels = new Uint8Array(width * height * 4).fill(128);
+  const image = new PhotonImage(pixels, width, height);
+  return new Uint8Array(image.get_bytes_jpeg(90));
 }
 
 beforeEach(() => {
@@ -305,13 +317,36 @@ describe("uploadDishImageAction", () => {
     const fd = new FormData();
     fd.set("dishId", "dish-1");
     fd.set("altText", "Ein Teller Pasta");
-    fd.set("file", fakeImageFile("dish.jpg", "image/jpeg", 10));
+    fd.set("file", fakeFile("dish.jpg", "image/jpeg", makeValidJpegBytes()));
 
     const { uploadDishImageAction } = await import("./actions");
     const result = await uploadDishImageAction({}, fd);
 
     expect(result.success).toBeDefined();
     expect(uploadedPath.startsWith("tenant-1/")).toBe(true);
+    // Ticket #72: the action always stores the re-encoded JPEG output, not
+    // the original upload bytes/content-type.
+    expect(uploadedPath.endsWith(".jpg")).toBe(true);
+    expect(storageUploadMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Buffer),
+      expect.objectContaining({ contentType: "image/jpeg" }),
+    );
+  });
+
+  it("rejects a file that declares an allowed MIME type but isn't a decodable image", async () => {
+    allowPermission();
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("altText", "Ein Teller Pasta");
+    const bogusBytes = new TextEncoder().encode("this is not a real image".repeat(10));
+    fd.set("file", fakeFile("fake.jpg", "image/jpeg", bogusBytes));
+
+    const { uploadDishImageAction } = await import("./actions");
+    const result = await uploadDishImageAction({}, fd);
+
+    expect(result.error).toMatch(/gültiges Bild/);
+    expect(storageUploadMock).not.toHaveBeenCalled();
   });
 });
 
