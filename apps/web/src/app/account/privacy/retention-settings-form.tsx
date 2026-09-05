@@ -19,7 +19,7 @@ export function RetentionSettingsForm({ initialRetentionDays }: { initialRetenti
   );
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Aufbewahrungsfrist Analytics-Events</h2>
       <p className="text-sm text-foreground">
         Legt fest, nach wie vielen Tagen Analytics-Events als abgelaufen gelten. Dieses Bereinigen
@@ -32,7 +32,7 @@ export function RetentionSettingsForm({ initialRetentionDays }: { initialRetenti
         <p
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-foreground"
         >
           {state.error}
         </p>
@@ -41,7 +41,7 @@ export function RetentionSettingsForm({ initialRetentionDays }: { initialRetenti
         <p
           role="status"
           aria-live="polite"
-          className="rounded-md border border-neutral-300 bg-neutral-100 p-3 text-sm text-foreground"
+          className="rounded-md border border-neutral-300 bg-surface-muted p-3 text-sm text-foreground"
         >
           {state.success}
         </p>
@@ -72,7 +72,7 @@ export function RetentionSettingsForm({ initialRetentionDays }: { initialRetenti
             className="w-32 rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.analyticsEventsRetentionDays ? (
-            <span id="analyticsEventsRetentionDays-error" className="text-sm text-danger-600">
+            <span id="analyticsEventsRetentionDays-error" className="text-sm text-danger-foreground">
               {state.fieldErrors.analyticsEventsRetentionDays}
             </span>
           ) : null}
@@ -101,7 +101,7 @@ export function RetentionSettingsForm({ initialRetentionDays }: { initialRetenti
           <p
             role="alert"
             aria-live="assertive"
-            className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-600"
+            className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-foreground"
           >
             {purgeState.error}
           </p>
@@ -110,7 +110,7 @@ export function RetentionSettingsForm({ initialRetentionDays }: { initialRetenti
           <p
             role="status"
             aria-live="polite"
-            className="rounded-md border border-neutral-300 bg-neutral-100 p-3 text-sm text-foreground"
+            className="rounded-md border border-neutral-300 bg-surface-muted p-3 text-sm text-foreground"
           >
             {purgeState.success}
           </p>
@@ -120,7 +120,7 @@ export function RetentionSettingsForm({ initialRetentionDays }: { initialRetenti
           <button
             type="submit"
             disabled={isPurgePending}
-            className="w-fit rounded-md border border-neutral-300 px-4 py-2 font-medium text-foreground hover:bg-neutral-100 disabled:opacity-60"
+            className="w-fit rounded-md border border-neutral-300 px-4 py-2 font-medium text-foreground hover:bg-surface-muted disabled:opacity-60"
           >
             {isPurgePending ? "Bereinigt..." : "Jetzt bereinigen"}
           </button>

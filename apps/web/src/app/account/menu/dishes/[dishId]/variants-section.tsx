@@ -37,7 +37,7 @@ export function VariantsSection({
   const [deleteState, deleteFormAction] = useActionState(deleteVariantAction, initialState);
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm">
+    <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Varianten (Größen)</h2>
 
       <ul className="flex flex-col gap-2">
@@ -56,7 +56,7 @@ export function VariantsSection({
                   <input type="hidden" name="variantId" value={variant.id} />
                   <button
                     type="submit"
-                    className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-600"
+                    className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-foreground"
                   >
                     Entfernen
                   </button>
@@ -80,7 +80,7 @@ export function VariantsSection({
         ) : null}
       </ul>
       {deleteState.error ? (
-        <p role="alert" className="text-sm text-danger-600">
+        <p role="alert" className="text-sm text-danger-foreground">
           {deleteState.error}
         </p>
       ) : null}
@@ -122,7 +122,7 @@ export function VariantsSection({
         </form>
       ) : null}
       {createState.error ? (
-        <p role="alert" className="text-sm text-danger-600">
+        <p role="alert" className="text-sm text-danger-foreground">
           {createState.error}
         </p>
       ) : null}

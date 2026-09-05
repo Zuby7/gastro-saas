@@ -21,12 +21,12 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
   const cart = await loadCartViewForDisplay(slug);
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       {/*
         Hero (design pass v2, see `packages/ui/src/tokens.ts`'s header
         comment for context and the approved mockup this replicates): a
         warm, dark diagonal gradient replacing the old flat
-        `bg-neutral-50` header band. The two gradient stops and the
+        `bg-surface-secondary` header band. The two gradient stops and the
         `gold-300` label/badge color are checked against
         `public-menu-design.a11y.test.ts` (contrast measured against
         `espresso-800`, the LIGHTER of the two stops -- the worst case for
@@ -67,7 +67,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
 
       <div className="mx-auto flex max-w-5xl flex-col gap-12 px-5 py-10 sm:px-8">
         {menu.categories.length === 0 ? (
-          <p className="rounded-md border border-neutral-300 bg-neutral-0 p-4 text-foreground">
+          <p className="rounded-md border border-neutral-300 bg-surface p-4 text-foreground">
             Diese Speisekarte ist aktuell leer.
           </p>
         ) : null}

@@ -62,7 +62,7 @@ export function OptionGroupsSection({
   const unassignedGroups = allOptionGroups.filter((group) => !assignedGroupIds.includes(group.id));
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm">
+    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Optionsgruppen &amp; Extras</h2>
 
       <div className="flex flex-col gap-2">
@@ -82,7 +82,7 @@ export function OptionGroupsSection({
                   <input type="hidden" name="optionGroupId" value={group.id} />
                   <button
                     type="submit"
-                    className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-600"
+                    className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-foreground"
                   >
                     Entfernen
                   </button>
@@ -122,12 +122,12 @@ export function OptionGroupsSection({
           </div>
         ))}
         {assignState.error ? (
-          <p role="alert" className="text-sm text-danger-600">
+          <p role="alert" className="text-sm text-danger-foreground">
             {assignState.error}
           </p>
         ) : null}
         {unassignState.error ? (
-          <p role="alert" className="text-sm text-danger-600">
+          <p role="alert" className="text-sm text-danger-foreground">
             {unassignState.error}
           </p>
         ) : null}
@@ -209,7 +209,7 @@ export function OptionGroupsSection({
             {isCreateGroupPending ? "Wird angelegt…" : "Gruppe anlegen"}
           </button>
           {createGroupState.error ? (
-            <p role="alert" className="w-full text-sm text-danger-600">
+            <p role="alert" className="w-full text-sm text-danger-foreground">
               {createGroupState.error}
             </p>
           ) : null}
@@ -266,7 +266,7 @@ export function OptionGroupsSection({
             {isCreateOptionPending ? "Wird angelegt…" : "Option anlegen"}
           </button>
           {createOptionState.error ? (
-            <p role="alert" className="w-full text-sm text-danger-600">
+            <p role="alert" className="w-full text-sm text-danger-foreground">
               {createOptionState.error}
             </p>
           ) : null}

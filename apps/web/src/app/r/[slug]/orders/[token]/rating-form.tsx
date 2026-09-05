@@ -33,7 +33,7 @@ export function RatingForm({ tenantSlug, token }: RatingFormProps) {
     return (
       <section
         aria-live="polite"
-        className="rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm"
+        className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm"
       >
         <h2 className="text-sm font-semibold text-foreground">Vielen Dank für Ihre Bewertung!</h2>
         <p className="mt-1 text-sm text-foreground-secondary">
@@ -44,7 +44,7 @@ export function RatingForm({ tenantSlug, token }: RatingFormProps) {
   }
 
   return (
-    <section className="rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+    <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-foreground">Wie war Ihre Bestellung?</h2>
       <form action={formAction} className="mt-3 flex flex-col gap-4" noValidate>
         <fieldset className="flex flex-col gap-2">
@@ -82,7 +82,7 @@ export function RatingForm({ tenantSlug, token }: RatingFormProps) {
           <p
             role="alert"
             aria-live="assertive"
-            className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm font-medium text-danger-600"
+            className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm font-medium text-danger-foreground"
           >
             {state.error}
           </p>
