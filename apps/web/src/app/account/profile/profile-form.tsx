@@ -10,6 +10,8 @@ export interface ProfileFormInitialValues {
   phone: string;
   timezone: string;
   brandColor: string;
+  legalImprintText: string;
+  legalPrivacyText: string;
 }
 
 const initialState: ProfileFormState = {};
@@ -140,6 +142,58 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
           />
           {state.fieldErrors?.brandColor ? (
             <span className="text-sm text-danger-600">{state.fieldErrors.brandColor}</span>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="legalImprintText" className="text-sm font-medium text-foreground">
+            Impressum
+          </label>
+          <p className="text-sm text-neutral-500">
+            Freitext, wird 1:1 (ohne HTML-Formatierung) auf der öffentlichen Impressum-Seite
+            angezeigt.
+          </p>
+          <textarea
+            id="legalImprintText"
+            name="legalImprintText"
+            rows={8}
+            defaultValue={initial.legalImprintText}
+            aria-invalid={state.fieldErrors?.legalImprintText ? true : undefined}
+            aria-describedby={
+              state.fieldErrors?.legalImprintText ? "legalImprintText-error" : undefined
+            }
+            className="rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm text-foreground"
+          />
+          {state.fieldErrors?.legalImprintText ? (
+            <span id="legalImprintText-error" className="text-sm text-danger-600">
+              {state.fieldErrors.legalImprintText}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="legalPrivacyText" className="text-sm font-medium text-foreground">
+            Datenschutzerklärung
+          </label>
+          <p className="text-sm text-neutral-500">
+            Freitext, wird 1:1 (ohne HTML-Formatierung) auf der öffentlichen
+            Datenschutz-Seite und im Checkout-Hinweis verlinkt angezeigt.
+          </p>
+          <textarea
+            id="legalPrivacyText"
+            name="legalPrivacyText"
+            rows={8}
+            defaultValue={initial.legalPrivacyText}
+            aria-invalid={state.fieldErrors?.legalPrivacyText ? true : undefined}
+            aria-describedby={
+              state.fieldErrors?.legalPrivacyText ? "legalPrivacyText-error" : undefined
+            }
+            className="rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm text-foreground"
+          />
+          {state.fieldErrors?.legalPrivacyText ? (
+            <span id="legalPrivacyText-error" className="text-sm text-danger-600">
+              {state.fieldErrors.legalPrivacyText}
+            </span>
           ) : null}
         </div>
 

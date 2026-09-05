@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { checkoutAction, type CheckoutFormState } from "./actions";
 
@@ -126,6 +127,25 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
           Warenkorb, bevor Sie fortfahren.
         </p>
       ) : null}
+
+      {/*
+        Ticket #41: privacy notice shown before order submission, with a
+        link to the full Datenschutzerklärung. Required by the acceptance
+        criteria -- not gated behind a checkbox (the ticket's non-goal
+        explicitly rules out building a general cookie-consent-banner
+        toolkit beyond what Turnstile/PostHog need).
+      */}
+      <p className="text-sm text-foreground-secondary">
+        Mit dem Absenden der Bestellung werden Ihre Angaben (Name, Kontaktdaten, Bestellinhalt)
+        zur Abwicklung Ihrer Bestellung verarbeitet. Details finden Sie in unserer{" "}
+        <Link
+          href={`/r/${tenantSlug}/datenschutz`}
+          className="font-medium text-link-foreground underline hover:text-brand-700"
+        >
+          Datenschutzerklärung
+        </Link>
+        .
+      </p>
 
       <button
         type="submit"

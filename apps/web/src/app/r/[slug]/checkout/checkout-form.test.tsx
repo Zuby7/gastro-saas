@@ -57,4 +57,13 @@ describe("CheckoutForm accessibility", () => {
     ).toBe(true);
     expect(screen.getByRole("button", { name: "Bestellung abschicken" })).toBeDisabled();
   });
+
+  // Ticket #41: privacy notice with a link to the full Datenschutzerklärung,
+  // shown before the order can be submitted.
+  it("shows a privacy notice linking to the tenant's Datenschutzerklärung before submission", () => {
+    render(<CheckoutForm tenantSlug="demo" checkoutReady />);
+
+    const link = screen.getByRole("link", { name: "Datenschutzerklärung" });
+    expect(link).toHaveAttribute("href", "/r/demo/datenschutz");
+  });
 });
