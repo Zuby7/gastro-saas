@@ -354,9 +354,10 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
       ),
     ).rejects.toThrow(/duplicate key value|unique constraint/i);
 
-    const count = await admin.query(`select count(*)::int as count from refunds where payment_id = $1`, [
-      paymentId,
-    ]);
+    const count = await admin.query(
+      `select count(*)::int as count from refunds where payment_id = $1`,
+      [paymentId],
+    );
     expect(count.rows[0].count).toBe(1);
   });
 
@@ -383,9 +384,10 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
     );
     expect(second.rows).toHaveLength(1);
 
-    const count = await admin.query(`select count(*)::int as count from refunds where payment_id = $1`, [
-      paymentId,
-    ]);
+    const count = await admin.query(
+      `select count(*)::int as count from refunds where payment_id = $1`,
+      [paymentId],
+    );
     expect(count.rows[0].count).toBe(2);
   });
 

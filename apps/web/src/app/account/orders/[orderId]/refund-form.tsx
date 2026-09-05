@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useRef } from "react";
 import { issueRefundAction, type RefundActionState } from "./actions";
 
 const initialState: RefundActionState = {};
@@ -16,15 +16,12 @@ export function RefundForm({
   // Request idempotency token (issue #97, risk:payment): one crypto.randomUUID()
   // per submission attempt. A double-click before `isPending` flips true
   // submits this SAME value twice -- the server rejects the repeat
-  // (see refund-service.ts's DuplicateRefundRequestError). Regenerated after
-  // every settled action so the next, genuinely new submission gets a fresh
-  // token rather than being permanently stuck reusing one.
-  const [requestToken, setRequestToken] = useState(() => crypto.randomUUID());
-  useEffect(() => {
-    if (state.success || state.error) {
-      setRequestToken(crypto.randomUUID());
-    }
-  }, [state.success, state.error]);
+  // (see refund-service.ts's DuplicateRefundRequestError). The hidden input is
+  // uncontrolled; we mutate its DOM value directly in the submit handler
+  // (synchronously, before the native submission is captured) so every new
+  // submission attempt gets a fresh token without a setState-in-effect
+  // cascading-render pattern.
+  const requestTokenRef = useRef<HTMLInputElement>(null);
 
   return (
     <form
@@ -32,12 +29,22 @@ export function RefundForm({
       className="flex flex-col gap-3"
       noValidate
       aria-labelledby="refund-form-heading"
+      onSubmit={() => {
+        if (requestTokenRef.current) {
+          requestTokenRef.current.value = crypto.randomUUID();
+        }
+      }}
     >
       <h3 id="refund-form-heading" className="text-base font-medium text-foreground">
         Rückerstattung auslösen
       </h3>
       <input type="hidden" name="orderId" value={orderId} />
-      <input type="hidden" name="requestToken" value={requestToken} />
+      <input
+        ref={requestTokenRef}
+        type="hidden"
+        name="requestToken"
+        defaultValue={crypto.randomUUID()}
+      />
 
       <div className="flex flex-col gap-1">
         <label htmlFor="refund-amount" className="text-sm font-medium text-foreground">

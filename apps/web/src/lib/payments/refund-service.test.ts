@@ -554,9 +554,7 @@ describe("issueRefundForOrder", () => {
       code: "23505",
     };
 
-    const { issueRefundForOrder, DuplicateRefundRequestError } = await import(
-      "./refund-service"
-    );
+    const { issueRefundForOrder, DuplicateRefundRequestError } = await import("./refund-service");
 
     await expect(
       issueRefundForOrder(fakeSupabase() as never, {
@@ -573,9 +571,8 @@ describe("issueRefundForOrder", () => {
   });
 
   it("rejects an invalid (non-UUID) request token before ever touching the database", async () => {
-    const { issueRefundForOrder, RefundInvalidRequestTokenError } = await import(
-      "./refund-service"
-    );
+    const { issueRefundForOrder, RefundInvalidRequestTokenError } =
+      await import("./refund-service");
 
     await expect(
       issueRefundForOrder(fakeSupabase() as never, {
