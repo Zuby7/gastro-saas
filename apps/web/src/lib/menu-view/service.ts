@@ -62,3 +62,82 @@ export async function recordMenuViewOnce(tenantSlug: string, tenantId: string): 
     console.error("[menu-view] recordMenuViewOnce failed", error);
   }
 }
+
+/**
+ * Records one rate-limited, deduplicated `dish_view` analytics event for a
+ * single dish, mirroring `recordMenuViewOnce()` exactly (see
+ * `record_dish_view()`,
+ * supabase/migrations/20260906090000_dish_view_and_add_to_cart_analytics.sql).
+ *
+ * Reuses the same per-tenant menu-view session cookie as `recordMenuViewOnce`
+ * (ticket #67) -- both are "this anonymous browser session on this tenant's
+ * public menu today" signals. `tenantId`/`dishId` must already be resolved
+ * server-side (never client-supplied without independent verification).
+ * Never throws: analytics is best-effort and must never break menu
+ * rendering for a real visitor.
+ */
+export async function recordDishViewOnce(
+  tenantSlug: string,
+  tenantId: string,
+  dishId: string,
+): Promise<void> {
+  try {
+    const token = await readMenuViewToken(tenantSlug);
+    if (!token) {
+      return;
+    }
+
+    const ip = await getClientIp();
+    const admin = createSupabaseAdminClient();
+    const { error } = await admin.rpc("record_dish_view", {
+      p_tenant_id: tenantId,
+      p_dish_id: dishId,
+      p_session_token_hash: hashMenuViewToken(token),
+      p_ip_hash: hashIp(ip),
+    });
+
+    if (error) {
+      console.error("[menu-view] record_dish_view failed", error);
+    }
+  } catch (error) {
+    console.error("[menu-view] recordDishViewOnce failed", error);
+  }
+}
+
+/**
+ * Records one rate-limited, deduplicated `add_to_cart` analytics event for a
+ * single dish (see `record_add_to_cart_event()`,
+ * supabase/migrations/20260906090000_dish_view_and_add_to_cart_analytics.sql).
+ *
+ * Called from the `add_cart_item()` success path
+ * (`apps/web/src/app/r/[slug]/cart/actions.ts`'s `addToCartAction`), after
+ * the cart mutation itself has already succeeded -- never blocks or fails
+ * the cart action on an analytics error.
+ */
+export async function recordAddToCartEventOnce(
+  tenantSlug: string,
+  tenantId: string,
+  dishId: string,
+): Promise<void> {
+  try {
+    const token = await readMenuViewToken(tenantSlug);
+    if (!token) {
+      return;
+    }
+
+    const ip = await getClientIp();
+    const admin = createSupabaseAdminClient();
+    const { error } = await admin.rpc("record_add_to_cart_event", {
+      p_tenant_id: tenantId,
+      p_dish_id: dishId,
+      p_session_token_hash: hashMenuViewToken(token),
+      p_ip_hash: hashIp(ip),
+    });
+
+    if (error) {
+      console.error("[menu-view] record_add_to_cart_event failed", error);
+    }
+  } catch (error) {
+    console.error("[menu-view] recordAddToCartEventOnce failed", error);
+  }
+}

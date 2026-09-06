@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
 import { resolveTenantIdBySlug } from "@/lib/cart/service";
-import { recordMenuViewOnce } from "@/lib/menu-view/service";
+import { recordDishViewOnce, recordMenuViewOnce } from "@/lib/menu-view/service";
 import { getPublicMenu } from "@/lib/public-menu/fetch";
 import { loadCartViewForDisplay } from "./cart/actions";
 import { CategoryNav } from "./category-nav";
@@ -30,6 +30,16 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
   const tenantId = await resolveTenantIdBySlug(slug);
   if (tenantId) {
     await recordMenuViewOnce(slug, tenantId);
+
+    // Ticket #120 part B: record a rate-limited/deduplicated dish_view event
+    // for every dish shown on this render, resolving both tenant_id and
+    // dish ids server-side from the already-fetched (never client-supplied)
+    // menu -- fired in parallel so this doesn't add per-dish serial latency
+    // to a server-rendered page (see `.claude/rules/frontend.md`).
+    const dishIds = menu.categories.flatMap((category) =>
+      category.dishes.map((dish) => dish.id),
+    );
+    await Promise.all(dishIds.map((dishId) => recordDishViewOnce(slug, tenantId, dishId)));
   }
 
   return (

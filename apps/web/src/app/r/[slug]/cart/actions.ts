@@ -13,6 +13,7 @@ import {
   updateCartItemQuantity,
 } from "@/lib/cart/service";
 import type { CartView } from "@/lib/cart/types";
+import { recordAddToCartEventOnce } from "@/lib/menu-view/service";
 import { AddToCartSchema, RemoveCartItemSchema, UpdateCartItemQuantitySchema } from "./schemas";
 
 export interface CartActionState {
@@ -57,6 +58,12 @@ export async function addToCartAction(
     });
 
     revalidatePath(`/r/${tenantSlug}/cart`);
+
+    // Ticket #120 part B: record a rate-limited/deduplicated add_to_cart
+    // event only after the cart mutation itself has already succeeded --
+    // never blocks or fails the cart action on an analytics error.
+    await recordAddToCartEventOnce(tenantSlug, tenantId, parsed.data.dishId);
+
     return { cart };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unbekannter Fehler." };
