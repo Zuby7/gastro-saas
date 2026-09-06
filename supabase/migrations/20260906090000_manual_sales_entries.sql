@@ -199,7 +199,29 @@ alter table manual_sales_entries enable row level security;
 grant select, insert, update, delete on manual_sales_entries to authenticated;
 grant all on manual_sales_entries to service_role;
 
+-- `apply_basic_tenant_policies()` was a transient helper, scoped to and
+-- dropped at the end of 20260801110000_restaurant_profile_and_menu_management.sql
+-- -- it no longer exists in the schema by this migration's own apply time.
+-- Recreated here (identical body) so this migration can keep using the same,
+-- already-battle-tested RLS shape as every other tenant-scoped admin table,
+-- then dropped again at the end, mirroring that same original pattern.
+create or replace function apply_basic_tenant_policies(p_table regclass, p_write_permission text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  execute format('create policy %I on %s for select to authenticated using (public.is_tenant_member(tenant_id))', p_table::text || '_select_member', p_table);
+  execute format('create policy %I on %s for insert to authenticated with check (public.has_tenant_permission(tenant_id, %L))', p_table::text || '_insert_write', p_table, p_write_permission);
+  execute format('create policy %I on %s for update to authenticated using (public.has_tenant_permission(tenant_id, %L)) with check (public.has_tenant_permission(tenant_id, %L))', p_table::text || '_update_write', p_table, p_write_permission, p_write_permission);
+  execute format('create policy %I on %s for delete to authenticated using (public.has_tenant_permission(tenant_id, %L))', p_table::text || '_delete_write', p_table, p_write_permission);
+end;
+$$;
+
 select apply_basic_tenant_policies('manual_sales_entries', 'analytics.manualsales.write');
+
+drop function apply_basic_tenant_policies(regclass, text);
 
 -- ----------------------------------------------------------------------------
 -- get_analytics_dashboard_summary(): additive manual-sales fields
