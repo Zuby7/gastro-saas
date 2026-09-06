@@ -121,6 +121,29 @@ function makeSolidColorJpeg(width: number, height: number): Uint8Array {
   return image.get_bytes_jpeg(90);
 }
 
+/**
+ * Builds the minimal bytes needed for `readImageDimensionsFromHeader`'s JPEG
+ * parser to read a width/height: SOI marker, then a single SOF0 segment
+ * declaring the given dimensions. Deliberately NOT a fully valid/decodable
+ * JPEG (no scan data) -- the whole point of the pixel-bomb guard is to reject
+ * based on the header alone, before any decode is attempted, so a fixture
+ * this minimal is exactly what a real attack payload would look like (a
+ * tiny file that merely *claims* huge dimensions).
+ */
+function makeMinimalJpegHeader(width: number, height: number): Uint8Array {
+  const bytes = new Uint8Array(11);
+  const view = new DataView(bytes.buffer);
+  bytes[0] = 0xff;
+  bytes[1] = 0xd8; // SOI
+  bytes[2] = 0xff;
+  bytes[3] = 0xc0; // SOF0
+  view.setUint16(4, 7, false); // segment length (includes itself)
+  bytes[6] = 8; // sample precision
+  view.setUint16(7, height, false);
+  view.setUint16(9, width, false);
+  return bytes;
+}
+
 describe("reEncodeDishImage", () => {
   it("re-encodes a valid image and returns JPEG bytes", () => {
     const result = reEncodeDishImage(makeSolidColorJpeg(20, 20));
@@ -195,14 +218,41 @@ describe("reEncodeDishImage", () => {
     expect(decoded.get_height()).toBe(20);
   });
 
-  it("rejects an image whose decoded pixel count exceeds the decompression-bomb budget", () => {
-    // Simulates a maliciously-crafted small JPEG that decodes successfully
-    // but declares huge dimensions (e.g. 30000x30000): the guard must reject
-    // it based on width/height alone, *before* any resize/RGBA buffer
-    // allocation is attempted. A fake decoded image (no real multi-hundred-
-    // megapixel pixel buffer) keeps this test fast and memory-safe while
-    // still exercising the exact `width * height > MAX_DECODED_PIXELS`
-    // check in the production code.
+  it("rejects an image whose HEADER declares a pixel count exceeding the decompression-bomb budget, without ever decoding it", () => {
+    // Simulates a maliciously-crafted, tiny-on-disk JPEG that *declares* huge
+    // dimensions in its SOF0 header (e.g. 30000x30000) but carries none of
+    // the actual scan data a real image that size would need. The guard must
+    // reject it based on the raw header bytes alone, before
+    // `PhotonImage.new_from_byteslice` is ever called -- if the guard instead
+    // only checked the *decoded* image's `get_width`/`get_height` (as it used
+    // to), this exact input would already have made photon attempt to
+    // allocate a multi-gigabyte RGBA buffer by the time that check could run.
+    // `PhotonImage.new_from_byteslice` is spied on (not mocked/replaced) so
+    // this test also verifies it is genuinely never invoked, not just that
+    // the function returns an error.
+    const decodeSpy = vi.spyOn(PhotonImage, "new_from_byteslice");
+
+    const hugeSide = Math.ceil(Math.sqrt(MAX_DECODED_PIXELS)) + 1000;
+    const bogusHugeJpeg = makeMinimalJpegHeader(hugeSide, hugeSide);
+
+    const result = reEncodeDishImage(bogusHugeJpeg);
+
+    expect(decodeSpy).not.toHaveBeenCalled();
+    decodeSpy.mockRestore();
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe("invalid_image");
+  });
+
+  it("still rejects an oversized image via the post-decode check when its header can't be parsed by the header-only guard", () => {
+    // Defense-in-depth: a real, decodable, oversized image whose header this
+    // minimal parser doesn't recognize must still be rejected -- via the
+    // existing post-decode `get_width`/`get_height` check -- rather than
+    // silently let an oversized image through just because the fast-path
+    // header parse failed. A real (small, valid) fixture already decodes
+    // correctly, so the fake-decoded-dimensions spy below only stands in for
+    // the "declares huge dimensions" part, not for decodability itself.
     const hugeSide = Math.ceil(Math.sqrt(MAX_DECODED_PIXELS)) + 1000;
     const fakeDecoded = {
       get_width: () => hugeSide,
@@ -211,7 +261,11 @@ describe("reEncodeDishImage", () => {
 
     const decodeSpy = vi.spyOn(PhotonImage, "new_from_byteslice").mockReturnValueOnce(fakeDecoded);
 
-    const result = reEncodeDishImage(new Uint8Array([0xff, 0xd8, 0xff, 0xdb]));
+    // Bytes that don't match this module's minimal JPEG/PNG/WebP header
+    // parser at all, so `readImageDimensionsFromHeader` returns `null` and
+    // the header-only guard can't run -- falling through to the post-decode
+    // check exercised via the mocked decode result above.
+    const result = reEncodeDishImage(new Uint8Array([0x00, 0x00, 0x00, 0x00]));
 
     decodeSpy.mockRestore();
 

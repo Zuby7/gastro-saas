@@ -604,6 +604,12 @@ export async function toggleAssignmentAction(
  * The original `file.type`/`file.size` are only used for the pre-upload
  * gate; the *stored* `content_type`/`size_bytes` always reflect the
  * re-encoded output, not the original upload.
+ *
+ * Authorization (`requireMenuWriteContext`/`ensurePermission`) runs BEFORE
+ * `reEncodeDishImage` -- the re-encode is real CPU/WASM work, and an
+ * unauthorized caller must not be able to trigger it (Opus review finding on
+ * PR #132: it previously ran the re-encode first, before any permission
+ * check).
  */
 export async function uploadDishImageAction(
   _prevState: DishActionState,
@@ -629,6 +635,14 @@ export async function uploadDishImageAction(
     return { error: "Das Bild darf höchstens 5 MB groß sein." };
   }
 
+  // Authorization runs BEFORE any file read/re-encode work below: the
+  // re-encode (photon WASM decode/resize) is real CPU/memory work, and an
+  // unauthorized caller shouldn't be able to trigger it just by holding a
+  // valid image file (Opus review finding on PR #132).
+  const { supabase, tenantId } = await requireMenuWriteContext();
+  const denied = await ensurePermission(supabase, tenantId);
+  if (denied) return denied;
+
   const originalBytes = new Uint8Array(await file.arrayBuffer());
   const reEncoded = reEncodeDishImage(originalBytes);
 
@@ -641,10 +655,6 @@ export async function uploadDishImageAction(
   if (buffer.byteLength > MAX_IMAGE_SIZE_BYTES) {
     return { error: "Das Bild darf höchstens 5 MB groß sein." };
   }
-
-  const { supabase, tenantId } = await requireMenuWriteContext();
-  const denied = await ensurePermission(supabase, tenantId);
-  if (denied) return denied;
 
   const storagePath = `${tenantId}/${randomUUID()}.${REENCODED_EXTENSION}`;
 

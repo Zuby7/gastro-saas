@@ -33,18 +33,30 @@
  * gives predictable, bounded output sizes instead.
  */
 import { PhotonImage, resize, SamplingFilter } from "@cf-wasm/photon";
+import { readImageDimensionsFromHeader } from "./image-header-dimensions";
 
 export const MAX_DIMENSION_PX = 1600;
 export const JPEG_QUALITY = 82;
 
 /**
- * Upper bound on decoded pixel count, checked *before* any resize/RGBA
- * allocation. Guards against a decompression-bomb upload: a small JPEG can
- * declare huge dimensions (e.g. 30000x30000), which would otherwise make
- * photon allocate a full-resolution RGBA buffer in WASM memory before
- * downscaling ever runs. 40 megapixels comfortably covers any real dish
- * photo (well beyond typical phone camera output) while bounding worst-case
- * memory use.
+ * Upper bound on decoded pixel count. Guards against a decompression-bomb
+ * upload: a small-on-disk JPEG/PNG/WebP can declare huge dimensions (e.g.
+ * 30000x30000), which would make `photon` allocate a full-resolution RGBA
+ * buffer in WASM memory (~3.6 GB for that example) if it were ever decoded.
+ * 40 megapixels comfortably covers any real dish photo (well beyond typical
+ * phone camera output) while bounding worst-case memory use.
+ *
+ * This is checked TWICE, deliberately:
+ *  1. Against `readImageDimensionsFromHeader`'s header-only parse, BEFORE
+ *     `PhotonImage.new_from_byteslice` is ever called -- this is the check
+ *     that actually prevents the decode allocation, since it never decodes
+ *     any pixel data.
+ *  2. Against the already-decoded `PhotonImage`'s own `get_width`/`get_height`
+ *     (unchanged from before), as defense-in-depth for any file whose header
+ *     this minimal parser fails to recognize (in which case check 1 can't
+ *     run and the decode already happened) -- this second check can't undo
+ *     an allocation that already happened, but still stops an oversized
+ *     image from reaching the resize/re-encode step.
  */
 export const MAX_DECODED_PIXELS = 40_000_000;
 
@@ -60,6 +72,14 @@ export type ReEncodeResult = { ok: true; buffer: Buffer } | { ok: false; error: 
  * decoded as a valid image (e.g. a non-image file with a spoofed MIME type).
  */
 export function reEncodeDishImage(input: Uint8Array): ReEncodeResult {
+  // Check 1 (see MAX_DECODED_PIXELS' comment above): reject based on the raw
+  // header alone, before any decode call, so an oversized image never causes
+  // photon to allocate a full-resolution RGBA buffer in the first place.
+  const headerDimensions = readImageDimensionsFromHeader(input);
+  if (headerDimensions && headerDimensions.width * headerDimensions.height > MAX_DECODED_PIXELS) {
+    return { ok: false, error: "invalid_image" };
+  }
+
   let photonImage: PhotonImage;
   try {
     photonImage = PhotonImage.new_from_byteslice(input);

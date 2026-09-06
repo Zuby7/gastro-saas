@@ -18,6 +18,15 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+// Wraps the real `reEncodeDishImage` in a spy (rather than a full mock) so
+// that most tests below still exercise its real decode/re-encode behavior,
+// while the authorization-ordering test can assert it was never called.
+vi.mock("@/lib/images/re-encode-dish-image", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/images/re-encode-dish-image")>();
+  return { ...actual, reEncodeDishImage: vi.fn(actual.reEncodeDishImage) };
+});
+
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
     auth: { getUser: getUserMock },
@@ -336,6 +345,24 @@ describe("uploadDishImageAction", () => {
       expect.any(Buffer),
       expect.objectContaining({ contentType: "image/jpeg" }),
     );
+  });
+
+  it("denies the upload before re-encoding when the caller lacks menu.write, even with a valid image", async () => {
+    denyPermission();
+    const { reEncodeDishImage } = await import("@/lib/images/re-encode-dish-image");
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("altText", "Ein Teller Pasta");
+    fd.set("file", fakeFile("dish.jpg", "image/jpeg", makeValidJpegBytes()));
+
+    const { uploadDishImageAction } = await import("./actions");
+    const result = await uploadDishImageAction({}, fd);
+
+    expect(result.error).toContain("nicht die erforderliche Berechtigung");
+    // The permission check must run BEFORE the (expensive, WASM) re-encode --
+    // an unauthorized caller must not be able to trigger it at all.
+    expect(reEncodeDishImage).not.toHaveBeenCalled();
+    expect(storageUploadMock).not.toHaveBeenCalled();
   });
 
   it("rejects a file that declares an allowed MIME type but isn't a decodable image", async () => {
