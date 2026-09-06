@@ -41,7 +41,9 @@ const dbAvailable = await probeDatabase();
 
 if (!dbAvailable) {
   if (isCiEnvironment) {
-    throw new Error(`[dish-engagement-analytics.integration.test] no reachable Postgres at ${DB_URL}.`);
+    throw new Error(
+      `[dish-engagement-analytics.integration.test] no reachable Postgres at ${DB_URL}.`,
+    );
   }
   console.warn(
     `[dish-engagement-analytics.integration.test] Skipping: no reachable Postgres at ${DB_URL}.`,
@@ -79,218 +81,246 @@ async function seedPublishedDish(admin: Client, tenantId: string): Promise<strin
   return dishId;
 }
 
-describe.skipIf(!dbAvailable)("record_dish_view / record_add_to_cart_event (ticket #120 part B)", () => {
-  let admin: Client;
-  let fixture: TwoTenantFixture;
+describe.skipIf(!dbAvailable)(
+  "record_dish_view / record_add_to_cart_event (ticket #120 part B)",
+  () => {
+    let admin: Client;
+    let fixture: TwoTenantFixture;
 
-  beforeAll(async () => {
-    admin = new Client({ connectionString: DB_URL });
-    await admin.connect();
-  });
-
-  afterAll(async () => {
-    await admin.end();
-  });
-
-  afterEach(async () => {
-    await fixture?.cleanup();
-  });
-
-  async function recordDishView(tenantId: string, dishId: string, sessionTokenHash: string, ipHash: string) {
-    const result = await admin.query<{ record_dish_view: boolean }>(
-      `select record_dish_view($1, $2, $3, $4) as record_dish_view`,
-      [tenantId, dishId, sessionTokenHash, ipHash],
-    );
-    return result.rows[0]!.record_dish_view;
-  }
-
-  async function recordAddToCart(tenantId: string, dishId: string, sessionTokenHash: string, ipHash: string) {
-    const result = await admin.query<{ record_add_to_cart_event: boolean }>(
-      `select record_add_to_cart_event($1, $2, $3, $4) as record_add_to_cart_event`,
-      [tenantId, dishId, sessionTokenHash, ipHash],
-    );
-    return result.rows[0]!.record_add_to_cart_event;
-  }
-
-  async function countEvents(tenantId: string, eventType: string): Promise<number> {
-    const result = await admin.query<{ c: string }>(
-      `select count(*)::int as c from analytics_events where tenant_id = $1 and event_type = $2`,
-      [tenantId, eventType],
-    );
-    return Number(result.rows[0]!.c);
-  }
-
-  describe("record_dish_view", () => {
-    it("dedupes repeated calls for the same tenant+dish+session+day into exactly one event", async () => {
-      fixture = await seedTwoTenantFixture(admin);
-      const { tenantA } = fixture;
-      const dishId = await seedPublishedDish(admin, tenantA.tenantId);
-      const sessionHash = hash(`session-${randomUUID()}`);
-      const ipHash = hash("203.0.113.20");
-
-      const first = await recordDishView(tenantA.tenantId, dishId, sessionHash, ipHash);
-      const second = await recordDishView(tenantA.tenantId, dishId, sessionHash, ipHash);
-
-      expect(first).toBe(true);
-      expect(second).toBe(false);
-      expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(1);
+    beforeAll(async () => {
+      admin = new Client({ connectionString: DB_URL });
+      await admin.connect();
     });
 
-    it("counts a different session for the same tenant+dish as an independent event", async () => {
-      fixture = await seedTwoTenantFixture(admin);
-      const { tenantA } = fixture;
-      const dishId = await seedPublishedDish(admin, tenantA.tenantId);
-      const ipHash = hash("203.0.113.21");
-
-      await recordDishView(tenantA.tenantId, dishId, hash(`session-${randomUUID()}`), ipHash);
-      await recordDishView(tenantA.tenantId, dishId, hash(`session-${randomUUID()}`), ipHash);
-
-      expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(2);
+    afterAll(async () => {
+      await admin.end();
     });
 
-    it("counts the same session again once the dedup day rolls over", async () => {
-      fixture = await seedTwoTenantFixture(admin);
-      const { tenantA } = fixture;
-      const dishId = await seedPublishedDish(admin, tenantA.tenantId);
-      const sessionHash = hash(`session-${randomUUID()}`);
-      const ipHash = hash("203.0.113.22");
+    afterEach(async () => {
+      await fixture?.cleanup();
+    });
 
-      expect(await recordDishView(tenantA.tenantId, dishId, sessionHash, ipHash)).toBe(true);
+    async function recordDishView(
+      tenantId: string,
+      dishId: string,
+      sessionTokenHash: string,
+      ipHash: string,
+    ) {
+      const result = await admin.query<{ record_dish_view: boolean }>(
+        `select record_dish_view($1, $2, $3, $4) as record_dish_view`,
+        [tenantId, dishId, sessionTokenHash, ipHash],
+      );
+      return result.rows[0]!.record_dish_view;
+    }
 
-      await admin.query(
-        `update dish_engagement_attempts set view_date = view_date - interval '1 day'
+    async function recordAddToCart(
+      tenantId: string,
+      dishId: string,
+      sessionTokenHash: string,
+      ipHash: string,
+    ) {
+      const result = await admin.query<{ record_add_to_cart_event: boolean }>(
+        `select record_add_to_cart_event($1, $2, $3, $4) as record_add_to_cart_event`,
+        [tenantId, dishId, sessionTokenHash, ipHash],
+      );
+      return result.rows[0]!.record_add_to_cart_event;
+    }
+
+    async function countEvents(tenantId: string, eventType: string): Promise<number> {
+      const result = await admin.query<{ c: string }>(
+        `select count(*)::int as c from analytics_events where tenant_id = $1 and event_type = $2`,
+        [tenantId, eventType],
+      );
+      return Number(result.rows[0]!.c);
+    }
+
+    describe("record_dish_view", () => {
+      it("dedupes repeated calls for the same tenant+dish+session+day into exactly one event", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const dishId = await seedPublishedDish(admin, tenantA.tenantId);
+        const sessionHash = hash(`session-${randomUUID()}`);
+        const ipHash = hash("203.0.113.20");
+
+        const first = await recordDishView(tenantA.tenantId, dishId, sessionHash, ipHash);
+        const second = await recordDishView(tenantA.tenantId, dishId, sessionHash, ipHash);
+
+        expect(first).toBe(true);
+        expect(second).toBe(false);
+        expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(1);
+      });
+
+      it("counts a different session for the same tenant+dish as an independent event", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const dishId = await seedPublishedDish(admin, tenantA.tenantId);
+        const ipHash = hash("203.0.113.21");
+
+        await recordDishView(tenantA.tenantId, dishId, hash(`session-${randomUUID()}`), ipHash);
+        await recordDishView(tenantA.tenantId, dishId, hash(`session-${randomUUID()}`), ipHash);
+
+        expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(2);
+      });
+
+      it("counts the same session again once the dedup day rolls over", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const dishId = await seedPublishedDish(admin, tenantA.tenantId);
+        const sessionHash = hash(`session-${randomUUID()}`);
+        const ipHash = hash("203.0.113.22");
+
+        expect(await recordDishView(tenantA.tenantId, dishId, sessionHash, ipHash)).toBe(true);
+
+        await admin.query(
+          `update dish_engagement_attempts set view_date = view_date - interval '1 day'
          where tenant_id = $1 and dish_id = $2 and event_type = 'dish_view' and session_token_hash = $3`,
-        [tenantA.tenantId, dishId, sessionHash],
-      );
-
-      expect(await recordDishView(tenantA.tenantId, dishId, sessionHash, ipHash)).toBe(true);
-      expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(2);
-    });
-
-    it("rate-limits a burst of rapid calls from the same tenant+ip bucket, even across distinct sessions", async () => {
-      fixture = await seedTwoTenantFixture(admin);
-      const { tenantA } = fixture;
-      const dishId = await seedPublishedDish(admin, tenantA.tenantId);
-      const ipHash = hash("203.0.113.23");
-
-      // Fixed threshold is 200/10min (see the migration's header comment) --
-      // fire well past it, each with its own fresh session and dish
-      // reference, to prove a session-rotating burst still can't create
-      // unbounded rows.
-      const attempts = 210;
-      const results: boolean[] = [];
-      for (let i = 0; i < attempts; i += 1) {
-        results.push(
-          await recordDishView(tenantA.tenantId, dishId, hash(`burst-session-${i}-${randomUUID()}`), ipHash),
+          [tenantA.tenantId, dishId, sessionHash],
         );
-      }
 
-      const recordedCount = results.filter(Boolean).length;
-      expect(recordedCount).toBe(200);
-      expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(200);
-    }, 30000);
+        expect(await recordDishView(tenantA.tenantId, dishId, sessionHash, ipHash)).toBe(true);
+        expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(2);
+      });
 
-    it("rejects a dish id that doesn't belong to the given tenant (no cross-tenant attribution)", async () => {
-      fixture = await seedTwoTenantFixture(admin);
-      const { tenantA, tenantB } = fixture;
-      const dishIdOwnedByTenantB = await seedPublishedDish(admin, tenantB.tenantId);
+      it("rate-limits a burst of rapid calls from the same tenant+ip bucket, even across distinct sessions", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const dishId = await seedPublishedDish(admin, tenantA.tenantId);
+        const ipHash = hash("203.0.113.23");
 
-      const result = await recordDishView(
-        tenantA.tenantId,
-        dishIdOwnedByTenantB,
-        hash("session"),
-        hash("203.0.113.24"),
-      );
+        // Fixed threshold is 200/10min (see the migration's header comment) --
+        // fire well past it, each with its own fresh session and dish
+        // reference, to prove a session-rotating burst still can't create
+        // unbounded rows.
+        const attempts = 210;
+        const results: boolean[] = [];
+        for (let i = 0; i < attempts; i += 1) {
+          results.push(
+            await recordDishView(
+              tenantA.tenantId,
+              dishId,
+              hash(`burst-session-${i}-${randomUUID()}`),
+              ipHash,
+            ),
+          );
+        }
 
-      expect(result).toBe(false);
-      expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(0);
-      expect(await countEvents(tenantB.tenantId, "dish_view")).toBe(0);
+        const recordedCount = results.filter(Boolean).length;
+        expect(recordedCount).toBe(200);
+        expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(200);
+      }, 30000);
+
+      it("rejects a dish id that doesn't belong to the given tenant (no cross-tenant attribution)", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA, tenantB } = fixture;
+        const dishIdOwnedByTenantB = await seedPublishedDish(admin, tenantB.tenantId);
+
+        const result = await recordDishView(
+          tenantA.tenantId,
+          dishIdOwnedByTenantB,
+          hash("session"),
+          hash("203.0.113.24"),
+        );
+
+        expect(result).toBe(false);
+        expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(0);
+        expect(await countEvents(tenantB.tenantId, "dish_view")).toBe(0);
+      });
+
+      it("keeps the same raw session token independent across two tenants' own dishes (no cross-tenant leak)", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA, tenantB } = fixture;
+        const dishA = await seedPublishedDish(admin, tenantA.tenantId);
+        const dishB = await seedPublishedDish(admin, tenantB.tenantId);
+        const sharedSessionHash = hash("shared-browser-session");
+        const ipHash = hash("203.0.113.25");
+
+        const resultA = await recordDishView(tenantA.tenantId, dishA, sharedSessionHash, ipHash);
+        const resultB = await recordDishView(tenantB.tenantId, dishB, sharedSessionHash, ipHash);
+        const resultARepeat = await recordDishView(
+          tenantA.tenantId,
+          dishA,
+          sharedSessionHash,
+          ipHash,
+        );
+
+        expect(resultA).toBe(true);
+        expect(resultB).toBe(true);
+        expect(resultARepeat).toBe(false);
+        expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(1);
+        expect(await countEvents(tenantB.tenantId, "dish_view")).toBe(1);
+      });
     });
 
-    it("keeps the same raw session token independent across two tenants' own dishes (no cross-tenant leak)", async () => {
-      fixture = await seedTwoTenantFixture(admin);
-      const { tenantA, tenantB } = fixture;
-      const dishA = await seedPublishedDish(admin, tenantA.tenantId);
-      const dishB = await seedPublishedDish(admin, tenantB.tenantId);
-      const sharedSessionHash = hash("shared-browser-session");
-      const ipHash = hash("203.0.113.25");
+    describe("record_add_to_cart_event", () => {
+      it("dedupes repeated calls for the same tenant+dish+session+day into exactly one event", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const dishId = await seedPublishedDish(admin, tenantA.tenantId);
+        const sessionHash = hash(`session-${randomUUID()}`);
+        const ipHash = hash("203.0.113.30");
 
-      const resultA = await recordDishView(tenantA.tenantId, dishA, sharedSessionHash, ipHash);
-      const resultB = await recordDishView(tenantB.tenantId, dishB, sharedSessionHash, ipHash);
-      const resultARepeat = await recordDishView(tenantA.tenantId, dishA, sharedSessionHash, ipHash);
+        const first = await recordAddToCart(tenantA.tenantId, dishId, sessionHash, ipHash);
+        const second = await recordAddToCart(tenantA.tenantId, dishId, sessionHash, ipHash);
 
-      expect(resultA).toBe(true);
-      expect(resultB).toBe(true);
-      expect(resultARepeat).toBe(false);
-      expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(1);
-      expect(await countEvents(tenantB.tenantId, "dish_view")).toBe(1);
+        expect(first).toBe(true);
+        expect(second).toBe(false);
+        expect(await countEvents(tenantA.tenantId, "add_to_cart")).toBe(1);
+      });
+
+      it("rate-limits a burst of rapid calls from the same tenant+ip bucket", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const dishId = await seedPublishedDish(admin, tenantA.tenantId);
+        const ipHash = hash("203.0.113.31");
+
+        // Fixed threshold is 60/10min (see the migration's header comment).
+        const attempts = 70;
+        const results: boolean[] = [];
+        for (let i = 0; i < attempts; i += 1) {
+          results.push(
+            await recordAddToCart(
+              tenantA.tenantId,
+              dishId,
+              hash(`burst-session-${i}-${randomUUID()}`),
+              ipHash,
+            ),
+          );
+        }
+
+        const recordedCount = results.filter(Boolean).length;
+        expect(recordedCount).toBe(60);
+        expect(await countEvents(tenantA.tenantId, "add_to_cart")).toBe(60);
+      }, 30000);
+
+      it("rejects a dish id that doesn't belong to the given tenant (no cross-tenant attribution)", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA, tenantB } = fixture;
+        const dishIdOwnedByTenantB = await seedPublishedDish(admin, tenantB.tenantId);
+
+        const result = await recordAddToCart(
+          tenantA.tenantId,
+          dishIdOwnedByTenantB,
+          hash("session"),
+          hash("203.0.113.32"),
+        );
+
+        expect(result).toBe(false);
+        expect(await countEvents(tenantA.tenantId, "add_to_cart")).toBe(0);
+        expect(await countEvents(tenantB.tenantId, "add_to_cart")).toBe(0);
+      });
     });
-  });
 
-  describe("record_add_to_cart_event", () => {
-    it("dedupes repeated calls for the same tenant+dish+session+day into exactly one event", async () => {
+    it("dish_view and add_to_cart dedup buckets are independent for the same tenant+dish+session+day", async () => {
       fixture = await seedTwoTenantFixture(admin);
       const { tenantA } = fixture;
       const dishId = await seedPublishedDish(admin, tenantA.tenantId);
       const sessionHash = hash(`session-${randomUUID()}`);
-      const ipHash = hash("203.0.113.30");
+      const ipHash = hash("203.0.113.40");
 
-      const first = await recordAddToCart(tenantA.tenantId, dishId, sessionHash, ipHash);
-      const second = await recordAddToCart(tenantA.tenantId, dishId, sessionHash, ipHash);
-
-      expect(first).toBe(true);
-      expect(second).toBe(false);
+      expect(await recordDishView(tenantA.tenantId, dishId, sessionHash, ipHash)).toBe(true);
+      expect(await recordAddToCart(tenantA.tenantId, dishId, sessionHash, ipHash)).toBe(true);
+      expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(1);
       expect(await countEvents(tenantA.tenantId, "add_to_cart")).toBe(1);
     });
-
-    it("rate-limits a burst of rapid calls from the same tenant+ip bucket", async () => {
-      fixture = await seedTwoTenantFixture(admin);
-      const { tenantA } = fixture;
-      const dishId = await seedPublishedDish(admin, tenantA.tenantId);
-      const ipHash = hash("203.0.113.31");
-
-      // Fixed threshold is 60/10min (see the migration's header comment).
-      const attempts = 70;
-      const results: boolean[] = [];
-      for (let i = 0; i < attempts; i += 1) {
-        results.push(
-          await recordAddToCart(tenantA.tenantId, dishId, hash(`burst-session-${i}-${randomUUID()}`), ipHash),
-        );
-      }
-
-      const recordedCount = results.filter(Boolean).length;
-      expect(recordedCount).toBe(60);
-      expect(await countEvents(tenantA.tenantId, "add_to_cart")).toBe(60);
-    }, 30000);
-
-    it("rejects a dish id that doesn't belong to the given tenant (no cross-tenant attribution)", async () => {
-      fixture = await seedTwoTenantFixture(admin);
-      const { tenantA, tenantB } = fixture;
-      const dishIdOwnedByTenantB = await seedPublishedDish(admin, tenantB.tenantId);
-
-      const result = await recordAddToCart(
-        tenantA.tenantId,
-        dishIdOwnedByTenantB,
-        hash("session"),
-        hash("203.0.113.32"),
-      );
-
-      expect(result).toBe(false);
-      expect(await countEvents(tenantA.tenantId, "add_to_cart")).toBe(0);
-      expect(await countEvents(tenantB.tenantId, "add_to_cart")).toBe(0);
-    });
-  });
-
-  it("dish_view and add_to_cart dedup buckets are independent for the same tenant+dish+session+day", async () => {
-    fixture = await seedTwoTenantFixture(admin);
-    const { tenantA } = fixture;
-    const dishId = await seedPublishedDish(admin, tenantA.tenantId);
-    const sessionHash = hash(`session-${randomUUID()}`);
-    const ipHash = hash("203.0.113.40");
-
-    expect(await recordDishView(tenantA.tenantId, dishId, sessionHash, ipHash)).toBe(true);
-    expect(await recordAddToCart(tenantA.tenantId, dishId, sessionHash, ipHash)).toBe(true);
-    expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(1);
-    expect(await countEvents(tenantA.tenantId, "add_to_cart")).toBe(1);
-  });
-});
+  },
+);

@@ -36,9 +36,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
     // dish ids server-side from the already-fetched (never client-supplied)
     // menu -- fired in parallel so this doesn't add per-dish serial latency
     // to a server-rendered page (see `.claude/rules/frontend.md`).
-    const dishIds = menu.categories.flatMap((category) =>
-      category.dishes.map((dish) => dish.id),
-    );
+    const dishIds = menu.categories.flatMap((category) => category.dishes.map((dish) => dish.id));
     await Promise.all(dishIds.map((dishId) => recordDishViewOnce(slug, tenantId, dishId)));
   }
 
