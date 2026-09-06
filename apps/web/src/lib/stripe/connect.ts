@@ -19,21 +19,31 @@ export interface ConnectAccountSnapshot {
  * #24) will need. No verification documents are ever handled by this
  * server: Stripe's hosted onboarding (Account Link, created separately)
  * collects them directly.
+ *
+ * `options.idempotencyKey` (issue #92): the caller passes a key derived from
+ * the tenant's `payment_accounts` row (its primary key, `tenant_id`) so that
+ * a retry after a failure elsewhere in the onboarding flow (e.g. the
+ * subsequent DB write) reuses the exact same Stripe Express account instead
+ * of creating a second, orphaned one.
  */
 export async function createExpressAccount(
   stripe: Stripe,
   input: { tenantId: string; email?: string | null },
+  options?: Stripe.RequestOptions,
 ): Promise<Stripe.Account> {
-  return stripe.accounts.create({
-    type: "express",
-    country: "DE",
-    email: input.email ?? undefined,
-    capabilities: {
-      card_payments: { requested: true },
-      transfers: { requested: true },
+  return stripe.accounts.create(
+    {
+      type: "express",
+      country: "DE",
+      email: input.email ?? undefined,
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      },
+      metadata: { tenant_id: input.tenantId },
     },
-    metadata: { tenant_id: input.tenantId },
-  });
+    options,
+  );
 }
 
 /**

@@ -55,7 +55,7 @@ export async function submitRatingAction(
     const admin = createSupabaseAdminClient();
     const rateLimitStore = createSupabaseRateLimitStore(admin);
     const ip = await getClientIp();
-    const { limited } = await reserveAndCheckRateLimit(rateLimitStore, {
+    const { limited, attemptId } = await reserveAndCheckRateLimit(rateLimitStore, {
       scope: "rating",
       ip,
       email: guestAccessTokenHash,
@@ -85,6 +85,15 @@ export async function submitRatingAction(
       stars: parsed.data.stars,
       comment: parsed.data.comment,
     });
+
+    // Ticket #121, Epic-10 Opus review finding 4: exclude this now-successful
+    // attempt from the `rating` scope's failure counts, mirroring every other
+    // scope in this codebase (login/register/checkout/invite) -- without
+    // this, successful submissions counted toward `maxIpAttempts` too, so
+    // legitimate guests rating orders from the same restaurant's shared
+    // WiFi/CGNAT could get locked out starting at the 21st IP request/hour
+    // even with zero actual abuse.
+    await rateLimitStore.markSucceeded(attemptId);
 
     revalidatePath(`/r/${tenantSlug}/orders/${rawToken}`);
 
