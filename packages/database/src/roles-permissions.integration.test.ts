@@ -200,6 +200,46 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
     );
   });
 
+  // Regression test for ticket #114: seed_standard_roles_for_tenant() used to
+  // hardcode every non-Owner role's default grants directly in the trigger
+  // function body, requiring a full `create or replace function` (hand-copy
+  // of the previous version) on every permission-granting migration -- which
+  // silently dropped grants twice. Fixed by
+  // 20260906090000_additive_system_role_default_permissions.sql: default
+  // grants now come from the additive `system_role_default_permissions`
+  // table. This proves the additive mechanism itself: inserting a new row
+  // there (no function rewrite) is picked up by a freshly seeded tenant.
+  it("picks up a newly inserted system_role_default_permissions row for a freshly seeded tenant", async () => {
+    // audit.read is not part of Kitchen's default grant set today (see the
+    // pinned expected-grant-matrix test above), so it's a safe additive probe.
+    await admin.query(
+      `insert into system_role_default_permissions (role_key, permission_key)
+       values ('kitchen', 'audit.read')
+       on conflict do nothing`,
+    );
+
+    try {
+      fixture = await seedTwoTenantFixture(admin);
+      const { tenantA } = fixture;
+
+      const kitchenGrant = await admin.query<{ permission_key: string }>(
+        `select rp.permission_key
+           from role_permissions rp
+           join roles r on r.id = rp.role_id
+          where r.tenant_id = $1
+            and r.key = 'kitchen'
+            and rp.permission_key = 'audit.read'`,
+        [tenantA.tenantId],
+      );
+
+      expect(kitchenGrant.rows).toHaveLength(1);
+    } finally {
+      await admin.query(
+        `delete from system_role_default_permissions where role_key = 'kitchen' and permission_key = 'audit.read'`,
+      );
+    }
+  });
+
   it("grants Owner all permissions and denies Kitchen revenue/analytics reads", async () => {
     const kitchenUserId = randomUUID();
     fixture = await seedTwoTenantFixture(admin, {
