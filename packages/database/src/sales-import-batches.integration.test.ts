@@ -281,6 +281,45 @@ describe.skipIf(!dbAvailable)("sales_import_batches (ticket #59)", () => {
     expect(salesCount.rows[0]!.count).toBe(1);
   });
 
+  it(
+    "commit_sales_import_batch() raises rather than inserting when an entry references " +
+      "another tenant's dish (Opus repair-cycle finding: the function is security definer " +
+      "and bypasses RLS, so it must re-verify dish ownership itself, not just trust the " +
+      "app layer's own tenant-scoped lookup)",
+    async () => {
+      const seed = await seedFixtureWithManagerAndStaff();
+      fixture = seed.fixture;
+      const foreignDishId = await seedPublishedDish(admin, fixture.tenantB.tenantId);
+
+      const batch = await queryAsUser(
+        admin,
+        seed.managerId,
+        `insert into sales_import_batches (tenant_id, created_by_user_id, original_filename, headers, rows, row_count)
+         values ($1, $2, 'sales.xlsx', $3, $4, 1) returning id`,
+        [fixture.tenantA.tenantId, seed.managerId, JSON.stringify(headers), JSON.stringify(rows)],
+      );
+      const batchId = batch.rows[0]!.id as string;
+      const entries = JSON.stringify([
+        { dishId: foreignDishId, quantity: 5, saleDate: "2026-08-01", channel: "" },
+      ]);
+
+      await expect(
+        queryAsUser(
+          admin,
+          seed.managerId,
+          `select claimed, imported_count from commit_sales_import_batch($1, $2, $3, $4)`,
+          [fixture.tenantA.tenantId, batchId, entries, seed.managerId],
+        ),
+      ).rejects.toThrow(/not owned by tenant|dish/i);
+
+      const salesCount = await admin.query(
+        `select count(*)::int as count from manual_sales_entries where tenant_id = $1`,
+        [fixture.tenantA.tenantId],
+      );
+      expect(salesCount.rows[0]!.count).toBe(0);
+    },
+  );
+
   // Review finding (PR #139): two concurrent confirm calls for the same
   // batch must produce exactly row_count entries, not double. Fires both
   // calls on separate connections truly in parallel (Promise.all, not

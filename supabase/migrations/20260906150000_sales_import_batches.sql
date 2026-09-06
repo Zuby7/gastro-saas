@@ -226,6 +226,28 @@ begin
     return;
   end if;
 
+  -- Defense in depth (Opus repair-cycle finding): this function is
+  -- `security definer` and bypasses RLS, and `p_entries` is caller-supplied
+  -- jsonb -- the app layer's own tenant-scoped dish lookup
+  -- (apps/web/src/app/account/menu/import/actions.ts) is the only thing
+  -- normally preventing a foreign dish_id from reaching here. Re-verify
+  -- every dish_id belongs to p_tenant_id inside the function itself, and
+  -- raise rather than silently dropping the row, so imported_count can never
+  -- silently diverge from the caller's own row count.
+  if exists (
+    select 1
+      from jsonb_array_elements(p_entries) as entry
+     where not exists (
+       select 1
+         from public.dishes d
+        where d.id = (entry ->> 'dishId')::uuid
+          and d.tenant_id = p_tenant_id
+     )
+  ) then
+    raise exception 'commit_sales_import_batch: entry references a dish not owned by tenant %', p_tenant_id
+      using errcode = '22023';
+  end if;
+
   insert into public.manual_sales_entries
     (tenant_id, dish_id, quantity, sale_date, channel, entered_by_user_id)
   select p_tenant_id,
@@ -243,7 +265,7 @@ end;
 $$;
 
 comment on function commit_sales_import_batch(uuid, uuid, jsonb, uuid) is
-  'Ticket #59 review finding: atomically claims a pending sales_import_batches row (status pending -> committed) and, only if the claim actually affected a row, bulk-inserts the caller''s pre-validated entries into manual_sales_entries -- both in one transaction/function, so two concurrent confirm calls for the same batch can never both insert (the second caller''s claimed = false, imported_count = 0). Enforces analytics.manualsales.write itself via require_tenant_permission.';
+  'Ticket #59 review finding: atomically claims a pending sales_import_batches row (status pending -> committed) and, only if the claim actually affected a row, bulk-inserts the caller''s pre-validated entries into manual_sales_entries -- both in one transaction/function, so two concurrent confirm calls for the same batch can never both insert (the second caller''s claimed = false, imported_count = 0). Enforces analytics.manualsales.write itself via require_tenant_permission. Also re-verifies every dish_id belongs to p_tenant_id before inserting (this function is security definer and bypasses RLS), raising rather than silently dropping a foreign-tenant entry.';
 
 revoke all on function commit_sales_import_batch(uuid, uuid, jsonb, uuid) from public;
 grant execute on function commit_sales_import_batch(uuid, uuid, jsonb, uuid) to authenticated, service_role;
