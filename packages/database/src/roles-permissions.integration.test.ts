@@ -97,6 +97,7 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
     expect(result.rows.map((row) => row.key)).toEqual([
       "analytics.read",
       "audit.read",
+      "integrations.manage",
       "menu.availability.manage",
       "menu.publish",
       "menu.read",
