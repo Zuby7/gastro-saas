@@ -66,6 +66,16 @@ and an Owner-only (`tenant.data.delete`) deletion-request workflow
   the deletion workflow: it is append-only/immutable for every app-facing
   role by design (ticket #6, `reject_audit_log_mutation()`), a deliberate
   security/compliance invariant this ticket does not reopen.
+- `menu_view_attempts` (ticket #67's rate-limit/dedup bookkeeping table for
+  `record_menu_view()`, `supabase/migrations/20260905120000_menu_view_rate_limited_analytics.sql`)
+  had no cleanup path at all until a PR #129 review finding closed it
+  (`supabase/migrations/20260906080000_menu_view_attempts_retention.sql`):
+  `purge_stale_menu_view_attempts(p_retention_days default 35)` is an
+  on-demand purge RPC, mirroring `purge_expired_analytics_events()`'s shape.
+  Same "no cron/scheduled-job infrastructure yet" caveat as `analytics_events`
+  above applies here too -- nothing invokes this automatically yet; it exists
+  as a real, callable cleanup path for an operator (or a future
+  scheduled-job ticket) rather than no path at all.
 - Explicit non-goal: this workflow does not delete the tenant record itself,
   staff accounts/memberships, menu data, or the audit trail — full
   tenant/account deletion is a materially larger, separately-tracked effort.

@@ -43,7 +43,9 @@ if (!dbAvailable) {
   if (isCiEnvironment) {
     throw new Error(`[menu-view-analytics.integration.test] no reachable Postgres at ${DB_URL}.`);
   }
-  console.warn(`[menu-view-analytics.integration.test] Skipping: no reachable Postgres at ${DB_URL}.`);
+  console.warn(
+    `[menu-view-analytics.integration.test] Skipping: no reachable Postgres at ${DB_URL}.`,
+  );
 }
 
 function hash(value: string): string {
@@ -147,7 +149,9 @@ describe.skipIf(!dbAvailable)("record_menu_view (ticket #67)", () => {
     const attempts = 40;
     const results: boolean[] = [];
     for (let i = 0; i < attempts; i += 1) {
-      results.push(await recordView(tenantA.tenantId, hash(`burst-session-${i}-${randomUUID()}`), ipHash));
+      results.push(
+        await recordView(tenantA.tenantId, hash(`burst-session-${i}-${randomUUID()}`), ipHash),
+      );
     }
 
     const recordedCount = results.filter(Boolean).length;
