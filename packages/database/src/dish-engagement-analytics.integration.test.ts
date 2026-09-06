@@ -322,5 +322,131 @@ describe.skipIf(!dbAvailable)(
       expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(1);
       expect(await countEvents(tenantA.tenantId, "add_to_cart")).toBe(1);
     });
+
+    // record_dish_views (batched, PR #136 review finding) --
+    // supabase/migrations/20260906100000_dish_views_batched_rpc_and_retention.sql
+    describe("record_dish_views (batched)", () => {
+      async function recordDishViews(
+        tenantId: string,
+        dishIds: string[],
+        sessionTokenHash: string,
+        ipHash: string,
+      ): Promise<number> {
+        const result = await admin.query<{ record_dish_views: number }>(
+          `select record_dish_views($1, $2, $3, $4) as record_dish_views`,
+          [tenantId, dishIds, sessionTokenHash, ipHash],
+        );
+        return Number(result.rows[0]!.record_dish_views);
+      }
+
+      it("records one dish_view event per dish id for a single batch call", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const dishIds = await Promise.all(
+          Array.from({ length: 5 }, () => seedPublishedDish(admin, tenantA.tenantId)),
+        );
+        const sessionHash = hash(`session-${randomUUID()}`);
+        const ipHash = hash("203.0.113.50");
+
+        const recordedCount = await recordDishViews(tenantA.tenantId, dishIds, sessionHash, ipHash);
+
+        expect(recordedCount).toBe(5);
+        expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(5);
+      });
+
+      it("dedupes a repeated batch call for the same tenant+session+day into zero additional events", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const dishIds = await Promise.all(
+          Array.from({ length: 3 }, () => seedPublishedDish(admin, tenantA.tenantId)),
+        );
+        const sessionHash = hash(`session-${randomUUID()}`);
+        const ipHash = hash("203.0.113.51");
+
+        const first = await recordDishViews(tenantA.tenantId, dishIds, sessionHash, ipHash);
+        const second = await recordDishViews(tenantA.tenantId, dishIds, sessionHash, ipHash);
+
+        expect(first).toBe(3);
+        expect(second).toBe(0);
+        expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(3);
+      });
+
+      it("silently filters out a dish id that doesn't belong to the given tenant (no cross-tenant attribution)", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA, tenantB } = fixture;
+        const ownDishId = await seedPublishedDish(admin, tenantA.tenantId);
+        const otherTenantsDishId = await seedPublishedDish(admin, tenantB.tenantId);
+        const sessionHash = hash(`session-${randomUUID()}`);
+        const ipHash = hash("203.0.113.52");
+
+        const recordedCount = await recordDishViews(
+          tenantA.tenantId,
+          [ownDishId, otherTenantsDishId],
+          sessionHash,
+          ipHash,
+        );
+
+        expect(recordedCount).toBe(1);
+        expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(1);
+        expect(await countEvents(tenantB.tenantId, "dish_view")).toBe(0);
+      });
+
+      it("respects the shared tenant+ip rate-limit budget across the whole batch, capping at whatever remains", async () => {
+        fixture = await seedTwoTenantFixture(admin);
+        const { tenantA } = fixture;
+        const ipHash = hash("203.0.113.53");
+        const budgetFillerDishId = await seedPublishedDish(admin, tenantA.tenantId);
+
+        // Pre-fill 195 of the fixed 200/10min budget directly (bypassing the
+        // RPC) so this test doesn't need to seed/insert 200+ real dishes to
+        // prove the cap -- same (tenant_id, event_type, ip_hash) bucket
+        // record_dish_views() itself counts against.
+        const fillerAttempts = 195;
+        for (let i = 0; i < fillerAttempts; i += 1) {
+          // eslint-disable-next-line no-await-in-loop -- simple sequential seeding, not perf-sensitive
+          await admin.query(
+            `insert into dish_engagement_attempts
+               (tenant_id, dish_id, event_type, session_token_hash, ip_hash, view_date)
+             values ($1, $2, 'dish_view', $3, $4, (now() at time zone 'utc')::date)`,
+            [tenantA.tenantId, budgetFillerDishId, hash(`filler-session-${i}`), ipHash],
+          );
+        }
+
+        const newDishIds = await Promise.all(
+          Array.from({ length: 10 }, () => seedPublishedDish(admin, tenantA.tenantId)),
+        );
+        const sessionHash = hash(`session-${randomUUID()}`);
+
+        // Only 5 of the remaining budget (200 - 195) should be recorded, even
+        // though the batch requests 10 -- the whole batch shares ONE
+        // rate-limit check, not one per dish id.
+        const recordedCount = await recordDishViews(
+          tenantA.tenantId,
+          newDishIds,
+          sessionHash,
+          ipHash,
+        );
+
+        expect(recordedCount).toBe(5);
+        expect(await countEvents(tenantA.tenantId, "dish_view")).toBe(5);
+
+        const totalAttemptRows = await admin.query<{ c: string }>(
+          `select count(*)::int as c from dish_engagement_attempts
+           where tenant_id = $1 and event_type = 'dish_view' and ip_hash = $2`,
+          [tenantA.tenantId, ipHash],
+        );
+        expect(Number(totalAttemptRows.rows[0]!.c)).toBe(200);
+      });
+
+      it("returns 0 and writes nothing for an unresolvable tenant id", async () => {
+        const recordedCount = await recordDishViews(
+          randomUUID(),
+          [randomUUID()],
+          hash("session"),
+          hash("203.0.113.54"),
+        );
+        expect(recordedCount).toBe(0);
+      });
+    });
   },
 );

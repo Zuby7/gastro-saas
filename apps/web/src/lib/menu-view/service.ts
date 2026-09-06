@@ -105,6 +105,58 @@ export async function recordDishViewOnce(
 }
 
 /**
+ * Records rate-limited, deduplicated `dish_view` analytics events for every
+ * dish id in `dishIds` in a SINGLE database round trip (see
+ * `record_dish_views()`,
+ * supabase/migrations/20260906100000_dish_views_batched_rpc_and_retention.sql).
+ *
+ * Replaces the previous `Promise.all(dishIds.map(recordDishViewOnce))`
+ * pattern at the public menu page's call site
+ * (`apps/web/src/app/r/[slug]/page.tsx`): that fired one RPC call per dish,
+ * each taking its own advisory lock on the SAME (tenant_id, ip_hash) key --
+ * for N dishes shown on one render, N calls serialize against each other in
+ * Postgres, directly blocking TTFB on the SEO-critical public menu page (PR
+ * #136 Opus finding). This function takes one lock, does one rate-limit
+ * count check, and does one bulk insert for the whole batch instead.
+ *
+ * `tenantId` must already be resolved server-side from the route slug, and
+ * `dishIds` must already come from that same tenant's already-fetched (never
+ * client-supplied) menu. Never throws: analytics is best-effort and must
+ * never break menu rendering for a real visitor.
+ */
+export async function recordDishViewsOnce(
+  tenantSlug: string,
+  tenantId: string,
+  dishIds: string[],
+): Promise<void> {
+  if (dishIds.length === 0) {
+    return;
+  }
+
+  try {
+    const token = await readMenuViewToken(tenantSlug);
+    if (!token) {
+      return;
+    }
+
+    const ip = await getClientIp();
+    const admin = createSupabaseAdminClient();
+    const { error } = await admin.rpc("record_dish_views", {
+      p_tenant_id: tenantId,
+      p_dish_ids: dishIds,
+      p_session_token_hash: hashMenuViewToken(token),
+      p_ip_hash: hashIp(ip),
+    });
+
+    if (error) {
+      console.error("[menu-view] record_dish_views failed", error);
+    }
+  } catch (error) {
+    console.error("[menu-view] recordDishViewsOnce failed", error);
+  }
+}
+
+/**
  * Records one rate-limited, deduplicated `add_to_cart` analytics event for a
  * single dish (see `record_add_to_cart_event()`,
  * supabase/migrations/20260906090000_dish_view_and_add_to_cart_analytics.sql).

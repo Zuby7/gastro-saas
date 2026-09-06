@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { readCartToken } from "@/lib/cart/cookie";
 import { hashCartToken } from "@/lib/cart/token";
 import {
@@ -61,8 +62,18 @@ export async function addToCartAction(
 
     // Ticket #120 part B: record a rate-limited/deduplicated add_to_cart
     // event only after the cart mutation itself has already succeeded --
-    // never blocks or fails the cart action on an analytics error.
-    await recordAddToCartEventOnce(tenantSlug, tenantId, parsed.data.dishId);
+    // never blocks or fails the cart action on an analytics error. Not
+    // awaited: this is a user-blocking mutation (the cart action's caller is
+    // waiting on the response to update the UI), and `recordAddToCartEventOnce`
+    // already swallows every error internally, so there is nothing useful to
+    // await here (PR #136 Opus finding: this used to add its round trip's
+    // latency directly to the cart mutation). `after()` (not a bare `void`)
+    // registers it with the platform's request lifecycle so it's still
+    // guaranteed to run to completion after the response is sent, even on a
+    // serverless/edge runtime that might otherwise freeze/recycle the
+    // process right after responding -- same rationale as
+    // apps/web/src/app/login/actions.ts's `after(() => recordFailedLoginAttempt(...))`.
+    after(() => recordAddToCartEventOnce(tenantSlug, tenantId, parsed.data.dishId));
 
     return { cart };
   } catch (error) {

@@ -107,7 +107,18 @@ set search_path = ''
 as $$
 declare
   -- Fixed, non-caller-configurable thresholds -- see migration header for
-  -- why this is higher than record_menu_view()'s 30/10min.
+  -- why this is higher than record_menu_view()'s 30/10min. 200/10min is
+  -- sized for a realistic menu render (this codebase's seeded demo menu has
+  -- 12 dishes; even a large real-world menu is expected to stay well under
+  -- ~150-200 dishes shown on one page) -- a menu with >=200 dishes rendered
+  -- in one page would exhaust this budget in a single visit, undercounting
+  -- later dishes on the page and skewing get_dish_performance_stats() (#31)
+  -- analytics (PR #136 Opus finding). The batched record_dish_views()
+  -- function below takes one advisory lock/count-check for an entire page
+  -- render instead of one per dish, which removes most of the pressure on
+  -- this budget, but the fixed constant itself is not raised here -- if a
+  -- tenant's real menu approaches this size, revisit the threshold rather
+  -- than relying on the batching alone.
   dish_view_ip_rate_limit_max constant integer := 200;
   dish_view_ip_rate_limit_window constant interval := interval '10 minutes';
   v_today date := (now() at time zone 'utc')::date;

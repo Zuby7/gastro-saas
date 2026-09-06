@@ -67,3 +67,36 @@ describe("recordMenuViewOnce", () => {
     expect((params as { p_ip_hash: string }).p_ip_hash).toBe(hash("203.0.113.42"));
   });
 });
+
+describe("recordDishViewsOnce", () => {
+  it(
+    "calls record_dish_views exactly once with every dish id, instead of once per dish " +
+      "(PR #136 Opus finding: one call per dish previously took one advisory lock per " +
+      "dish, serializing in Postgres)",
+    async () => {
+      getClientIpMock.mockResolvedValue("203.0.113.60");
+      readMenuViewTokenMock.mockResolvedValue("some-session-token");
+      rpcMock.mockClear();
+
+      const { recordDishViewsOnce } = await import("./service");
+      const dishIds = ["dish-1", "dish-2", "dish-3"];
+      await recordDishViewsOnce("some-tenant", "11111111-1111-1111-1111-111111111111", dishIds);
+
+      expect(rpcMock).toHaveBeenCalledTimes(1);
+      const [rpcName, params] = rpcMock.mock.calls[0]!;
+      expect(rpcName).toBe("record_dish_views");
+      expect((params as { p_dish_ids: string[] }).p_dish_ids).toEqual(dishIds);
+    },
+  );
+
+  it("does not call the RPC at all for an empty dish id list", async () => {
+    rpcMock.mockClear();
+    readMenuViewTokenMock.mockClear();
+
+    const { recordDishViewsOnce } = await import("./service");
+    await recordDishViewsOnce("some-tenant", "11111111-1111-1111-1111-111111111111", []);
+
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(readMenuViewTokenMock).not.toHaveBeenCalled();
+  });
+});
