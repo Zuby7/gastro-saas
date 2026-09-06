@@ -12,3 +12,4 @@ export * from "./orders/state-machine";
 export * from "./payments/connect-status";
 export * from "./qr";
 export * from "./restaurant/opening-hours";
+export * from "./sales-import/validate-import-rows";

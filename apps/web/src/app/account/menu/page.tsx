@@ -107,12 +107,20 @@ export default async function MenuPage() {
               Dies ist der Entwurf -- Kunden sehen nur die zuletzt veröffentlichte Version.
             </p>
           </div>
-          <Link
-            href="/account"
-            className="text-sm font-medium text-link-foreground underline hover:text-brand-700"
-          >
-            Zurück
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/account/menu/import"
+              className="text-sm font-medium text-link-foreground underline hover:text-brand-700"
+            >
+              Verkaufsdaten importieren
+            </Link>
+            <Link
+              href="/account"
+              className="text-sm font-medium text-link-foreground underline hover:text-brand-700"
+            >
+              Zurück
+            </Link>
+          </div>
         </div>
 
         <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm">
