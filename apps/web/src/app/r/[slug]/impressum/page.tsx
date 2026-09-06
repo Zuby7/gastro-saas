@@ -21,7 +21,7 @@ export default async function ImpressumPage({ params }: ImpressumPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-10 sm:px-8">
         <div className="flex items-center justify-between gap-4">
           <h1 className="font-display text-2xl font-semibold text-foreground">

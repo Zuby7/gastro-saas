@@ -40,7 +40,7 @@ export function AssignableLookupSection({
   );
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm">
+    <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">{heading}</h2>
       <p className="text-sm text-foreground-secondary">
         Angaben werden vom Restaurant gepflegt -- keine automatische Ableitung, keine Rechtsprüfung.
@@ -73,7 +73,7 @@ export function AssignableLookupSection({
         ) : null}
       </ul>
       {toggleState.error ? (
-        <p role="alert" className="text-sm text-danger-600">
+        <p role="alert" className="text-sm text-danger-foreground">
           {toggleState.error}
         </p>
       ) : null}
@@ -101,7 +101,7 @@ export function AssignableLookupSection({
         </button>
       </form>
       {createState.error ? (
-        <p role="alert" className="text-sm text-danger-600">
+        <p role="alert" className="text-sm text-danger-foreground">
           {createState.error}
         </p>
       ) : null}

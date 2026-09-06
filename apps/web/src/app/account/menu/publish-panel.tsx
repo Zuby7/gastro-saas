@@ -23,7 +23,7 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
   return (
     <section
       aria-labelledby="publish-heading"
-      className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm"
+      className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm"
     >
       <h2 id="publish-heading" className="text-lg font-semibold text-foreground">
         Vorschau &amp; Veröffentlichen
@@ -45,7 +45,7 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
       </form>
 
       {checkState.error ? (
-        <p role="alert" className="text-sm text-danger-600">
+        <p role="alert" className="text-sm text-danger-foreground">
           {checkState.error}
         </p>
       ) : null}
@@ -62,7 +62,7 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
             <h3
               className={
                 blockers.length > 0
-                  ? "font-semibold text-danger-600"
+                  ? "font-semibold text-danger-foreground"
                   : "font-semibold text-foreground"
               }
             >
@@ -74,7 +74,7 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
                   <li
                     key={check.code}
                     role="alert"
-                    className="rounded-md border border-danger-500 bg-neutral-0 p-2 text-sm font-medium text-danger-600"
+                    className="rounded-md border border-danger-500 bg-surface p-2 text-sm font-medium text-danger-foreground"
                   >
                     {check.message}
                   </li>
@@ -129,14 +129,14 @@ export function PublishPanel({ menuVersionId }: { menuVersionId: string }) {
           </p>
         ) : null}
         {hasRunChecks && !canPublish ? (
-          <p className="mt-2 text-sm text-danger-600">
+          <p className="mt-2 text-sm text-danger-foreground">
             Veröffentlichung ist gesperrt, solange Blocker bestehen.
           </p>
         ) : null}
       </form>
 
       {publishState.error ? (
-        <p role="alert" className="text-sm text-danger-600">
+        <p role="alert" className="text-sm text-danger-foreground">
           {publishState.error}
         </p>
       ) : null}

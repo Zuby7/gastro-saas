@@ -26,7 +26,7 @@ export function DeletionRequestForm() {
         <p
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-foreground"
         >
           {state.error}
         </p>
@@ -35,7 +35,7 @@ export function DeletionRequestForm() {
         <p
           role="status"
           aria-live="polite"
-          className="rounded-md border border-neutral-300 bg-neutral-100 p-3 text-sm text-foreground"
+          className="rounded-md border border-neutral-300 bg-surface-muted p-3 text-sm text-foreground"
         >
           {state.success}
         </p>

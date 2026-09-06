@@ -54,6 +54,7 @@ function refundFormData(overrides: Partial<Record<string, string>> = {}): FormDa
   fd.set("orderId", overrides.orderId ?? "11111111-1111-4111-8111-111111111111");
   fd.set("amountCents", overrides.amountCents ?? "500");
   fd.set("reason", overrides.reason ?? "Kunde unzufrieden");
+  fd.set("requestToken", overrides.requestToken ?? "33333333-3333-4333-8333-333333333333");
   return fd;
 }
 
@@ -119,8 +120,37 @@ describe("issueRefundAction", () => {
         actorUserId: "user-1",
         amountCents: 500,
         reason: "Kunde unzufrieden",
+        requestToken: "33333333-3333-4333-8333-333333333333",
       }),
     );
+  });
+
+  it("rejects a missing/invalid (non-UUID) request token before checking permissions (issue #97, risk:payment)", async () => {
+    const { issueRefundAction } = await import("./actions");
+    const result = await issueRefundAction({}, refundFormData({ requestToken: "not-a-uuid" }));
+
+    expect(result.error).toBeDefined();
+    expect(result.fieldErrors?.requestToken).toBeDefined();
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(issueRefundForOrderMock).not.toHaveBeenCalled();
+  });
+
+  // Issue #97, risk:payment: two rapid double-clicks submit the identical
+  // client-generated request token -- the server (via refund-service.ts's
+  // unique-constraint-backed DuplicateRefundRequestError) must surface a
+  // clear, specific error rather than silently creating a second refund.
+  it("surfaces a clear error when the same request token is submitted twice (double-click double-submit)", async () => {
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "require_tenant_permission") return { data: null, error: null };
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+    const { DuplicateRefundRequestError } = await import("@/lib/payments/refund-service");
+    issueRefundForOrderMock.mockRejectedValue(new DuplicateRefundRequestError());
+
+    const { issueRefundAction } = await import("./actions");
+    const result = await issueRefundAction({}, refundFormData());
+
+    expect(result.error).toMatch(/bereits übermittelt/);
   });
 
   it("surfaces a clear error when the requested amount would exceed the remaining refundable amount", async () => {

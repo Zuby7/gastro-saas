@@ -6,6 +6,34 @@
   --foreground: var(--color-neutral-900);
   --foreground-secondary: var(--color-neutral-500);
   --link-foreground: var(--color-brand-600);
+
+  /*
+   * Scheme-aware surface tokens (added for issue #83). Every card/section
+   * throughout the app previously hardcoded `bg-neutral-0`/`bg-neutral-50`/
+   * `bg-neutral-100` directly, which never switched for dark mode while
+   * inherited text color (via `--foreground`) did -- that mismatch is what
+   * made automatic dark mode unreadable and got it disabled. All three are
+   * now real tokens so background AND (inherited) text switch together:
+   *  - `--surface`: the "card" background, lighter than the page it sits on
+   *    (was `bg-neutral-0`).
+   *  - `--surface-secondary`: the page-level background and any "recessed"
+   *    nested section inside a card (was `bg-neutral-50`).
+   *  - `--surface-muted`: static muted/notice boxes and hover backgrounds
+   *    (was `bg-neutral-100`).
+   * See `packages/ui/src/contrast.test.ts` for the verified AA ratios of
+   * every (surface, foreground) pair in both schemes.
+   */
+  --surface: var(--color-neutral-0);
+  --surface-secondary: var(--color-neutral-50);
+  --surface-muted: var(--color-neutral-100);
+
+  /*
+   * `text-danger-600` (error/alert copy) fails AA against the dark-mode
+   * surface tokens above -- `--danger-foreground` gives it a dark-scheme-safe
+   * lighter tint (`danger-300`), mirroring how `--link-foreground` already
+   * swaps to `brand-300` in dark mode for the same reason.
+   */
+  --danger-foreground: var(--color-danger-600);
 }
 
 @theme inline {
@@ -13,26 +41,40 @@
   --color-foreground: var(--foreground);
   --color-foreground-secondary: var(--foreground-secondary);
   --color-link-foreground: var(--link-foreground);
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-muted: var(--surface-muted);
+  --color-danger-foreground: var(--danger-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-space-mono);
   --font-display: var(--font-roboto-slab);
 }
 
 /*
- * Automatic OS-driven dark mode is intentionally OFF for now (previously
- * auto-switched via `@media (prefers-color-scheme: dark)`). Only the root
- * `--background`/`--foreground` CSS variables ever flipped for dark mode;
- * nearly every card/section throughout the app hardcodes light-mode utility
- * classes directly (`bg-neutral-0`, `bg-neutral-50`, etc.) instead of the
- * `--background`/`--foreground` variables, so a user with an OS-level dark
- * preference got near-white text over a still-hardcoded-white card
- * background — invisible content, not a real dark theme. A real dark mode
- * needs every surface audited to use the semantic background/foreground
- * tokens consistently, not just the two root variables; until that's done
- * as its own deliberate pass, shipping "automatic" dark mode does more harm
- * than good. See issue #83; do not re-enable this media query without first
- * auditing every `bg-neutral-0`/`bg-neutral-50` usage.
+ * Automatic OS-driven dark mode (issue #83). Previously this was fully
+ * disabled after a real bug: only the root `--background`/`--foreground`
+ * variables ever flipped for dark mode, while nearly every card/section
+ * hardcoded light-mode utility classes directly (`bg-neutral-0`,
+ * `bg-neutral-50`, `bg-neutral-100`) instead of semantic tokens, so a user
+ * with an OS-level dark preference got near-white text over a
+ * still-hardcoded-white card background. That audit is now done: every one
+ * of those hardcoded classes across `apps/web/src/**` has been migrated to
+ * the scheme-aware `--surface`/`--surface-secondary`/`--surface-muted`/
+ * `--danger-foreground` tokens above, each pair re-verified for WCAG AA
+ * contrast in both schemes (see `packages/ui/src/contrast.test.ts`).
  */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: var(--color-neutral-900);
+    --foreground: var(--color-neutral-50);
+    --foreground-secondary: var(--color-neutral-300);
+    --link-foreground: var(--color-brand-300);
+    --surface: var(--color-neutral-800);
+    --surface-secondary: var(--color-neutral-900);
+    --surface-muted: var(--color-neutral-700);
+    --danger-foreground: var(--color-danger-300);
+  }
+}
 
 body {
   background: var(--background);
