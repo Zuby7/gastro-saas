@@ -318,6 +318,79 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
   // holder flip a still-pending row (whose own finalize call may have been
   // lost) to e.g. 'failed' without going through the trusted server code
   // path that actually confirms the Stripe outcome.
+  // Issue #97, risk:payment: two rapid double-clicked submissions of the
+  // same partial refund previously each individually passed the
+  // never-exceed-paid-amount check (as long as both fit under the
+  // remaining headroom) and created two independent refunds. The
+  // unique index on (payment_id, request_token) closes this: a second
+  // INSERT for the same payment carrying the identical client-generated
+  // token is rejected outright, so only one refund row is ever created.
+  it("rejects a second refund insert carrying the same request_token for the same payment (double-click double-submit)", async () => {
+    const seed = await seedFixtureWithManager();
+    fixture = seed.fixture;
+    const { orderId, paymentId } = await seedPaidPayment(admin, fixture.tenantA.tenantId, 2000);
+    const requestToken = randomUUID();
+
+    const first = await queryAsUser(
+      admin,
+      seed.managerId,
+      `insert into refunds (tenant_id, payment_id, order_id, amount_cents, currency, reason, actor_user_id, request_token)
+       values ($1, $2, $3, 500, 'EUR', 'Doppelklick', $4, $5) returning id`,
+      [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId, requestToken],
+    );
+    expect(first.rows).toHaveLength(1);
+
+    // Same payment, same request token (simulating a double-clicked
+    // resubmission of the identical in-flight request) -- rejected, even
+    // though the amount alone would easily fit under the remaining
+    // headroom (500 + 500 = 1000 <= 2000).
+    await expect(
+      queryAsUser(
+        admin,
+        seed.managerId,
+        `insert into refunds (tenant_id, payment_id, order_id, amount_cents, currency, reason, actor_user_id, request_token)
+         values ($1, $2, $3, 500, 'EUR', 'Doppelklick', $4, $5)`,
+        [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId, requestToken],
+      ),
+    ).rejects.toThrow(/duplicate key value|unique constraint/i);
+
+    const count = await admin.query(
+      `select count(*)::int as count from refunds where payment_id = $1`,
+      [paymentId],
+    );
+    expect(count.rows[0].count).toBe(1);
+  });
+
+  it("allows a second, genuinely distinct refund attempt against the same payment with a DIFFERENT request_token", async () => {
+    const seed = await seedFixtureWithManager();
+    fixture = seed.fixture;
+    const { orderId, paymentId } = await seedPaidPayment(admin, fixture.tenantA.tenantId, 2000);
+
+    const first = await queryAsUser(
+      admin,
+      seed.managerId,
+      `insert into refunds (tenant_id, payment_id, order_id, amount_cents, currency, reason, actor_user_id, request_token)
+       values ($1, $2, $3, 500, 'EUR', 'erste Teilerstattung', $4, $5) returning id`,
+      [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId, randomUUID()],
+    );
+    expect(first.rows).toHaveLength(1);
+
+    const second = await queryAsUser(
+      admin,
+      seed.managerId,
+      `insert into refunds (tenant_id, payment_id, order_id, amount_cents, currency, reason, actor_user_id, request_token)
+       values ($1, $2, $3, 500, 'EUR', 'zweite Teilerstattung', $4, $5) returning id`,
+      [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId, randomUUID()],
+    );
+    expect(second.rows).toHaveLength(1);
+
+    const count = await admin.query(
+      `select count(*)::int as count from refunds where payment_id = $1`,
+      [paymentId],
+    );
+    expect(count.rows[0].count).toBe(2);
+  });
+
   it("denies a payments.refund holder from finalizing a refund row directly (must go through finalize_refund())", async () => {
     const seed = await seedFixtureWithManager();
     fixture = seed.fixture;
