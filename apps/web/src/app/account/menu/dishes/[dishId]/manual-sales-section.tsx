@@ -38,7 +38,7 @@ export function ManualSalesSection({ dishId, entries }: ManualSalesSectionProps)
   return (
     <section
       aria-labelledby="manual-sales-heading"
-      className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm"
+      className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm"
     >
       <h2 id="manual-sales-heading" className="text-lg font-semibold text-foreground">
         Verkäufe nachtragen

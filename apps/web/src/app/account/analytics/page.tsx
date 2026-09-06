@@ -204,7 +204,7 @@ export default async function AnalyticsDashboardPage() {
         */}
         <section
           aria-labelledby="manual-sales-heading"
-          className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-neutral-50 p-6"
+          className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-surface-muted p-6"
         >
           <h2 id="manual-sales-heading" className="text-sm font-medium text-foreground">
             Manuell nachgetragene Verkäufe heute (externe Kanäle/vor Ort)
