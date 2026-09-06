@@ -13,6 +13,8 @@ interface RestaurantProfileRow {
   phone: string | null;
   timezone: string;
   brand_color: string;
+  legal_imprint_text: string;
+  legal_privacy_text: string;
 }
 
 interface OpeningHourRow {
@@ -65,7 +67,9 @@ export default async function ProfilePage() {
 
   const { data: profile } = await supabase
     .from("restaurant_profiles")
-    .select("display_name, description, contact_email, phone, timezone, brand_color")
+    .select(
+      "display_name, description, contact_email, phone, timezone, brand_color, legal_imprint_text, legal_privacy_text",
+    )
     .eq("tenant_id", membership.tenantId)
     .maybeSingle<RestaurantProfileRow>();
 
@@ -83,6 +87,8 @@ export default async function ProfilePage() {
     phone: profile?.phone ?? "",
     timezone: profile?.timezone ?? "Europe/Berlin",
     brandColor: profile?.brand_color ?? "#166534",
+    legalImprintText: profile?.legal_imprint_text ?? "",
+    legalPrivacyText: profile?.legal_privacy_text ?? "",
   };
 
   const hoursByWeekday = new Map((hours ?? []).map((row) => [row.weekday, row]));

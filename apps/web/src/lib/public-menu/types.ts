@@ -50,3 +50,10 @@ export interface PublicMenu {
   };
   categories: PublicMenuCategory[];
 }
+
+export type PublicLegalPageKind = "imprint" | "privacy";
+
+export interface PublicLegalPage {
+  tenantName: string;
+  text: string;
+}
