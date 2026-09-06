@@ -1,11 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import {
-  analyzeImportFileAction,
-  confirmImportAction,
-  type ImportActionState,
-} from "./actions";
+import { analyzeImportFileAction, confirmImportAction, type ImportActionState } from "./actions";
 
 const initialState: ImportActionState = {};
 
@@ -41,22 +37,24 @@ export function SalesImportClient() {
   // failed) confirm of an older batch, that older confirm's leftover state
   // must not keep the (now-stale) mapping form hidden or the wrong result
   // banner visible.
-  const confirmIsForCurrentBatch = analyzed && confirmState.confirmedForBatchId === analyzed.batchId;
-  const showMapping = Boolean(analyzed) && !(confirmIsForCurrentBatch && confirmState.importedCount !== undefined);
+  const confirmIsForCurrentBatch =
+    analyzed && confirmState.confirmedForBatchId === analyzed.batchId;
+  const showMapping =
+    Boolean(analyzed) && !(confirmIsForCurrentBatch && confirmState.importedCount !== undefined);
 
   return (
     <div className="flex flex-col gap-6">
       <section
         aria-labelledby="import-upload-heading"
-        className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm"
+        className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm"
       >
         <h2 id="import-upload-heading" className="text-lg font-semibold text-foreground">
           1. Datei hochladen
         </h2>
         <p className="text-sm text-foreground-secondary">
-          .xlsx- oder .csv-Datei mit historischen Verkaufsdaten (max. 5 MB, max. 2000 Zeilen).
-          Diese Daten fließen als manuell nachgetragene Verkäufe in die Analytics ein -- wie
-          Ticket #58, nur gebulkt.
+          .xlsx- oder .csv-Datei mit historischen Verkaufsdaten (max. 5 MB, max. 2000 Zeilen). Diese
+          Daten fließen als manuell nachgetragene Verkäufe in die Analytics ein -- wie Ticket #58,
+          nur gebulkt.
         </p>
 
         {!showMapping && analyzeState.error ? (
@@ -92,7 +90,7 @@ export function SalesImportClient() {
       {showMapping && analyzed ? (
         <section
           aria-labelledby="import-mapping-heading"
-          className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm"
+          className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm"
         >
           <h2 id="import-mapping-heading" className="text-lg font-semibold text-foreground">
             2. Spalten zuordnen &amp; Vorschau
@@ -118,7 +116,9 @@ export function SalesImportClient() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-foreground">
-              <caption className="sr-only">Vorschau der ersten Zeilen der hochgeladenen Datei</caption>
+              <caption className="sr-only">
+                Vorschau der ersten Zeilen der hochgeladenen Datei
+              </caption>
               <thead>
                 <tr>
                   {analyzed.headers.map((header) => (
@@ -189,7 +189,9 @@ export function SalesImportClient() {
         </section>
       ) : null}
 
-      {confirmIsForCurrentBatch && confirmState.success && confirmState.importedCount !== undefined ? (
+      {confirmIsForCurrentBatch &&
+      confirmState.success &&
+      confirmState.importedCount !== undefined ? (
         <p role="status" className="text-sm text-success-600">
           {confirmState.success}
         </p>

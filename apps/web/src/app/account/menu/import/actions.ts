@@ -8,11 +8,7 @@ import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permi
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-event";
 import { parseSalesFile, SalesFileParseError } from "@/lib/import/parse-sales-file";
-import {
-  ColumnMappingSchema,
-  MAX_IMPORT_FILE_SIZE_BYTES,
-  isAllowedImportFile,
-} from "./schemas";
+import { ColumnMappingSchema, MAX_IMPORT_FILE_SIZE_BYTES, isAllowedImportFile } from "./schemas";
 
 export interface ImportActionState {
   error?: string;
@@ -218,48 +214,127 @@ export async function confirmImportAction(
     };
   }
 
-  const { data: dishes } = await supabase
-    .from("dishes")
-    .select("id, name")
+  // Scoped to the tenant's CURRENTLY PUBLISHED menu version -- mirrors
+  // get_dish_performance_stats()'s own scoping (only the published version's
+  // dishes are ever reported there). Matching against dishes across every
+  // menu version (draft, older published versions still on disk, etc.)
+  // could resolve a repeated dish name to the wrong/older dish id, which
+  // then silently never shows up in dish-performance stats once it doesn't
+  // belong to the current published version.
+  const { data: publishedVersion } = await supabase
+    .from("menu_versions")
+    .select("id")
     .eq("tenant_id", tenantId)
-    .is("archived_at", null)
-    .returns<Array<{ id: string; name: string }>>();
+    .eq("status", "published")
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
 
-  const dishLookup = new Map<string, string>();
-  for (const dish of dishes ?? []) {
-    dishLookup.set(dish.name.trim().toLowerCase(), dish.id);
-  }
-
-  const { validRows, errors } = validateImportRows(batchRow.rows, mapping, dishLookup);
-
-  if (errors.length > 0) {
+  if (!publishedVersion) {
     return {
-      error: `${errors.length} von ${batchRow.rows.length} Zeile(n) sind ungültig. Es wurde nichts importiert -- bitte korrigieren Sie die Datei und laden Sie sie erneut hoch.`,
-      rowErrors: errors.slice(0, 100),
+      error:
+        "Es gibt noch keine veröffentlichte Speisekarte -- ein Import kann erst nach der ersten Veröffentlichung zugeordnet werden.",
       confirmedForBatchId: batchId,
     };
   }
 
-  const { error: insertError } = await supabase.from("manual_sales_entries").insert(
-    validRows.map((row) => ({
-      tenant_id: tenantId,
-      dish_id: row.dishId,
-      quantity: row.quantity,
-      sale_date: row.saleDate,
-      channel: row.channel,
-      entered_by_user_id: user?.id ?? null,
-    })),
+  const { data: dishes } = await supabase
+    .from("dishes")
+    .select("id, name")
+    .eq("tenant_id", tenantId)
+    .eq("menu_version_id", publishedVersion.id)
+    .is("archived_at", null)
+    .returns<Array<{ id: string; name: string }>>();
+
+  const dishNameCounts = new Map<string, number>();
+  for (const dish of dishes ?? []) {
+    const key = dish.name.trim().toLowerCase();
+    dishNameCounts.set(key, (dishNameCounts.get(key) ?? 0) + 1);
+  }
+  const ambiguousDishNames = [...dishNameCounts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([name]) => name);
+
+  const dishLookup = new Map<string, string>();
+  for (const dish of dishes ?? []) {
+    const key = dish.name.trim().toLowerCase();
+    if (dishNameCounts.get(key)! > 1) continue; // ambiguous -- never guess which one
+    dishLookup.set(key, dish.id);
+  }
+
+  const { validRows, errors } = validateImportRows(batchRow.rows, mapping, dishLookup);
+
+  // Ambiguous dish names were excluded from dishLookup above, so
+  // validateImportRows() already reports every such row as an error --
+  // replace its generic "not found" message with an explicit,
+  // ambiguity-specific one rather than reporting a misleading "not found"
+  // for a dish that does exist (just not uniquely).
+  const ambiguousRowNumbers = new Set(
+    ambiguousDishNames.length > 0
+      ? batchRow.rows
+          .filter((row) =>
+            ambiguousDishNames.includes(
+              String(row.cells[mapping.dishColumn] ?? "")
+                .trim()
+                .toLowerCase(),
+            ),
+          )
+          .map((row) => row.rowNumber)
+      : [],
   );
 
-  if (insertError) {
+  const allErrors = errors.map((rowError) =>
+    ambiguousRowNumbers.has(rowError.rowNumber)
+      ? {
+          rowNumber: rowError.rowNumber,
+          message:
+            "Mehrere Gerichte der veröffentlichten Speisekarte haben denselben Namen -- eine eindeutige Zuordnung ist nicht möglich.",
+        }
+      : rowError,
+  );
+
+  if (allErrors.length > 0) {
+    return {
+      error: `${allErrors.length} von ${batchRow.rows.length} Zeile(n) sind ungültig. Es wurde nichts importiert -- bitte korrigieren Sie die Datei und laden Sie sie erneut hoch.`,
+      rowErrors: allErrors.slice(0, 100),
+      confirmedForBatchId: batchId,
+    };
+  }
+
+  // Atomic claim-then-insert (review finding): commit_sales_import_batch()
+  // flips this batch's status from 'pending' to 'committed' and bulk-inserts
+  // the validated entries in one transaction, only if the claim actually
+  // affected a row -- so two concurrent confirms for the same batch can
+  // never both insert (see the migration's own comment for the full race
+  // this closes).
+  const { data: commitRows, error: commitError } = await supabase.rpc("commit_sales_import_batch", {
+    p_tenant_id: tenantId,
+    p_batch_id: batchId,
+    p_entries: validRows.map((row) => ({
+      dishId: row.dishId,
+      quantity: row.quantity,
+      saleDate: row.saleDate,
+      channel: row.channel ?? "",
+    })),
+    p_entered_by_user_id: user?.id ?? null,
+  });
+
+  if (commitError) {
     return { error: "Der Import konnte nicht gespeichert werden.", confirmedForBatchId: batchId };
   }
 
-  await supabase
-    .from("sales_import_batches")
-    .update({ status: "committed", committed_at: new Date().toISOString() })
-    .eq("id", batchId)
-    .eq("tenant_id", tenantId);
+  const commitResult = (
+    commitRows as Array<{ claimed: boolean; imported_count: number }> | null
+  )?.[0];
+
+  if (!commitResult?.claimed) {
+    return {
+      error: "Import wurde nicht gefunden oder ist bereits abgeschlossen.",
+      confirmedForBatchId: batchId,
+    };
+  }
+
+  const importedCount = commitResult.imported_count;
 
   await recordMenuAdminAuditEvent(supabase, {
     tenantId,
@@ -267,15 +342,15 @@ export async function confirmImportAction(
     action: "sales_import.committed",
     targetType: "sales_import_batch",
     targetId: batchId,
-    metadata: { importedCount: validRows.length, originalFilename: batchRow.original_filename },
+    metadata: { importedCount, originalFilename: batchRow.original_filename },
   });
 
   revalidatePath("/account/analytics");
   revalidatePath("/account/analytics/dishes");
 
   return {
-    success: `${validRows.length} Verkauf/Verkäufe wurden importiert.`,
-    importedCount: validRows.length,
+    success: `${importedCount} Verkauf/Verkäufe wurden importiert.`,
+    importedCount,
     confirmedForBatchId: batchId,
   };
 }

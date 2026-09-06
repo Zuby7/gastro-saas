@@ -125,7 +125,14 @@ describe("analyzeImportFileAction", () => {
   it("rejects a malformed/corrupted file that ExcelJS cannot parse", async () => {
     allowPermission();
     const fd = new FormData();
-    fd.set("file", fakeFile("sales.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 20));
+    fd.set(
+      "file",
+      fakeFile(
+        "sales.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        20,
+      ),
+    );
 
     const { analyzeImportFileAction } = await import("./actions");
     const result = await analyzeImportFileAction({}, fd);
@@ -250,22 +257,53 @@ describe("confirmImportAction", () => {
     };
   }
 
-  function dishesTable(dishes: Array<{ id: string; name: string }>) {
+  function menuVersionsTable(id = "menu-version-1") {
     return {
       select: () => ({
         eq: () => ({
-          is: () => ({
-            // supabase-js chain ends at `.returns<T>()` which is a type-only
-            // no-op at runtime -- the actual awaited value is this object.
-            returns: () => Promise.resolve({ data: dishes, error: null }),
+          eq: () => ({
+            order: () => ({
+              limit: () => ({
+                maybeSingle: async () => ({ data: { id }, error: null }),
+              }),
+            }),
           }),
         }),
       }),
     };
   }
 
+  function dishesTable(dishes: Array<{ id: string; name: string }>) {
+    return {
+      select: () => ({
+        eq: () => ({
+          eq: () => ({
+            is: () => ({
+              // supabase-js chain ends at `.returns<T>()` which is a type-only
+              // no-op at runtime -- the actual awaited value is this object.
+              returns: () => Promise.resolve({ data: dishes, error: null }),
+            }),
+          }),
+        }),
+      }),
+    };
+  }
+
+  function allowPermissionAndCommit(
+    commitResult: { claimed: boolean; imported_count: number } = {
+      claimed: true,
+      imported_count: 0,
+    },
+  ) {
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "require_tenant_permission") return { data: null, error: null };
+      if (fn === "commit_sales_import_batch") return { data: [commitResult], error: null };
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+  }
+
   it("rejects the whole batch (imports nothing) when any row is invalid, reporting every bad row", async () => {
-    allowPermission();
+    allowPermissionAndCommit();
     fromMock.mockImplementation((table: string) => {
       if (table === "tenant_memberships") return membershipTable();
       if (table === "sales_import_batches") {
@@ -274,6 +312,7 @@ describe("confirmImportAction", () => {
           { rowNumber: 2, cells: { Artikel: "Unbekannt", Menge: "1", Datum: "2026-08-01" } },
         ]);
       }
+      if (table === "menu_versions") return menuVersionsTable();
       if (table === "dishes") return dishesTable([{ id: "dish-1", name: "Margherita" }]);
       throw new Error(`unexpected table: ${table}`);
     });
@@ -285,44 +324,62 @@ describe("confirmImportAction", () => {
     expect(result.rowErrors).toEqual([
       { rowNumber: 2, message: expect.stringContaining("Unbekannt") },
     ]);
-    expect(fromMock).not.toHaveBeenCalledWith("manual_sales_entries");
+    expect(rpcMock).not.toHaveBeenCalledWith("commit_sales_import_batch", expect.anything());
   });
 
-  it("bulk-inserts every valid row into manual_sales_entries, scoped to the caller's own tenant, and marks the batch committed", async () => {
-    allowPermission();
-    let insertedRows: Array<Record<string, unknown>> | undefined;
-    let updatedBatch: Record<string, unknown> | undefined;
+  it("reports an explicit ambiguous-name error (not a misleading 'not found') when the published menu has two dishes sharing a name", async () => {
+    allowPermissionAndCommit();
     fromMock.mockImplementation((table: string) => {
       if (table === "tenant_memberships") return membershipTable();
       if (table === "sales_import_batches") {
-        return {
-          ...batchTable([
-            { rowNumber: 1, cells: { Artikel: "Margherita", Menge: "5", Datum: "2026-08-01" } },
-            { rowNumber: 2, cells: { Artikel: "Pasta Carbonara", Menge: "2", Datum: "2026-08-02" } },
-          ]),
-          update: (row: Record<string, unknown>) => ({
-            eq: () => ({
-              eq: async () => {
-                updatedBatch = row;
-                return { error: null };
-              },
-            }),
-          }),
-        };
+        return batchTable([
+          { rowNumber: 1, cells: { Artikel: "Margherita", Menge: "5", Datum: "2026-08-01" } },
+        ]);
       }
+      if (table === "menu_versions") return menuVersionsTable();
+      if (table === "dishes") {
+        return dishesTable([
+          { id: "dish-1", name: "Margherita" },
+          { id: "dish-2", name: "Margherita" },
+        ]);
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const { confirmImportAction } = await import("./actions");
+    const result = await confirmImportAction({}, baseFormData());
+
+    expect(result.rowErrors).toEqual([
+      { rowNumber: 1, message: expect.stringContaining("Mehrere Gerichte") },
+    ]);
+    expect(rpcMock).not.toHaveBeenCalledWith("commit_sales_import_batch", expect.anything());
+  });
+
+  it("commits the batch via commit_sales_import_batch(), scoped to the current published menu version's dishes", async () => {
+    allowPermissionAndCommit({ claimed: true, imported_count: 2 });
+    let commitArgs: Record<string, unknown> | undefined;
+    rpcMock.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn === "require_tenant_permission") return { data: null, error: null };
+      if (fn === "commit_sales_import_batch") {
+        commitArgs = args;
+        return { data: [{ claimed: true, imported_count: 2 }], error: null };
+      }
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") return membershipTable();
+      if (table === "sales_import_batches") {
+        return batchTable([
+          { rowNumber: 1, cells: { Artikel: "Margherita", Menge: "5", Datum: "2026-08-01" } },
+          { rowNumber: 2, cells: { Artikel: "Pasta Carbonara", Menge: "2", Datum: "2026-08-02" } },
+        ]);
+      }
+      if (table === "menu_versions") return menuVersionsTable();
       if (table === "dishes") {
         return dishesTable([
           { id: "dish-1", name: "Margherita" },
           { id: "dish-2", name: "Pasta Carbonara" },
         ]);
-      }
-      if (table === "manual_sales_entries") {
-        return {
-          insert: async (rows: Array<Record<string, unknown>>) => {
-            insertedRows = rows;
-            return { error: null };
-          },
-        };
       }
       if (table === "audit_logs") {
         return { insert: async () => ({ error: null }) };
@@ -335,26 +392,38 @@ describe("confirmImportAction", () => {
 
     expect(result.success).toBeDefined();
     expect(result.importedCount).toBe(2);
-    expect(insertedRows).toEqual([
-      {
-        tenant_id: "tenant-1",
-        dish_id: "dish-1",
-        quantity: 5,
-        sale_date: "2026-08-01",
-        channel: null,
-        entered_by_user_id: "user-1",
-      },
-      {
-        tenant_id: "tenant-1",
-        dish_id: "dish-2",
-        quantity: 2,
-        sale_date: "2026-08-02",
-        channel: null,
-        entered_by_user_id: "user-1",
-      },
-    ]);
-    expect(updatedBatch).toMatchObject({ status: "committed" });
+    expect(commitArgs).toMatchObject({
+      p_tenant_id: "tenant-1",
+      p_batch_id: "batch-1",
+      p_entered_by_user_id: "user-1",
+      p_entries: [
+        { dishId: "dish-1", quantity: 5, saleDate: "2026-08-01", channel: "" },
+        { dishId: "dish-2", quantity: 2, saleDate: "2026-08-02", channel: "" },
+      ],
+    });
+    expect(fromMock).not.toHaveBeenCalledWith("manual_sales_entries");
     expect(fromMock).not.toHaveBeenCalledWith("orders");
     expect(fromMock).not.toHaveBeenCalledWith("payments");
+  });
+
+  it("reports 'not found/already completed' when commit_sales_import_batch() could not claim the batch (already committed by a concurrent confirm)", async () => {
+    allowPermissionAndCommit({ claimed: false, imported_count: 0 });
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") return membershipTable();
+      if (table === "sales_import_batches") {
+        return batchTable([
+          { rowNumber: 1, cells: { Artikel: "Margherita", Menge: "5", Datum: "2026-08-01" } },
+        ]);
+      }
+      if (table === "menu_versions") return menuVersionsTable();
+      if (table === "dishes") return dishesTable([{ id: "dish-1", name: "Margherita" }]);
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const { confirmImportAction } = await import("./actions");
+    const result = await confirmImportAction({}, baseFormData());
+
+    expect(result.error).toMatch(/nicht gefunden/);
+    expect(result.success).toBeUndefined();
   });
 });
