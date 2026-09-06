@@ -95,6 +95,7 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
 
     const result = await admin.query<{ key: string }>(`select key from permissions order by key`);
     expect(result.rows.map((row) => row.key)).toEqual([
+      "analytics.manualsales.write",
       "analytics.read",
       "audit.read",
       "integrations.manage",
@@ -157,6 +158,7 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
 
     expect(grantsByRole.get("manager")).toEqual(
       [
+        "analytics.manualsales.write",
         "analytics.read",
         "audit.read",
         "integrations.manage",
