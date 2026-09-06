@@ -18,7 +18,8 @@ export type PermissionKey =
   | "analytics.read"
   | "audit.read"
   | "reviews.read"
-  | "reviews.moderate";
+  | "reviews.moderate"
+  | "integrations.manage";
 
 export class PermissionDeniedError extends Error {
   constructor(
