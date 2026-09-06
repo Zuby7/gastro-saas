@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { issueRefundAction, type RefundActionState } from "./actions";
 
 const initialState: RefundActionState = {};
@@ -13,15 +13,33 @@ export function RefundForm({
   remainingRefundableCents: number;
 }) {
   const [state, formAction, isPending] = useActionState(issueRefundAction, initialState);
-  // Request idempotency token (issue #97, risk:payment): one crypto.randomUUID()
-  // per submission attempt. A double-click before `isPending` flips true
-  // submits this SAME value twice -- the server rejects the repeat
-  // (see refund-service.ts's DuplicateRefundRequestError). The hidden input is
-  // uncontrolled; we mutate its DOM value directly in the submit handler
-  // (synchronously, before the native submission is captured) so every new
-  // submission attempt gets a fresh token without a setState-in-effect
-  // cascading-render pattern.
-  const requestTokenRef = useRef<HTMLInputElement>(null);
+  // Request idempotency token (issue #97, risk:payment): minted ONCE per form
+  // instance, and only rotated after a *successful* submission -- never
+  // inside `onSubmit`. Minting it inside `onSubmit` was the original bug: a
+  // double-click before `isPending` flips true fired the action twice with
+  // TWO DIFFERENT tokens, so the server-side unique index on `requestToken`
+  // never caught the duplicate (see refund-service.ts's
+  // DuplicateRefundRequestError) -- defeating the whole point of the ticket.
+  //
+  // The token is populated in a post-mount effect rather than a `useState`
+  // initializer, because a lazy initializer still runs during SSR; calling
+  // `crypto.randomUUID()` there would produce a different value on the
+  // server-rendered HTML than on the client's first render, causing a
+  // hydration mismatch. Starting from "" (identical on server and client)
+  // and filling it in only after mount avoids that.
+  const [requestToken, setRequestToken] = useState("");
+  const lastRotatedForSuccessRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    setRequestToken(crypto.randomUUID());
+  }, []);
+
+  useEffect(() => {
+    if (state.success && state.success !== lastRotatedForSuccessRef.current) {
+      lastRotatedForSuccessRef.current = state.success;
+      setRequestToken(crypto.randomUUID());
+    }
+  }, [state.success]);
 
   return (
     <form
@@ -29,22 +47,12 @@ export function RefundForm({
       className="flex flex-col gap-3"
       noValidate
       aria-labelledby="refund-form-heading"
-      onSubmit={() => {
-        if (requestTokenRef.current) {
-          requestTokenRef.current.value = crypto.randomUUID();
-        }
-      }}
     >
       <h3 id="refund-form-heading" className="text-base font-medium text-foreground">
         Rückerstattung auslösen
       </h3>
       <input type="hidden" name="orderId" value={orderId} />
-      <input
-        ref={requestTokenRef}
-        type="hidden"
-        name="requestToken"
-        defaultValue={crypto.randomUUID()}
-      />
+      <input type="hidden" name="requestToken" value={requestToken} />
 
       <div className="flex flex-col gap-1">
         <label htmlFor="refund-amount" className="text-sm font-medium text-foreground">
@@ -90,7 +98,7 @@ export function RefundForm({
 
       <button
         type="submit"
-        disabled={isPending || remainingRefundableCents <= 0}
+        disabled={isPending || remainingRefundableCents <= 0 || !requestToken}
         className="w-fit rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60"
       >
         {isPending ? "Wird ausgelöst…" : "Rückerstattung auslösen"}
