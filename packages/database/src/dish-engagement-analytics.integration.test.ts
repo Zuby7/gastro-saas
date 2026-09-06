@@ -349,9 +349,10 @@ describe.skipIf(!dbAvailable)(
       it("records one dish_view event per dish id for a single batch call", async () => {
         fixture = await seedTwoTenantFixture(admin);
         const { tenantA } = fixture;
-        const dishIds = await Promise.all(
-          Array.from({ length: 5 }, () => seedPublishedDish(admin, tenantA.tenantId)),
-        );
+        const dishIds: string[] = [];
+        for (let i = 0; i < 5; i++) {
+          dishIds.push(await seedPublishedDish(admin, tenantA.tenantId));
+        }
         const sessionHash = hash(`session-${randomUUID()}`);
         const ipHash = hash("203.0.113.50");
 
@@ -364,9 +365,10 @@ describe.skipIf(!dbAvailable)(
       it("dedupes a repeated batch call for the same tenant+session+day into zero additional events", async () => {
         fixture = await seedTwoTenantFixture(admin);
         const { tenantA } = fixture;
-        const dishIds = await Promise.all(
-          Array.from({ length: 3 }, () => seedPublishedDish(admin, tenantA.tenantId)),
-        );
+        const dishIds: string[] = [];
+        for (let i = 0; i < 3; i++) {
+          dishIds.push(await seedPublishedDish(admin, tenantA.tenantId));
+        }
         const sessionHash = hash(`session-${randomUUID()}`);
         const ipHash = hash("203.0.113.51");
 
@@ -419,9 +421,10 @@ describe.skipIf(!dbAvailable)(
           );
         }
 
-        const newDishIds = await Promise.all(
-          Array.from({ length: 10 }, () => seedPublishedDish(admin, tenantA.tenantId)),
-        );
+        const newDishIds: string[] = [];
+        for (let i = 0; i < 10; i++) {
+          newDishIds.push(await seedPublishedDish(admin, tenantA.tenantId));
+        }
         const sessionHash = hash(`session-${randomUUID()}`);
 
         // Only 5 of the remaining budget (200 - 195) should be recorded, even
