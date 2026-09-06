@@ -10,6 +10,20 @@ function hashIp(ip: string): string {
 }
 
 /**
+ * Resolves the rate-limit bucket hash for a request. `getClientIp()` returns
+ * the literal string "unknown" (and warns) when neither cf-connecting-ip nor
+ * x-forwarded-for resolved -- if that were hashed and used as-is, EVERY such
+ * visitor would share one (tenant_id, ip_hash) rate-limit bucket, capping the
+ * whole tenant's budget instead of per-visitor (Opus finding, PR #129, and
+ * the same defect reintroduced in the dish-view/add-to-cart recorders below,
+ * PR #136 repair cycle). Falls back to the session token's own hash so each
+ * anonymous browser still gets its own independent bucket.
+ */
+function resolveRateLimitBucketHash(ip: string, sessionTokenHash: string): string {
+  return ip === "unknown" ? hashIp(`session-fallback:${sessionTokenHash}`) : hashIp(ip);
+}
+
+/**
  * Records one rate-limited, deduplicated `menu_viewed` analytics event for
  * `tenantSlug`, if this browser hasn't already recorded one for this tenant
  * today (see `record_menu_view()`,
@@ -37,16 +51,7 @@ export async function recordMenuViewOnce(tenantSlug: string, tenantId: string): 
 
     const sessionTokenHash = hashMenuViewToken(token);
     const ip = await getClientIp();
-    // `getClientIp()` returns the literal string "unknown" (and warns) when
-    // neither cf-connecting-ip nor x-forwarded-for resolved -- if that were
-    // hashed and used as-is, EVERY such visitor would share one
-    // (tenant_id, ip_hash) rate-limit bucket, capping the whole tenant at
-    // MENU_VIEW_IP_RATE_LIMIT_MAX events total instead of per-visitor (Opus
-    // finding, PR #129). Fall back to the session token's own hash as the
-    // rate-limit bucket key in that case, so each anonymous browser still
-    // gets its own independent bucket, same as it would with a real,
-    // distinct IP.
-    const ipHash = ip === "unknown" ? hashIp(`session-fallback:${sessionTokenHash}`) : hashIp(ip);
+    const ipHash = resolveRateLimitBucketHash(ip, sessionTokenHash);
 
     const admin = createSupabaseAdminClient();
     const { error } = await admin.rpc("record_menu_view", {
@@ -88,12 +93,13 @@ export async function recordDishViewOnce(
     }
 
     const ip = await getClientIp();
+    const sessionTokenHash = hashMenuViewToken(token);
     const admin = createSupabaseAdminClient();
     const { error } = await admin.rpc("record_dish_view", {
       p_tenant_id: tenantId,
       p_dish_id: dishId,
-      p_session_token_hash: hashMenuViewToken(token),
-      p_ip_hash: hashIp(ip),
+      p_session_token_hash: sessionTokenHash,
+      p_ip_hash: resolveRateLimitBucketHash(ip, sessionTokenHash),
     });
 
     if (error) {
@@ -140,12 +146,13 @@ export async function recordDishViewsOnce(
     }
 
     const ip = await getClientIp();
+    const sessionTokenHash = hashMenuViewToken(token);
     const admin = createSupabaseAdminClient();
     const { error } = await admin.rpc("record_dish_views", {
       p_tenant_id: tenantId,
       p_dish_ids: dishIds,
-      p_session_token_hash: hashMenuViewToken(token),
-      p_ip_hash: hashIp(ip),
+      p_session_token_hash: sessionTokenHash,
+      p_ip_hash: resolveRateLimitBucketHash(ip, sessionTokenHash),
     });
 
     if (error) {
@@ -178,12 +185,13 @@ export async function recordAddToCartEventOnce(
     }
 
     const ip = await getClientIp();
+    const sessionTokenHash = hashMenuViewToken(token);
     const admin = createSupabaseAdminClient();
     const { error } = await admin.rpc("record_add_to_cart_event", {
       p_tenant_id: tenantId,
       p_dish_id: dishId,
-      p_session_token_hash: hashMenuViewToken(token),
-      p_ip_hash: hashIp(ip),
+      p_session_token_hash: sessionTokenHash,
+      p_ip_hash: resolveRateLimitBucketHash(ip, sessionTokenHash),
     });
 
     if (error) {

@@ -89,6 +89,32 @@ describe("recordDishViewsOnce", () => {
     },
   );
 
+  it(
+    "gives each distinct session its own rate-limit bucket when the client IP " +
+      "can't be resolved (PR #136 repair-cycle finding: the #129 fallback " +
+      "wasn't applied to the batched dish-view recorder)",
+    async () => {
+      getClientIpMock.mockResolvedValue("unknown");
+      rpcMock.mockClear();
+
+      const { recordDishViewsOnce } = await import("./service");
+
+      const sessionCount = 5;
+      for (let i = 0; i < sessionCount; i += 1) {
+        readMenuViewTokenMock.mockResolvedValue(`session-token-${i}`);
+        await recordDishViewsOnce("some-tenant", "11111111-1111-1111-1111-111111111111", [
+          "dish-1",
+        ]);
+      }
+
+      const ipHashesUsed = new Set(
+        rpcMock.mock.calls.map(([, params]) => (params as { p_ip_hash: string }).p_ip_hash),
+      );
+      expect(ipHashesUsed.size).toBe(sessionCount);
+      expect(ipHashesUsed.has(hash("unknown"))).toBe(false);
+    },
+  );
+
   it("does not call the RPC at all for an empty dish id list", async () => {
     rpcMock.mockClear();
     readMenuViewTokenMock.mockClear();
