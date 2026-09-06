@@ -50,7 +50,10 @@ describe("parseSalesFile (ticket #59)", () => {
   it("skips fully blank trailing rows", async () => {
     const buffer = await buildXlsxBuffer(
       ["Artikel", "Menge", "Datum"],
-      [["Margherita", 5, new Date("2026-08-01T00:00:00Z")], ["", "", ""]],
+      [
+        ["Margherita", 5, new Date("2026-08-01T00:00:00Z")],
+        ["", "", ""],
+      ],
     );
 
     const result = await parseSalesFile(buffer, "export.xlsx", 100);
@@ -64,9 +67,7 @@ describe("parseSalesFile (ticket #59)", () => {
 
   it("rejects a file with no data rows", async () => {
     const buffer = await buildXlsxBuffer(["Artikel", "Menge", "Datum"], []);
-    await expect(parseSalesFile(buffer, "export.xlsx", 100)).rejects.toThrow(
-      /keine Datenzeilen/,
-    );
+    await expect(parseSalesFile(buffer, "export.xlsx", 100)).rejects.toThrow(/keine Datenzeilen/);
   });
 
   it("rejects a file with more rows than the configured maximum", async () => {

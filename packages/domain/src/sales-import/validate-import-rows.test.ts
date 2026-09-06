@@ -61,7 +61,12 @@ describe("validateImportRows (ticket #59)", () => {
 
   it("rejects a row whose dish name does not match any of the tenant's own dishes", () => {
     const { validRows, errors } = validateImportRows(
-      [{ rowNumber: 3, cells: { Artikel: "Unbekanntes Gericht", Menge: "1", Datum: "2026-08-01" } }],
+      [
+        {
+          rowNumber: 3,
+          cells: { Artikel: "Unbekanntes Gericht", Menge: "1", Datum: "2026-08-01" },
+        },
+      ],
       mapping,
       dishLookup,
     );
@@ -77,7 +82,9 @@ describe("validateImportRows (ticket #59)", () => {
       mapping,
       dishLookup,
     );
-    expect(errors).toEqual([{ rowNumber: 2, message: expect.stringContaining("Ungültige Anzahl") }]);
+    expect(errors).toEqual([
+      { rowNumber: 2, message: expect.stringContaining("Ungültige Anzahl") },
+    ]);
   });
 
   it("rejects a zero or negative quantity", () => {
@@ -109,13 +116,20 @@ describe("validateImportRows (ticket #59)", () => {
       mapping,
       dishLookup,
     );
-    expect(errors).toEqual([{ rowNumber: 4, message: expect.stringContaining("Ungültiges Datum") }]);
+    expect(errors).toEqual([
+      { rowNumber: 4, message: expect.stringContaining("Ungültiges Datum") },
+    ]);
   });
 
   it("rejects a future date", () => {
     const futureYear = new Date().getUTCFullYear() + 5;
     const { errors } = validateImportRows(
-      [{ rowNumber: 5, cells: { Artikel: "Margherita", Menge: "1", Datum: `${futureYear}-01-01` } }],
+      [
+        {
+          rowNumber: 5,
+          cells: { Artikel: "Margherita", Menge: "1", Datum: `${futureYear}-01-01` },
+        },
+      ],
       mapping,
       dishLookup,
     );
