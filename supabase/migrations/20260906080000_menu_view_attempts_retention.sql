@@ -1,7 +1,7 @@
 -- ============================================================================
 -- menu_view_attempts retention (PR #129 review finding)
 -- ============================================================================
--- `menu_view_attempts` (supabase/migrations/20260905120000_menu_view_rate_limited_analytics.sql,
+-- `menu_view_attempts` (supabase/migrations/20260905130000_menu_view_rate_limited_analytics.sql,
 -- ticket #67) had no cleanup path at all: every call to `record_menu_view()`
 -- inserts a row, but nothing ever deleted one. Its dedup window only needs
 -- "today" (`view_date`) and its rate-limit window only looks back 10 minutes

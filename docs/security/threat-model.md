@@ -67,7 +67,7 @@ and an Owner-only (`tenant.data.delete`) deletion-request workflow
   role by design (ticket #6, `reject_audit_log_mutation()`), a deliberate
   security/compliance invariant this ticket does not reopen.
 - `menu_view_attempts` (ticket #67's rate-limit/dedup bookkeeping table for
-  `record_menu_view()`, `supabase/migrations/20260905120000_menu_view_rate_limited_analytics.sql`)
+  `record_menu_view()`, `supabase/migrations/20260905130000_menu_view_rate_limited_analytics.sql`)
   had no cleanup path at all until a PR #129 review finding closed it
   (`supabase/migrations/20260906080000_menu_view_attempts_retention.sql`):
   `purge_stale_menu_view_attempts(p_retention_days default 35)` is an
