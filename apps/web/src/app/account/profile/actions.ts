@@ -13,7 +13,14 @@ export interface ProfileFormState {
   success?: string;
   fieldErrors?: Partial<
     Record<
-      "displayName" | "description" | "contactEmail" | "phone" | "timezone" | "brandColor",
+      | "displayName"
+      | "description"
+      | "contactEmail"
+      | "phone"
+      | "timezone"
+      | "brandColor"
+      | "legalImprintText"
+      | "legalPrivacyText",
       string
     >
   >;
@@ -42,6 +49,8 @@ export async function saveProfileAction(
     phone: formData.get("phone") ?? "",
     timezone: formData.get("timezone"),
     brandColor: formData.get("brandColor"),
+    legalImprintText: formData.get("legalImprintText") ?? "",
+    legalPrivacyText: formData.get("legalPrivacyText") ?? "",
   });
 
   if (!parsed.success) {
@@ -87,6 +96,8 @@ export async function saveProfileAction(
       phone: parsed.data.phone || null,
       timezone: parsed.data.timezone,
       brand_color: parsed.data.brandColor,
+      legal_imprint_text: parsed.data.legalImprintText,
+      legal_privacy_text: parsed.data.legalPrivacyText,
       updated_by_user_id: user.id,
     },
     { onConflict: "tenant_id" },

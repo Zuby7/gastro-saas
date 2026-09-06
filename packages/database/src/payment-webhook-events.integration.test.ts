@@ -123,4 +123,71 @@ describe.skipIf(!dbAvailable)("claim_payment_webhook_event()", () => {
     expect(row.rows[0]?.event_type).toBe("account.updated");
     expect(row.rows[0]?.processed_at).not.toBeNull();
   });
+
+  // Issue #91: `claim_payment_webhook_event()` now takes an explicit
+  // `pg_advisory_xact_lock` before its claim. This test simulates two truly
+  // concurrent deliveries of the *same* event id, each holding its own
+  // connection/transaction open across a simulated "processing" delay (as a
+  // caller that wraps claim -> process -> mark-processed in one transaction
+  // would) -- and asserts the lock genuinely serializes them: the second
+  // connection's claim call blocks until the first connection commits,
+  // rather than both racing through and both observing
+  // `already_processed = false` at the same time.
+  it("serializes truly concurrent claims of the same event id via the advisory lock", async () => {
+    eventId = `evt_${randomUUID()}`;
+
+    const connA = new Client({ connectionString: DB_URL });
+    const connB = new Client({ connectionString: DB_URL });
+    await connA.connect();
+    await connB.connect();
+
+    try {
+      const order: string[] = [];
+
+      await connA.query("begin");
+      // Connection A claims first and holds its transaction open, simulating
+      // in-flight processing -- the advisory lock is held until A commits.
+      const claimA = await connA.query<{ already_processed: boolean }>(
+        `select already_processed from claim_payment_webhook_event($1, $2, $3)`,
+        [eventId, "acct_test", "account.updated"],
+      );
+      expect(claimA.rows[0]?.already_processed).toBe(false);
+
+      await connB.query("begin");
+      // Connection B's claim call for the *same* event id must block on the
+      // advisory lock until A commits -- race the two so we can prove B did
+      // not resolve before A committed.
+      const claimBPromise = connB
+        .query<{ already_processed: boolean }>(
+          `select already_processed from claim_payment_webhook_event($1, $2, $3)`,
+          [eventId, "acct_test", "account.updated"],
+        )
+        .then((result) => {
+          order.push("B");
+          return result;
+        });
+
+      // Give B's blocked query a moment to actually be waiting on the lock
+      // before A commits, so the assertion below is meaningful rather than
+      // a race that happens to pass.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(order).toEqual([]); // B must still be blocked at this point.
+
+      order.push("A-commit");
+      await connA.query("commit");
+
+      const claimB = await claimBPromise;
+      expect(order).toEqual(["A-commit", "B"]); // B only resolved after A committed.
+      // B re-claims (processed_at still null, since A never set it) rather
+      // than being told "already processed" -- serialization, not denial.
+      expect(claimB.rows[0]?.already_processed).toBe(false);
+
+      await connB.query("commit");
+    } finally {
+      await connA.query("rollback").catch(() => {});
+      await connB.query("rollback").catch(() => {});
+      await connA.end();
+      await connB.end();
+    }
+  });
 });
