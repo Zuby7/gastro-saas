@@ -59,11 +59,18 @@ async function seedPublishedDish(admin: Client, tenantId: string): Promise<strin
   const menuVersionId = randomUUID();
   const categoryId = randomUUID();
   const dishId = randomUUID();
+  // Multiple dishes are frequently seeded concurrently for the same tenant
+  // (e.g. via Array.from({ length: N }, () => seedPublishedDish(...))), each
+  // needing its own menu_versions row. version_number only has a `unique
+  // (tenant_id, version_number)` constraint (no single-published-version
+  // rule), so a wide random value avoids collisions without a race-prone
+  // read-then-insert max() lookup.
+  const versionNumber = Math.floor(Math.random() * 1_000_000_000);
 
-  await admin.query(`insert into menu_versions (id, tenant_id, status) values ($1, $2, 'draft')`, [
-    menuVersionId,
-    tenantId,
-  ]);
+  await admin.query(
+    `insert into menu_versions (id, tenant_id, status, version_number) values ($1, $2, 'draft', $3)`,
+    [menuVersionId, tenantId, versionNumber],
+  );
   await admin.query(
     `insert into categories (id, tenant_id, menu_version_id, name, sort_order) values ($1, $2, $3, 'Pizza', 1)`,
     [categoryId, tenantId, menuVersionId],
