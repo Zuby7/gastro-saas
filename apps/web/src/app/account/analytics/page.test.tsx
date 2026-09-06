@@ -50,6 +50,8 @@ function baseSummary(
     avgOrderValueCents: null,
     openOrdersCount: 0,
     paymentFailuresTodayCount: 0,
+    manualSalesTodayUnits: 0,
+    manualSalesTodayEstimatedRevenueCents: 0,
     ...overrides,
   };
 }
@@ -120,5 +122,28 @@ describe("AnalyticsDashboardPage (ticket #30)", () => {
       screen.getByText(/Brutto 40.00 EUR, abzüglich 15.00 EUR Rückerstattungen/),
     ).toBeInTheDocument();
     expect(screen.getByText("40.00 EUR")).toBeInTheDocument();
+  });
+
+  it("renders manually logged sales additively, clearly labeled and separate from the real-order figures (ticket #58)", async () => {
+    getUserMock.mockResolvedValueOnce({ data: { user: { id: "user-1" } } });
+    fromMock.mockReturnValueOnce(
+      membershipQueryChain({ data: { tenant_id: "tenant-1", role: "owner" } }),
+    );
+    rpcMock.mockResolvedValueOnce({ data: null, error: null });
+    getSummaryMock.mockResolvedValueOnce(
+      baseSummary({
+        manualSalesTodayUnits: 3,
+        manualSalesTodayEstimatedRevenueCents: 3600,
+      }),
+    );
+
+    const { default: AnalyticsDashboardPage } = await import("./page");
+    const element = await AnalyticsDashboardPage();
+    render(element);
+
+    expect(screen.getByText(/Manuell nachgetragene Verkäufe heute/)).toBeInTheDocument();
+    expect(screen.getByText("3 Stück")).toBeInTheDocument();
+    expect(screen.getByText(/36.00 EUR/)).toBeInTheDocument();
+    expect(screen.getByText(/NICHT Teil von "Umsatz heute \(netto\)"/)).toBeInTheDocument();
   });
 });

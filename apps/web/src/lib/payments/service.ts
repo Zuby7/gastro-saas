@@ -3,7 +3,10 @@ import { createStripeClient } from "@/lib/stripe/client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { recordOrderAuditEvent } from "@/lib/audit/record-order-audit-event";
 import {
+  AWAITING_PAYMENT_TIMEOUT_MINUTES,
+  CHECKOUT_EXPIRY_SAFETY_MARGIN_SECONDS,
   PaymentAccountNotReadyError,
+  STRIPE_MIN_CHECKOUT_EXPIRY_SECONDS,
   type CreateCheckoutSessionInput,
   type CreateCheckoutSessionResult,
   type OrderPaymentSnapshot,
@@ -157,6 +160,26 @@ export async function createCheckoutSessionForOrder(
       tenant_id: input.tenantId,
       order_id: input.orderId,
     },
+    // Issue #88: without this, Stripe defaults an unpaid Checkout Session to
+    // stay payable for 24 hours -- long after the awaiting-payment timeout
+    // sweep has already cancelled the underlying order (default 30 minutes,
+    // see AWAITING_PAYMENT_TIMEOUT_MINUTES). Aligning Stripe's own expiry
+    // with the sweep's timeout closes almost all of that window; the
+    // webhook handler's `payment_after_order_cancelled_flagged` path is the
+    // remaining safety net for the sweep's own cron interval.
+    //
+    // Stripe requires `expires_at` to be at least 30 minutes in the future
+    // *when Stripe processes the request*, not when this line ran -- an
+    // exact `Date.now() + 30*60` computed here, with zero margin, risks
+    // landing under that floor once real network latency is accounted for,
+    // producing a hard `invalid_request_error` in production (mocked
+    // Stripe client in tests, so CI can never catch this). Clamp the
+    // timeout-derived seconds to Stripe's own floor and add a fixed safety
+    // margin on top.
+    expires_at:
+      Math.floor(Date.now() / 1000) +
+      Math.max(AWAITING_PAYMENT_TIMEOUT_MINUTES * 60, STRIPE_MIN_CHECKOUT_EXPIRY_SECONDS) +
+      CHECKOUT_EXPIRY_SAFETY_MARGIN_SECONDS,
   };
 
   const session = await stripe.checkout.sessions.create(sessionParams, {

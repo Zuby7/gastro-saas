@@ -62,39 +62,92 @@ export async function startStripeOnboardingAction(
   let accountId = existing?.stripe_account_id ?? null;
 
   if (!accountId) {
-    const account = await createExpressAccount(stripe, {
-      tenantId: membership.tenantId,
-      email: user.email,
-    });
-    accountId = account.id;
-
     // Written through the service-role admin client, never the caller's own
     // session client: `payment_accounts` intentionally grants `authenticated`
-    // no INSERT at all (see the migration) -- `stripe_account_id` must only
-    // ever be a value this server itself just received from Stripe for this
-    // exact tenant, never a value the client could choose (epic-7 batch
-    // review fix -- previously a Manager could insert a row pointing at an
-    // account they controlled and redirect the tenant's payouts).
+    // no INSERT/UPDATE at all (see the migrations) -- `stripe_account_id`
+    // must only ever be a value this server itself just received from
+    // Stripe for this exact tenant, never a value the client could choose
+    // (epic-7 batch review fix -- previously a Manager could insert a row
+    // pointing at an account they controlled and redirect the tenant's
+    // payouts).
     const admin = createSupabaseAdminClient();
-    const { error: insertError } = await admin.from("payment_accounts").insert({
-      tenant_id: membership.tenantId,
-      stripe_account_id: accountId,
-      created_by_user_id: user.id,
-    });
 
-    if (insertError) {
+    // Phase 1 (issue #92): pre-create a provisioning row -- tenant_id +
+    // created_by_user_id only, `stripe_account_id` still NULL -- BEFORE
+    // calling Stripe. `ignoreDuplicates` makes this a no-op on a retry
+    // (the row from a previous, failed attempt already exists). Without
+    // this row existing first, a retry after phase 3 fails below would have
+    // no stable identifier to derive an idempotency key from and would call
+    // Stripe with a fresh key, creating a second orphaned account.
+    const { error: provisionError } = await admin
+      .from("payment_accounts")
+      .upsert(
+        { tenant_id: membership.tenantId, created_by_user_id: user.id },
+        { onConflict: "tenant_id", ignoreDuplicates: true },
+      );
+
+    if (provisionError) {
       return {
         error: "Das Stripe-Konto konnte nicht angelegt werden. Bitte versuchen Sie es erneut.",
       };
     }
 
-    await recordMenuAdminAuditEvent(supabase, {
-      tenantId: membership.tenantId,
-      actorUserId: user.id,
-      action: "payment_account.connect_started",
-      targetType: "payment_account",
-      targetId: membership.tenantId,
-    });
+    // Reconciliation (Opus review finding on issue #92): Stripe idempotency
+    // keys are only honored for ~24h. A retry later than that with the same
+    // `stripe-express-account:${tenantId}` key is treated by Stripe as a
+    // brand-new request and would create a SECOND, orphaned Express account
+    // -- the idempotency key alone is defense-in-depth for the
+    // same-request-window case, not a full reconciliation mechanism for
+    // long-delayed retries. Stripe Connect accounts can't be looked up by
+    // `metadata.tenant_id` directly, so the provisioning row this action
+    // itself just (re-)upserted above is the source of truth: re-read it
+    // via the service-role client immediately before calling Stripe. If a
+    // previous attempt already recorded a real `stripe_account_id` here (for
+    // example another in-flight request that finished first), reuse it
+    // instead of calling `stripe.accounts.create()` again at all.
+    const { data: reconciled } = await admin
+      .from("payment_accounts")
+      .select("stripe_account_id")
+      .eq("tenant_id", membership.tenantId)
+      .maybeSingle<{ stripe_account_id: string | null }>();
+
+    if (reconciled?.stripe_account_id) {
+      accountId = reconciled.stripe_account_id;
+    } else {
+      // Phase 2: create (or, on retry within Stripe's idempotency window,
+      // idempotently re-fetch) the Stripe Express account. The idempotency
+      // key is derived from `tenant_id` -- this table's primary key and the
+      // provisioning row's stable identifier -- so a retry shortly after
+      // phase 3 fails below reuses the exact same Stripe account instead of
+      // orphaning a new one.
+      const account = await createExpressAccount(
+        stripe,
+        { tenantId: membership.tenantId, email: user.email },
+        { idempotencyKey: `stripe-express-account:${membership.tenantId}` },
+      );
+      accountId = account.id;
+
+      // Phase 3: record the now-real Stripe account id on the provisioning
+      // row created in phase 1.
+      const { error: updateError } = await admin
+        .from("payment_accounts")
+        .update({ stripe_account_id: accountId })
+        .eq("tenant_id", membership.tenantId);
+
+      if (updateError) {
+        return {
+          error: "Das Stripe-Konto konnte nicht angelegt werden. Bitte versuchen Sie es erneut.",
+        };
+      }
+
+      await recordMenuAdminAuditEvent(supabase, {
+        tenantId: membership.tenantId,
+        actorUserId: user.id,
+        action: "payment_account.connect_started",
+        targetType: "payment_account",
+        targetId: membership.tenantId,
+      });
+    }
   }
 
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";

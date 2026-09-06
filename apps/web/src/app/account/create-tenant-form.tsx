@@ -26,7 +26,7 @@ export function CreateTenantForm({
   const [state, formAction, isPending] = useActionState(createTenantAction, initialState);
 
   return (
-    <div className="flex flex-col gap-4 rounded-md border border-neutral-300 p-4">
+    <div className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
       <div>
         <h2 className="text-lg font-semibold text-foreground">Restaurant anlegen</h2>
         <p className="mt-1 text-sm text-foreground-secondary">

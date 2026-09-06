@@ -9,13 +9,18 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:cf": "opennextjs-cloudflare build",
+    "preview:cf": "opennextjs-cloudflare preview",
+    "deploy:cf": "opennextjs-cloudflare deploy"
   },
   "dependencies": {
+    "@cf-wasm/photon": "^0.4.0",
     "@gastro-saas/domain": "workspace:*",
     "@gastro-saas/ui": "workspace:*",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.58.0",
+    "exceljs": "^4.4.0",
     "lucide-react": "^0.545.0",
     "next": "16.2.12",
     "qrcode": "^1.5.4",
@@ -26,6 +31,7 @@
   },
   "devDependencies": {
     "@gastro-saas/config": "workspace:*",
+    "@opennextjs/cloudflare": "^1.20.2",
     "@playwright/test": "^1.56.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
@@ -37,9 +43,11 @@
     "@vitejs/plugin-react": "^6.0.5",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "exifr": "^7.1.3",
     "jsdom": "^25.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "wrangler": "^4.129.0"
   }
 }

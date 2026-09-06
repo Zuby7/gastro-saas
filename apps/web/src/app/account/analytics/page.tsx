@@ -195,6 +195,30 @@ export default async function AnalyticsDashboardPage() {
             ) : null}
           </section>
         </div>
+
+        {/*
+          Ticket #58: manual (external-channel/walk-in) sales logged today,
+          rendered in its own clearly-labeled section -- never merged into
+          the real-order tiles above, and never counted toward
+          "Umsatz heute (netto)"/"Bezahlte Bestellungen heute".
+        */}
+        <section
+          aria-labelledby="manual-sales-heading"
+          className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-surface-muted p-6"
+        >
+          <h2 id="manual-sales-heading" className="text-sm font-medium text-foreground">
+            Manuell nachgetragene Verkäufe heute (externe Kanäle/vor Ort)
+          </h2>
+          <p className="text-2xl font-semibold text-foreground">
+            {summary.manualSalesTodayUnits} Stück
+          </p>
+          <p className="text-sm text-foreground">
+            Geschätzter Umsatz{" "}
+            {formatMoney(summary.manualSalesTodayEstimatedRevenueCents, summary.currency)} --
+            Schätzung auf Basis aktueller Gerichtpreise, NICHT Teil von &quot;Umsatz heute
+            (netto)&quot;.
+          </p>
+        </section>
       </div>
     </main>
   );
