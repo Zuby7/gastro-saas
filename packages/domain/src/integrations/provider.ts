@@ -16,10 +16,7 @@ export type IntegrationProviderKey = "mock";
 
 /** Mirrors `integration_sync_jobs.job_type`'s check constraint. */
 export type IntegrationJobType =
-  | "menu_export"
-  | "availability_sync"
-  | "order_import"
-  | "order_confirmation";
+  "menu_export" | "availability_sync" | "order_import" | "order_confirmation";
 
 /**
  * A minimal, already-published-menu-derived snapshot -- built by

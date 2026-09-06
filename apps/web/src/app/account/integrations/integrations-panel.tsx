@@ -45,9 +45,7 @@ export function IntegrationsPanel({ initialAccount, initialJobs }: IntegrationsP
       }
       if (result.jobs) {
         setJobs((current) => [...result.jobs!, ...current]);
-        setAccount((current) =>
-          current ? { ...current, status: "mock" } : current,
-        );
+        setAccount((current) => (current ? { ...current, status: "mock" } : current));
       }
     });
   }, []);
@@ -62,9 +60,7 @@ export function IntegrationsPanel({ initialAccount, initialJobs }: IntegrationsP
       }
       if (result.jobs) {
         setJobs((current) => [...result.jobs!, ...current]);
-        setAccount((current) =>
-          current ? { ...current, status: "mock" } : current,
-        );
+        setAccount((current) => (current ? { ...current, status: "mock" } : current));
       }
     });
   }, []);

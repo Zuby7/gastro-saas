@@ -28,7 +28,9 @@ export interface MockIntegrationProviderDeps {
  * tenant's sync payload" -- there is no cross-tenant state here at all, this
  * function is pure per-call).
  */
-export function createMockIntegrationProvider(deps: MockIntegrationProviderDeps): IntegrationProvider {
+export function createMockIntegrationProvider(
+  deps: MockIntegrationProviderDeps,
+): IntegrationProvider {
   const { now, generateId } = deps;
 
   return {
@@ -65,9 +67,7 @@ export function createMockIntegrationProvider(deps: MockIntegrationProviderDeps)
           provider: "mock",
           tenantSlug: menu.tenantSlug,
           externalOrderId,
-          items: sampleDish
-            ? [{ dishId: sampleDish.id, name: sampleDish.name, quantity: 1 }]
-            : [],
+          items: sampleDish ? [{ dishId: sampleDish.id, name: sampleDish.name, quantity: 1 }] : [],
         },
       };
     },

@@ -89,13 +89,21 @@ async function createAccount(
   tenantId: string,
   label = "Mock-Integration",
 ): Promise<IntegrationAccountRow> {
-  const result = await queryAsUser<{ create_integration_account: IntegrationAccountRow }>(
+  // `create_integration_account` returns the `integration_accounts` composite
+  // row type. Selecting it as a single scalar column (`select f() as alias`)
+  // makes `pg` hand back the row's raw, un-decoded composite text
+  // representation instead of an object with named fields (unlike
+  // `list_integration_accounts`/`list_integration_sync_jobs` below, which are
+  // set-returning functions called in the FROM clause so `pg` sees their
+  // individual, plain-typed output columns). `(f()).*` expands the composite
+  // into its individual columns so `pg` decodes each one properly.
+  const result = await queryAsUser<IntegrationAccountRow>(
     admin,
     actorUserId,
-    `select create_integration_account($1, 'mock', $2) as create_integration_account`,
+    `select (create_integration_account($1, 'mock', $2)).*`,
     [tenantId, label],
   );
-  return result.rows[0]!.create_integration_account;
+  return result.rows[0]!;
 }
 
 describe.skipIf(!dbAvailable)(
@@ -165,14 +173,17 @@ describe.skipIf(!dbAvailable)(
       const account = await createAccount(admin, seed.staffAId, fixture.tenantA.tenantId);
       expect(account.status).toBe("mock");
 
-      const jobResult = await queryAsUser<{ record_integration_sync_job: { id: string; status: string; job_type: string } }>(
+      // Same composite-decoding concern as `createAccount()` above: expand
+      // via `(f()).*` rather than selecting the scalar composite as a single
+      // aliased column, so `pg` returns plain, individually-typed columns.
+      const jobResult = await queryAsUser<{ id: string; status: string; job_type: string }>(
         admin,
         seed.staffAId,
-        `select record_integration_sync_job($1, $2, 'menu_export', 'succeeded', $3::jsonb, null) as record_integration_sync_job`,
+        `select (record_integration_sync_job($1, $2, 'menu_export', 'succeeded', $3::jsonb, null)).*`,
         [fixture.tenantA.tenantId, account.id, JSON.stringify({ categoryCount: 2, dishCount: 5 })],
       );
-      expect(jobResult.rows[0]!.record_integration_sync_job.status).toBe("succeeded");
-      expect(jobResult.rows[0]!.record_integration_sync_job.job_type).toBe("menu_export");
+      expect(jobResult.rows[0]!.status).toBe("succeeded");
+      expect(jobResult.rows[0]!.job_type).toBe("menu_export");
 
       const listResult = await queryAsUser<{ id: string; job_type: string }>(
         admin,
@@ -209,7 +220,10 @@ describe.skipIf(!dbAvailable)(
         `select job_type, status from list_integration_sync_jobs($1, $2) order by created_at`,
         [fixture.tenantA.tenantId, account.id],
       );
-      expect(listResult.rows.map((r) => r.job_type)).toEqual(["order_import", "order_confirmation"]);
+      expect(listResult.rows.map((r) => r.job_type)).toEqual([
+        "order_import",
+        "order_confirmation",
+      ]);
       expect(listResult.rows.every((r) => r.status === "succeeded")).toBe(true);
     });
 
@@ -308,9 +322,10 @@ describe.skipIf(!dbAvailable)(
           ),
         ).rejects.toThrow(/Integration account not found/i);
 
-        const jobs = await admin.query(`select id from integration_sync_jobs where tenant_id = $1`, [
-          fixture.tenantA.tenantId,
-        ]);
+        const jobs = await admin.query(
+          `select id from integration_sync_jobs where tenant_id = $1`,
+          [fixture.tenantA.tenantId],
+        );
         expect(jobs.rows).toHaveLength(0);
       });
 

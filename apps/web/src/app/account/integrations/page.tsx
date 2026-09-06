@@ -3,10 +3,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
-import {
-  ensureMockIntegrationAccount,
-  listIntegrationSyncJobs,
-} from "@/lib/integrations/service";
+import { ensureMockIntegrationAccount, listIntegrationSyncJobs } from "@/lib/integrations/service";
 import { IntegrationsPanel } from "./integrations-panel";
 
 /**

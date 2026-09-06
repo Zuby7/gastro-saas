@@ -26,9 +26,33 @@ const MOCK_ACCOUNT_ROW = {
 };
 
 const PUBLISHED_MENU = {
-  tenant: { slug: "trattoria-bella", name: "Trattoria Bella", description: "", timezone: "Europe/Berlin", brandColor: "#000" },
+  tenant: {
+    slug: "trattoria-bella",
+    name: "Trattoria Bella",
+    description: "",
+    timezone: "Europe/Berlin",
+    brandColor: "#000",
+  },
   categories: [
-    { id: "cat-1", name: "Pizza", dishes: [{ id: "dish-1", name: "Margherita", description: "", priceCents: 900, currency: "EUR", soldOut: false, image: null, variants: [], optionGroups: [], labels: [], allergenNotice: "" }] },
+    {
+      id: "cat-1",
+      name: "Pizza",
+      dishes: [
+        {
+          id: "dish-1",
+          name: "Margherita",
+          description: "",
+          priceCents: 900,
+          currency: "EUR",
+          soldOut: false,
+          image: null,
+          variants: [],
+          optionGroups: [],
+          labels: [],
+          allergenNotice: "",
+        },
+      ],
+    },
   ],
 };
 

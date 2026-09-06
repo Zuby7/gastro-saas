@@ -1,9 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  createMockIntegrationProvider,
-  type MenuSnapshot,
-} from "@gastro-saas/domain";
+import { createMockIntegrationProvider, type MenuSnapshot } from "@gastro-saas/domain";
 import type { PublicMenu } from "@/lib/public-menu/types";
 import type {
   IntegrationAccountView,

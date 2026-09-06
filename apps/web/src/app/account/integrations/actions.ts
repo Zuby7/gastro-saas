@@ -25,7 +25,11 @@ export interface IntegrationActionResult {
  */
 async function resolveAuthorizedTenant(): Promise<
   | { error: string }
-  | { supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>; tenantId: string; tenantSlug: string }
+  | {
+      supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+      tenantId: string;
+      tenantSlug: string;
+    }
 > {
   const supabase = await createSupabaseServerClient();
   const {
@@ -86,7 +90,9 @@ export async function exportMenuAction(): Promise<IntegrationActionResult> {
     if (error instanceof IntegrationDomainError) {
       return { error: error.message };
     }
-    return { error: "Der Menü-Export konnte nicht durchgeführt werden. Bitte versuchen Sie es erneut." };
+    return {
+      error: "Der Menü-Export konnte nicht durchgeführt werden. Bitte versuchen Sie es erneut.",
+    };
   }
 }
 
@@ -112,7 +118,8 @@ export async function simulateIncomingOrderAction(): Promise<IntegrationActionRe
       return { error: error.message };
     }
     return {
-      error: "Der simulierte Bestelleingang konnte nicht ausgelöst werden. Bitte versuchen Sie es erneut.",
+      error:
+        "Der simulierte Bestelleingang konnte nicht ausgelöst werden. Bitte versuchen Sie es erneut.",
     };
   }
 }
