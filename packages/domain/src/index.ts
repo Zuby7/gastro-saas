@@ -5,6 +5,8 @@ export * from "./analytics/dish-performance";
 export * from "./analytics/trend-comparison";
 export * from "./audit";
 export * from "./cart/pricing";
+export * from "./integrations/mock-provider";
+export * from "./integrations/provider";
 export * from "./menu/quality";
 export * from "./orders/state-machine";
 export * from "./payments/connect-status";
