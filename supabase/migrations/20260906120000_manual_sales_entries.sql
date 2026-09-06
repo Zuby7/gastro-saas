@@ -42,11 +42,11 @@
 -- still grant it to a custom role via the existing roles.manage UI.
 --
 -- Two enforcement layers per `.claude/rules/tenant-isolation.md`:
---   1. RLS on `manual_sales_entries` (`apply_basic_tenant_policies`, same
---      helper as every other tenant-scoped admin table) -- SELECT open to any
---      tenant member (matches this repo's convention for dish/menu-adjacent
---      tables; not itself highly sensitive financial data), INSERT/UPDATE/
---      DELETE gated on `analytics.manualsales.write`.
+--   1. RLS on `manual_sales_entries` -- SELECT gated on `analytics.read`
+--      (matches both analytics RPCs' own access rule below, so a
+--      low-privilege tenant member without analytics.read cannot bypass the
+--      RPCs' gate by querying this table directly), INSERT/UPDATE/DELETE
+--      gated on `analytics.manualsales.write`.
 --   2. The server action inserting a row (`recordManualSaleAction`) calls
 --      `requireTenantPermission` itself before writing, exactly like every
 --      other dish-admin mutation in this codebase.
@@ -63,15 +63,23 @@
 -- merged into a single blended total.
 --
 -- Rollback for local/throwaway DBs:
---   drop policy if exists manual_sales_entries_select_member on manual_sales_entries;
+--   drop policy if exists manual_sales_entries_select_analytics_read on manual_sales_entries;
 --   drop policy if exists manual_sales_entries_insert_write on manual_sales_entries;
 --   drop policy if exists manual_sales_entries_update_write on manual_sales_entries;
 --   drop policy if exists manual_sales_entries_delete_write on manual_sales_entries;
 --   drop table if exists manual_sales_entries;
+--   delete from system_role_default_permissions where role_key = 'manager' and permission_key = 'analytics.manualsales.write';
 --   -- then re-apply the previous bodies of get_analytics_dashboard_summary/
---   -- get_dish_performance_stats from their own migrations, and the previous
---   -- body of seed_standard_roles_for_tenant from
---   -- 20260819110000_privacy_export_retention_and_deletion_requests.sql.
+--   -- get_dish_performance_stats from their own migrations.
+--
+-- Note: this migration does NOT touch seed_standard_roles_for_tenant() at
+-- all -- ticket #114 (20260906090000_additive_system_role_default_permissions.sql,
+-- already on main) moved that function's non-Owner default grants into the
+-- additive `system_role_default_permissions(role_key, permission_key)` table
+-- specifically so future permission-granting migrations (this one included)
+-- never again need to `create or replace function` the whole trigger body
+-- (which had already silently dropped previously-granted permissions twice).
+-- This migration follows that pattern: it only INSERTs a new catalog row.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -93,84 +101,15 @@ select r.id, 'analytics.manualsales.write' from roles r where r.key = 'manager'
 on conflict do nothing;
 
 -- ----------------------------------------------------------------------------
--- seed_standard_roles_for_tenant(): reconstructed from the actual latest
--- accumulated body (20260819110000_privacy_export_retention_and_deletion_requests.sql),
--- plus this ticket's `analytics.manualsales.write` grant for Manager. Owner
--- keeps getting every permission via the unchanged wildcard subquery below.
+-- Additive default-permission catalog row (ticket #114's
+-- system_role_default_permissions table, already on main) -- future tenants'
+-- Manager role picks this up via seed_standard_roles_for_tenant()'s existing
+-- read from that table. This migration deliberately does NOT touch
+-- seed_standard_roles_for_tenant() itself (see migration header).
 -- ----------------------------------------------------------------------------
-create or replace function seed_standard_roles_for_tenant()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_owner_role_id uuid;
-  v_manager_role_id uuid;
-  v_kitchen_role_id uuid;
-  v_service_role_id uuid;
-  v_marketing_role_id uuid;
-begin
-  insert into public.roles (tenant_id, key, name, description, is_system)
-  values
-    (new.id, 'owner', 'Owner', 'Full tenant administration and safety-critical permissions.', true),
-    (new.id, 'manager', 'Manager', 'Operational tenant management without role-template administration.', true),
-    (new.id, 'kitchen', 'Kitchen', 'Kitchen workflow access only.', true),
-    (new.id, 'service', 'Service', 'Service and order workflow access.', true),
-    (new.id, 'marketing', 'Marketing', 'Menu publishing and analytics access without payment authority.', true)
-  on conflict (tenant_id, key) do update
-     set name = excluded.name,
-         description = excluded.description,
-         is_system = true;
-
-  select id into v_owner_role_id from public.roles where tenant_id = new.id and key = 'owner';
-  select id into v_manager_role_id from public.roles where tenant_id = new.id and key = 'manager';
-  select id into v_kitchen_role_id from public.roles where tenant_id = new.id and key = 'kitchen';
-  select id into v_service_role_id from public.roles where tenant_id = new.id and key = 'service';
-  select id into v_marketing_role_id from public.roles where tenant_id = new.id and key = 'marketing';
-
-  insert into public.role_permissions (role_id, permission_key)
-  select v_owner_role_id, key from public.permissions
-  on conflict do nothing;
-
-  insert into public.role_permissions (role_id, permission_key)
-  values
-    (v_manager_role_id, 'users.invite'),
-    (v_manager_role_id, 'users.manage'),
-    (v_manager_role_id, 'menu.publish'),
-    (v_manager_role_id, 'menu.read'),
-    (v_manager_role_id, 'menu.availability.manage'),
-    (v_manager_role_id, 'orders.cancel'),
-    (v_manager_role_id, 'orders.read'),
-    (v_manager_role_id, 'orders.manage'),
-    (v_manager_role_id, 'payments.refund'),
-    (v_manager_role_id, 'payments.read'),
-    (v_manager_role_id, 'analytics.read'),
-    (v_manager_role_id, 'analytics.manualsales.write'),
-    (v_manager_role_id, 'audit.read'),
-    (v_manager_role_id, 'reviews.read'),
-    (v_manager_role_id, 'reviews.moderate'),
-    (v_kitchen_role_id, 'menu.read'),
-    (v_kitchen_role_id, 'menu.availability.manage'),
-    (v_kitchen_role_id, 'orders.cancel'),
-    (v_kitchen_role_id, 'orders.read'),
-    (v_kitchen_role_id, 'orders.manage'),
-    (v_service_role_id, 'menu.read'),
-    (v_service_role_id, 'menu.availability.manage'),
-    (v_service_role_id, 'orders.cancel'),
-    (v_service_role_id, 'orders.read'),
-    (v_service_role_id, 'orders.manage'),
-    (v_marketing_role_id, 'menu.publish'),
-    (v_marketing_role_id, 'menu.read'),
-    (v_marketing_role_id, 'analytics.read')
-  on conflict do nothing;
-
-  return new;
-end;
-$$;
-
-comment on function seed_standard_roles_for_tenant() is
-  'Creates the Owner/Manager/Kitchen/Service/Marketing system roles for a tenant and attaches their default permissions.';
+insert into system_role_default_permissions (role_key, permission_key)
+values ('manager', 'analytics.manualsales.write')
+on conflict do nothing;
 
 -- ----------------------------------------------------------------------------
 -- manual_sales_entries table
@@ -180,7 +119,11 @@ create table manual_sales_entries (
   tenant_id uuid not null references tenants (id) on delete cascade,
   dish_id uuid not null references dishes (id) on delete cascade,
   quantity integer not null check (quantity > 0),
-  sale_date date not null,
+  -- Matches the app-level upper-bound validation in
+  -- apps/web/src/app/account/menu/dishes/[dishId]/schemas.ts -- a manual
+  -- entry logs a sale that already happened, never a future one (a small
+  -- +1 day allowance covers timezone-boundary edge cases around "today").
+  sale_date date not null check (sale_date <= current_date + 1),
   channel text check (channel is null or char_length(channel) <= 100),
   entered_by_user_id uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default now()
@@ -199,29 +142,42 @@ alter table manual_sales_entries enable row level security;
 grant select, insert, update, delete on manual_sales_entries to authenticated;
 grant all on manual_sales_entries to service_role;
 
--- `apply_basic_tenant_policies()` was a transient helper, scoped to and
--- dropped at the end of 20260801110000_restaurant_profile_and_menu_management.sql
--- -- it no longer exists in the schema by this migration's own apply time.
--- Recreated here (identical body) so this migration can keep using the same,
--- already-battle-tested RLS shape as every other tenant-scoped admin table,
--- then dropped again at the end, mirroring that same original pattern.
-create or replace function apply_basic_tenant_policies(p_table regclass, p_write_permission text)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  execute format('create policy %I on %s for select to authenticated using (public.is_tenant_member(tenant_id))', p_table::text || '_select_member', p_table);
-  execute format('create policy %I on %s for insert to authenticated with check (public.has_tenant_permission(tenant_id, %L))', p_table::text || '_insert_write', p_table, p_write_permission);
-  execute format('create policy %I on %s for update to authenticated using (public.has_tenant_permission(tenant_id, %L)) with check (public.has_tenant_permission(tenant_id, %L))', p_table::text || '_update_write', p_table, p_write_permission, p_write_permission);
-  execute format('create policy %I on %s for delete to authenticated using (public.has_tenant_permission(tenant_id, %L))', p_table::text || '_delete_write', p_table, p_write_permission);
-end;
-$$;
+-- Written as four explicit policies rather than via the
+-- `apply_basic_tenant_policies()` shared helper (used by most other
+-- tenant-scoped admin tables), because SELECT here intentionally deviates
+-- from that helper's default (plain tenant membership): both analytics RPCs
+-- above gate their own manual-sales figures on `analytics.read`. Leaving
+-- SELECT open to any tenant member would let a low-privilege staff account
+-- without `analytics.read` bypass that RPC gate by querying this table
+-- directly (joining `dishes.price_cents` to reconstruct the same
+-- estimated-revenue figures the RPCs withhold from them) -- mirrors
+-- `payment_accounts_select_payments_read`'s same reasoning
+-- (20260808130000_stripe_connect_payment_accounts.sql) for deviating from
+-- the shared helper's plain-membership SELECT default.
+create policy manual_sales_entries_select_analytics_read
+  on manual_sales_entries
+  for select
+  to authenticated
+  using (public.has_tenant_permission(tenant_id, 'analytics.read'));
 
-select apply_basic_tenant_policies('manual_sales_entries', 'analytics.manualsales.write');
+create policy manual_sales_entries_insert_write
+  on manual_sales_entries
+  for insert
+  to authenticated
+  with check (public.has_tenant_permission(tenant_id, 'analytics.manualsales.write'));
 
-drop function apply_basic_tenant_policies(regclass, text);
+create policy manual_sales_entries_update_write
+  on manual_sales_entries
+  for update
+  to authenticated
+  using (public.has_tenant_permission(tenant_id, 'analytics.manualsales.write'))
+  with check (public.has_tenant_permission(tenant_id, 'analytics.manualsales.write'));
+
+create policy manual_sales_entries_delete_write
+  on manual_sales_entries
+  for delete
+  to authenticated
+  using (public.has_tenant_permission(tenant_id, 'analytics.manualsales.write'));
 
 -- ----------------------------------------------------------------------------
 -- get_analytics_dashboard_summary(): additive manual-sales fields

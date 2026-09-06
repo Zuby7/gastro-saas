@@ -184,6 +184,31 @@ describe.skipIf(!dbAvailable)("manual_sales_entries (ticket #58)", () => {
     expect(ownRead.rows).toEqual([{ dish_id: dishIdB }]);
   });
 
+  it("denies a tenant member without analytics.read from reading manual_sales_entries directly (RLS matches the analytics RPCs' own access rule)", async () => {
+    const seed = await seedFixtureWithManagerAndStaff();
+    fixture = seed.fixture;
+    const dishId = await seedPublishedDish(admin, fixture.tenantB.tenantId);
+    await admin.query(
+      `insert into manual_sales_entries (tenant_id, dish_id, quantity, sale_date) values ($1, $2, 5, '2026-09-01')`,
+      [fixture.tenantB.tenantId, dishId],
+    );
+
+    // seed.staffId is a tenant member of tenantB but has no analytics.read
+    // (and no analytics.manualsales.write) -- plain tenant membership alone
+    // must not be enough to read this table, or a low-privilege staff
+    // account could bypass get_analytics_dashboard_summary()/
+    // get_dish_performance_stats()'s own analytics.read gate by joining
+    // dishes.price_cents to reconstruct the same figures those RPCs
+    // withhold from them.
+    const result = await queryAsUser(
+      admin,
+      seed.staffId,
+      `select id from manual_sales_entries where tenant_id = $1`,
+      [fixture.tenantB.tenantId],
+    );
+    expect(result.rows).toHaveLength(0);
+  });
+
   it("get_analytics_dashboard_summary() ignores a manual entry whose dish_id points to another tenant's dish (defense in depth against a tampered/foreign dish_id)", async () => {
     const seed = await seedFixtureWithManagerAndStaff();
     fixture = seed.fixture;
