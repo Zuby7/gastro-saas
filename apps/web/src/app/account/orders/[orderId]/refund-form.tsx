@@ -44,9 +44,7 @@ export function RefundForm({
   // state (see `cart-line.tsx`). Calling `setState` conditionally here, while
   // rendering, triggers an immediate re-render before the browser paints --
   // it is not a `set-state-in-effect` violation since there is no effect.
-  const [lastRotatedForSuccess, setLastRotatedForSuccess] = useState<string | undefined>(
-    undefined,
-  );
+  const [lastRotatedForSuccess, setLastRotatedForSuccess] = useState<string | undefined>(undefined);
   if (state.success && state.success !== lastRotatedForSuccess) {
     setLastRotatedForSuccess(state.success);
     setRequestToken(crypto.randomUUID());

@@ -16,16 +16,12 @@ vi.mock("./actions", () => ({
  */
 describe("RefundForm request idempotency", () => {
   it("submits the identical requestToken on a rapid double-submit before isPending settles", async () => {
-    const { container } = render(
-      <RefundForm orderId="order-1" remainingRefundableCents={1000} />,
-    );
+    const { container } = render(<RefundForm orderId="order-1" remainingRefundableCents={1000} />);
 
     // Token is populated post-mount (see refund-form.tsx for why: avoiding an
     // SSR/client hydration mismatch).
     await waitFor(() => {
-      const hiddenInput = container.querySelector(
-        'input[name="requestToken"]',
-      ) as HTMLInputElement;
+      const hiddenInput = container.querySelector('input[name="requestToken"]') as HTMLInputElement;
       expect(hiddenInput.value).not.toBe("");
     });
 
