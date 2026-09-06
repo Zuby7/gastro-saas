@@ -22,8 +22,7 @@ vi.mock("next/cache", () => ({
 // that most tests below still exercise its real decode/re-encode behavior,
 // while the authorization-ordering test can assert it was never called.
 vi.mock("@/lib/images/re-encode-dish-image", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/lib/images/re-encode-dish-image")>();
+  const actual = await importOriginal<typeof import("@/lib/images/re-encode-dish-image")>();
   return { ...actual, reEncodeDishImage: vi.fn(actual.reEncodeDishImage) };
 });
 
