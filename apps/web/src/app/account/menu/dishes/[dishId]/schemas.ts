@@ -91,6 +91,30 @@ export const AvailabilitySchema = z.object({
     ),
 });
 
+/**
+ * Ticket #58 ("Manuelle Nacherfassung von Verkäufen"): logging a sale that
+ * happened outside this platform's own order/payment system. `saleDate` is a
+ * plain `date` input value (yyyy-mm-dd) -- never a datetime, since these are
+ * calendar-day entries a staff member types in after the fact, not precise
+ * timestamps. `channel` is optional free text (e.g. "Lieferando", "Vor Ort").
+ */
+export const ManualSaleEntrySchema = z.object({
+  quantity: z.coerce
+    .number()
+    .int("Bitte geben Sie eine ganze Zahl an.")
+    .min(1, "Die Anzahl muss mindestens 1 sein.")
+    .max(100000, "Die Anzahl ist unrealistisch hoch."),
+  saleDate: z
+    .string()
+    .trim()
+    .min(1, "Bitte geben Sie ein Datum an.")
+    .refine((value) => !Number.isNaN(new Date(value).getTime()), "Bitte geben Sie ein gültiges Datum an.")
+    .refine((value) => new Date(value).getTime() <= Date.now() + 24 * 60 * 60 * 1000, {
+      message: "Das Datum darf nicht in der Zukunft liegen.",
+    }),
+  channel: z.string().trim().max(100, "Kanal/Quelle ist zu lang.").optional().or(z.literal("")),
+});
+
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 

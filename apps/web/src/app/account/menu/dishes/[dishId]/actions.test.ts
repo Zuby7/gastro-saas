@@ -380,6 +380,115 @@ describe("uploadDishImageAction", () => {
   });
 });
 
+describe("recordManualSaleAction", () => {
+  it("denies logging a manual sale when the caller lacks analytics.manual_sales.write", async () => {
+    denyPermission();
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("quantity", "3");
+    fd.set("saleDate", "2026-09-01");
+    fd.set("channel", "Lieferando");
+
+    const { recordManualSaleAction } = await import("./actions");
+    const result = await recordManualSaleAction({}, fd);
+
+    expect(result.error).toContain("nicht die erforderliche Berechtigung");
+    expect(fromMock).not.toHaveBeenCalledWith("manual_sales_entries");
+  });
+
+  it("rejects a non-positive quantity before ever calling the permission RPC", async () => {
+    allowPermission();
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("quantity", "0");
+    fd.set("saleDate", "2026-09-01");
+
+    const { recordManualSaleAction } = await import("./actions");
+    const result = await recordManualSaleAction({}, fd);
+
+    expect(result.error).toBeDefined();
+    expect(fromMock).not.toHaveBeenCalledWith("manual_sales_entries");
+  });
+
+  it("inserts only into manual_sales_entries, scoped to the caller's own tenant, with the resolved actor -- never orders/order_items/payments", async () => {
+    allowPermission();
+    let insertedRow: Record<string, unknown> | undefined;
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") return membershipTable();
+      if (table === "manual_sales_entries") {
+        return {
+          insert: async (row: Record<string, unknown>) => {
+            insertedRow = row;
+            return { error: null };
+          },
+        };
+      }
+      if (table === "audit_logs") {
+        return { insert: async () => ({ error: null }) };
+      }
+      // Explicitly fail the test if this action ever touches order-shaped
+      // tables -- structural separation is a non-negotiable of this ticket.
+      if (table === "orders" || table === "order_items" || table === "payments") {
+        throw new Error(`recordManualSaleAction must never touch table: ${table}`);
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("quantity", "5");
+    fd.set("saleDate", "2026-09-01");
+    fd.set("channel", "Vor Ort");
+
+    const { recordManualSaleAction } = await import("./actions");
+    const result = await recordManualSaleAction({}, fd);
+
+    expect(result.success).toBeDefined();
+    expect(insertedRow).toMatchObject({
+      tenant_id: "tenant-1",
+      dish_id: "dish-1",
+      quantity: 5,
+      sale_date: "2026-09-01",
+      channel: "Vor Ort",
+      entered_by_user_id: "user-1",
+    });
+    expect(fromMock).not.toHaveBeenCalledWith("orders");
+    expect(fromMock).not.toHaveBeenCalledWith("order_items");
+    expect(fromMock).not.toHaveBeenCalledWith("payments");
+  });
+
+  it("stores a null channel when none was provided (optional field)", async () => {
+    allowPermission();
+    let insertedRow: Record<string, unknown> | undefined;
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") return membershipTable();
+      if (table === "manual_sales_entries") {
+        return {
+          insert: async (row: Record<string, unknown>) => {
+            insertedRow = row;
+            return { error: null };
+          },
+        };
+      }
+      if (table === "audit_logs") {
+        return { insert: async () => ({ error: null }) };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("quantity", "2");
+    fd.set("saleDate", "2026-09-01");
+
+    const { recordManualSaleAction } = await import("./actions");
+    const result = await recordManualSaleAction({}, fd);
+
+    expect(result.success).toBeDefined();
+    expect(insertedRow).toMatchObject({ channel: null });
+  });
+});
+
 describe("setDishAvailabilityAction", () => {
   it("denies the toggle when the caller lacks menu.availability.manage", async () => {
     denyPermission();

@@ -18,6 +18,7 @@ import {
   AvailabilitySchema,
   DishBasicsSchema,
   LookupNameSchema,
+  ManualSaleEntrySchema,
   MAX_IMAGE_SIZE_BYTES,
   OptionGroupSchema,
   OptionSchema,
@@ -81,6 +82,31 @@ async function ensurePermission(
     if (error instanceof PermissionDeniedError) {
       return {
         error: "Sie haben nicht die erforderliche Berechtigung, den Menüplan zu bearbeiten.",
+      };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Ticket #58: gates manual sales entry on its own dedicated
+ * `analytics.manual_sales.write` permission, deliberately NOT `menu.write`
+ * (this is analytics/sales data entry, not menu content editing) and NOT
+ * `analytics.read` (read must never also authorize a write) -- see the
+ * migration header comment in
+ * `20260906090000_manual_sales_entries.sql` for the full rationale.
+ */
+async function ensureManualSalesPermission(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  tenantId: string,
+): Promise<DishActionState | null> {
+  try {
+    await requireTenantPermission(supabase, tenantId, "analytics.manual_sales.write");
+    return null;
+  } catch (error) {
+    if (error instanceof PermissionDeniedError) {
+      return {
+        error: "Sie haben nicht die erforderliche Berechtigung, Verkäufe nachzutragen.",
       };
     }
     throw error;
@@ -722,4 +748,69 @@ export async function uploadDishImageAction(
 
   revalidateDish(dishId);
   return { success: "Bild wurde hochgeladen." };
+}
+
+/**
+ * Ticket #58 ("Manuelle Nacherfassung von Verkäufen"): logs a sale that
+ * happened outside this platform's own order/payment system (e.g.
+ * Lieferando, walk-in without the ordering system) against one dish.
+ * Structurally separate from real orders -- this ONLY ever inserts into
+ * `manual_sales_entries` (a brand-new, dedicated table), never into
+ * `orders`/`order_items`/`payments`. `entered_by_user_id` is resolved from
+ * the authenticated session server-side, never taken from the client.
+ * `tenant_id` likewise always comes from the caller's own resolved
+ * membership -- never a client-supplied value -- and the underlying table's
+ * RLS INSERT policy independently re-checks `analytics.manual_sales.write`
+ * as the second enforcement layer (see the migration header comment).
+ */
+export async function recordManualSaleAction(
+  _prevState: DishActionState,
+  formData: FormData,
+): Promise<DishActionState> {
+  const dishId = String(formData.get("dishId") ?? "");
+  const parsed = ManualSaleEntrySchema.safeParse({
+    quantity: formData.get("quantity"),
+    saleDate: formData.get("saleDate"),
+    channel: formData.get("channel") ?? "",
+  });
+
+  if (!dishId || !parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.success ? [] : parsed.error.issues) {
+      const field = issue.path[0];
+      if (typeof field === "string") fieldErrors[field] = issue.message;
+    }
+    return { error: "Bitte korrigieren Sie die markierten Felder.", fieldErrors };
+  }
+
+  const { supabase, tenantId, user } = await requireMenuWriteContext();
+  const denied = await ensureManualSalesPermission(supabase, tenantId);
+  if (denied) return denied;
+
+  const channel = parsed.data.channel?.trim() || null;
+
+  const { error } = await supabase.from("manual_sales_entries").insert({
+    tenant_id: tenantId,
+    dish_id: dishId,
+    quantity: parsed.data.quantity,
+    sale_date: parsed.data.saleDate,
+    channel,
+    entered_by_user_id: user?.id ?? null,
+  });
+
+  if (error) {
+    return { error: "Der Verkauf konnte nicht nachgetragen werden." };
+  }
+
+  await recordMenuAdminAuditEvent(supabase, {
+    tenantId,
+    actorUserId: user?.id ?? null,
+    action: "dish.manual_sale_recorded",
+    targetType: "dish",
+    targetId: dishId,
+    metadata: { quantity: parsed.data.quantity, saleDate: parsed.data.saleDate, channel },
+  });
+
+  revalidateDish(dishId);
+  return { success: "Verkauf wurde nachgetragen." };
 }

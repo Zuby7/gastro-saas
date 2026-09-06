@@ -85,6 +85,8 @@ describe("DishPerformancePage (ticket #31)", () => {
         quantityRank: 1,
         revenueRank: 2,
         label: "topseller",
+        manualUnitsSold: 0,
+        manualEstimatedRevenueCents: 0,
       },
       {
         dishId: "d2",
@@ -99,6 +101,8 @@ describe("DishPerformancePage (ticket #31)", () => {
         quantityRank: 2,
         revenueRank: 1,
         label: "insufficient_data",
+        manualUnitsSold: 0,
+        manualEstimatedRevenueCents: 0,
       },
     ]);
 
@@ -137,6 +141,8 @@ describe("DishPerformancePage (ticket #31)", () => {
         quantityRank: 1,
         revenueRank: 1,
         label: "normal",
+        manualUnitsSold: 0,
+        manualEstimatedRevenueCents: 0,
       },
     ]);
 
@@ -167,6 +173,8 @@ describe("DishPerformancePage (ticket #31)", () => {
         quantityRank: 1,
         revenueRank: 1,
         label: "normal",
+        manualUnitsSold: 0,
+        manualEstimatedRevenueCents: 0,
       },
     ]);
 
@@ -197,6 +205,8 @@ describe("DishPerformancePage (ticket #31)", () => {
         quantityRank: 1,
         revenueRank: 1,
         label: "normal",
+        manualUnitsSold: 0,
+        manualEstimatedRevenueCents: 0,
       },
     ]);
 
