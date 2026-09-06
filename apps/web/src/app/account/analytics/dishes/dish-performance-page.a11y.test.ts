@@ -16,7 +16,7 @@ describe("dish performance page color contrast (WCAG AA)", () => {
     );
   });
 
-  it("text-foreground on bg-white (table cards) passes AA for normal text", () => {
+  it("text-foreground on bg-surface (table cards) passes AA for normal text", () => {
     expect(validateContrastRatio(colors.neutral[900], colors.neutral[0], "normal").passesAA).toBe(
       true,
     );

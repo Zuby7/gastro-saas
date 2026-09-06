@@ -194,7 +194,7 @@ function OrderColumn({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4"
+      className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4"
     >
       <h2 id={headingId} className="text-sm font-semibold text-foreground">
         {staffOrderStatusColumnLabel(status)}{" "}

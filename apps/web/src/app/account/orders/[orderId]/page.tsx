@@ -124,7 +124,7 @@ export default async function OrderDetailPage({
 
         <section
           aria-labelledby="order-details-heading"
-          className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="order-details-heading" className="text-lg font-medium text-foreground">
             Bestelldetails
@@ -145,7 +145,7 @@ export default async function OrderDetailPage({
 
         <section
           aria-labelledby="refund-history-heading"
-          className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="refund-history-heading" className="text-lg font-medium text-foreground">
             Zahlung &amp; Rückerstattungen

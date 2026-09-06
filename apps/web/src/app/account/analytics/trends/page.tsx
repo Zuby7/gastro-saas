@@ -175,7 +175,7 @@ export default async function TrendsAndExtrasPage({
 
         <section
           aria-labelledby="trend-widget-heading"
-          className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="trend-widget-heading" className="text-lg font-medium text-foreground">
             Zeitraumvergleich
@@ -269,7 +269,7 @@ export default async function TrendsAndExtrasPage({
 
         <section
           aria-labelledby="extras-heading"
-          className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="extras-heading" className="text-lg font-medium text-foreground">
             Extras-Auswertung
@@ -290,7 +290,7 @@ export default async function TrendsAndExtrasPage({
 
         <section
           aria-labelledby="removed-ingredients-heading"
-          className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="removed-ingredients-heading" className="text-lg font-medium text-foreground">
             Entfernte Zutaten

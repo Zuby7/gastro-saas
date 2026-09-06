@@ -24,30 +24,135 @@ interface TokenPair {
 }
 
 const lightPairs: TokenPair[] = [
-  { description: "foreground on surface (card)", foreground: colors.neutral[900], background: colors.neutral[0], textSize: "normal" },
-  { description: "foreground-secondary on surface (card)", foreground: colors.neutral[500], background: colors.neutral[0], textSize: "normal" },
-  { description: "link-foreground on surface (card)", foreground: colors.brand[600], background: colors.neutral[0], textSize: "normal" },
-  { description: "danger-foreground on surface (card)", foreground: colors.danger[600], background: colors.neutral[0], textSize: "normal" },
-  { description: "foreground on surface-secondary (page bg / recessed section)", foreground: colors.neutral[900], background: colors.neutral[50], textSize: "normal" },
-  { description: "link-foreground on surface-secondary", foreground: colors.brand[600], background: colors.neutral[50], textSize: "normal" },
-  { description: "danger-foreground on surface-secondary", foreground: colors.danger[600], background: colors.neutral[50], textSize: "normal" },
-  { description: "foreground on surface-muted (notice box / hover)", foreground: colors.neutral[900], background: colors.neutral[100], textSize: "normal" },
-  { description: "danger-foreground on surface-muted", foreground: colors.danger[600], background: colors.neutral[100], textSize: "normal" },
+  {
+    description: "foreground on surface (card)",
+    foreground: colors.neutral[900],
+    background: colors.neutral[0],
+    textSize: "normal",
+  },
+  {
+    description: "foreground-secondary on surface (card)",
+    foreground: colors.neutral[500],
+    background: colors.neutral[0],
+    textSize: "normal",
+  },
+  {
+    description: "link-foreground on surface (card)",
+    foreground: colors.brand[600],
+    background: colors.neutral[0],
+    textSize: "normal",
+  },
+  {
+    description: "danger-foreground on surface (card)",
+    foreground: colors.danger[600],
+    background: colors.neutral[0],
+    textSize: "normal",
+  },
+  {
+    description: "foreground on surface-secondary (page bg / recessed section)",
+    foreground: colors.neutral[900],
+    background: colors.neutral[50],
+    textSize: "normal",
+  },
+  {
+    description: "link-foreground on surface-secondary",
+    foreground: colors.brand[600],
+    background: colors.neutral[50],
+    textSize: "normal",
+  },
+  {
+    description: "danger-foreground on surface-secondary",
+    foreground: colors.danger[600],
+    background: colors.neutral[50],
+    textSize: "normal",
+  },
+  {
+    description: "foreground on surface-muted (notice box / hover)",
+    foreground: colors.neutral[900],
+    background: colors.neutral[100],
+    textSize: "normal",
+  },
+  {
+    description: "danger-foreground on surface-muted",
+    foreground: colors.danger[600],
+    background: colors.neutral[100],
+    textSize: "normal",
+  },
 ];
 
 const darkPairs: TokenPair[] = [
-  { description: "foreground on surface (card, dark)", foreground: colors.neutral[50], background: colors.neutral[800], textSize: "normal" },
-  { description: "foreground-secondary on surface (card, dark)", foreground: colors.neutral[300], background: colors.neutral[800], textSize: "normal" },
-  { description: "link-foreground on surface (card, dark)", foreground: colors.brand[300], background: colors.neutral[800], textSize: "normal" },
-  { description: "danger-foreground on surface (card, dark)", foreground: colors.danger[300], background: colors.neutral[800], textSize: "normal" },
-  { description: "foreground on surface-secondary (page bg, dark)", foreground: colors.neutral[50], background: colors.neutral[900], textSize: "normal" },
-  { description: "foreground-secondary on surface-secondary (dark)", foreground: colors.neutral[300], background: colors.neutral[900], textSize: "normal" },
-  { description: "link-foreground on surface-secondary (dark)", foreground: colors.brand[300], background: colors.neutral[900], textSize: "normal" },
-  { description: "danger-foreground on surface-secondary (dark)", foreground: colors.danger[300], background: colors.neutral[900], textSize: "normal" },
-  { description: "foreground on surface-muted (dark)", foreground: colors.neutral[50], background: colors.neutral[700], textSize: "normal" },
-  { description: "foreground-secondary on surface-muted (dark)", foreground: colors.neutral[300], background: colors.neutral[700], textSize: "normal" },
-  { description: "danger-foreground on surface-muted (dark)", foreground: colors.danger[300], background: colors.neutral[700], textSize: "normal" },
-  { description: "foreground on background (body, dark)", foreground: colors.neutral[50], background: colors.neutral[900], textSize: "normal" },
+  {
+    description: "foreground on surface (card, dark)",
+    foreground: colors.neutral[50],
+    background: colors.neutral[800],
+    textSize: "normal",
+  },
+  {
+    description: "foreground-secondary on surface (card, dark)",
+    foreground: colors.neutral[300],
+    background: colors.neutral[800],
+    textSize: "normal",
+  },
+  {
+    description: "link-foreground on surface (card, dark)",
+    foreground: colors.brand[300],
+    background: colors.neutral[800],
+    textSize: "normal",
+  },
+  {
+    description: "danger-foreground on surface (card, dark)",
+    foreground: colors.danger[300],
+    background: colors.neutral[800],
+    textSize: "normal",
+  },
+  {
+    description: "foreground on surface-secondary (page bg, dark)",
+    foreground: colors.neutral[50],
+    background: colors.neutral[900],
+    textSize: "normal",
+  },
+  {
+    description: "foreground-secondary on surface-secondary (dark)",
+    foreground: colors.neutral[300],
+    background: colors.neutral[900],
+    textSize: "normal",
+  },
+  {
+    description: "link-foreground on surface-secondary (dark)",
+    foreground: colors.brand[300],
+    background: colors.neutral[900],
+    textSize: "normal",
+  },
+  {
+    description: "danger-foreground on surface-secondary (dark)",
+    foreground: colors.danger[300],
+    background: colors.neutral[900],
+    textSize: "normal",
+  },
+  {
+    description: "foreground on surface-muted (dark)",
+    foreground: colors.neutral[50],
+    background: colors.neutral[700],
+    textSize: "normal",
+  },
+  {
+    description: "foreground-secondary on surface-muted (dark)",
+    foreground: colors.neutral[300],
+    background: colors.neutral[700],
+    textSize: "normal",
+  },
+  {
+    description: "danger-foreground on surface-muted (dark)",
+    foreground: colors.danger[300],
+    background: colors.neutral[700],
+    textSize: "normal",
+  },
+  {
+    description: "foreground on background (body, dark)",
+    foreground: colors.neutral[50],
+    background: colors.neutral[900],
+    textSize: "normal",
+  },
 ];
 
 describe("scheme-aware surface/foreground token pairs (WCAG AA) — light", () => {

@@ -14,7 +14,7 @@ describe("analytics dashboard page color contrast (WCAG AA)", () => {
     expect(result.passesAA).toBe(true);
   });
 
-  it("text-foreground on bg-white (tile cards) passes AA for normal text", () => {
+  it("text-foreground on bg-surface (tile cards) passes AA for normal text", () => {
     const result = validateContrastRatio(colors.neutral[900], colors.neutral[0], "normal");
     expect(result.passesAA).toBe(true);
   });

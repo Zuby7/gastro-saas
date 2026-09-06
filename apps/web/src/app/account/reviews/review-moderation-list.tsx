@@ -75,7 +75,7 @@ export function ReviewModerationList({ initialRatings, canModerate }: ReviewMode
         {ratings.map((rating) => (
           <li
             key={rating.ratingId}
-            className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-4 text-sm text-foreground"
+            className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-surface p-4 text-sm text-foreground"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium" aria-label={`${rating.stars} von 5 Sternen`}>

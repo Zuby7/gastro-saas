@@ -107,7 +107,7 @@ export default async function DishPerformancePage() {
         </p>
 
         {dishes.length === 0 ? (
-          <p className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-foreground">
+          <p className="rounded-lg border border-neutral-200 bg-surface p-6 text-sm text-foreground">
             Noch keine veröffentlichten Gerichte oder noch keine Daten für diesen Zeitraum.
           </p>
         ) : (
@@ -115,7 +115,7 @@ export default async function DishPerformancePage() {
             {dishes.every((dish) => dish.viewsCount === 0 && dish.addToCartCount === 0) ? (
               <p
                 role="status"
-                className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-foreground"
+                className="rounded-lg border border-neutral-200 bg-surface p-6 text-sm text-foreground"
               >
                 Die Spalten &quot;Aufrufe&quot; und &quot;Warenkorb-Hinzufügungen&quot; sind noch
                 nicht verfügbar: Es gibt aktuell keine Erfassung von Gericht-Aufrufen oder
@@ -153,7 +153,7 @@ function DishPerformanceTable({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-6"
+      className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-6"
     >
       <h2 id={headingId} className="text-lg font-medium text-foreground">
         {heading}

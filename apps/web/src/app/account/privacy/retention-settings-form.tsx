@@ -72,7 +72,10 @@ export function RetentionSettingsForm({ initialRetentionDays }: { initialRetenti
             className="w-32 rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.analyticsEventsRetentionDays ? (
-            <span id="analyticsEventsRetentionDays-error" className="text-sm text-danger-foreground">
+            <span
+              id="analyticsEventsRetentionDays-error"
+              className="text-sm text-danger-foreground"
+            >
               {state.fieldErrors.analyticsEventsRetentionDays}
             </span>
           ) : null}

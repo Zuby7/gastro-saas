@@ -101,7 +101,7 @@ export default async function PaymentsPage() {
 
         <section
           aria-labelledby="payments-status-heading"
-          className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="payments-status-heading" className="text-lg font-medium text-foreground">
             Stripe-Verbindungsstatus
