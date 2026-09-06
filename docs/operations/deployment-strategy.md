@@ -78,3 +78,11 @@ Supabase's free tier includes no managed backups. Since the user requires an ent
 ## Release checklist (`/release-check`)
 
 Before any staging→production promotion: migrations validated, environment variables verified, observability wired up, the free-tier backup job has a verified recent successful run and a tested restore, smoke tests green. Never deploys to production itself — it only validates readiness; the actual production deploy always needs separate explicit human approval.
+
+## Redeploy after main advances (2026-09-06, explicit user approval)
+
+The Worker had never been redeployed since the initial deploy — the user noticed the live site (`https://gastro-saas-web.gastro-saas-web.workers.dev`) still showed the very first placeholder page ("Foundation placeholder — no features yet.") despite `main` having accumulated the landing-page redesign, the frontend-polish pass, and the full Epic 9 analytics/sales/legal-compliance work merged since. `git push`/PR merges never trigger a Cloudflare redeploy on their own (no CI job wired to `deploy:cf` yet — tracked as a gap, not yet a ticket).
+
+Redeployed with explicit user approval via the same process as the original deploy: a local, gitignored Node wrapper script maps `.env`'s `PROD_SUPABASE_URL`/`PROD_SUPABASE_PUBLISHABLE_KEY` to the app's expected build-time `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`, injects them only into the child process env (never printed, never persisted to `apps/web/.env.local`), then runs `pnpm run build:cf` followed by `pnpm run deploy:cf`. Succeeded on the first attempt — new Version ID `41031959-7653-4102-97a8-06203b36d719`. Verified live: the homepage now renders the actual landing-page copy/sections, not the placeholder.
+
+**Follow-up worth a ticket**: wire a CD step (GitHub Actions, on `push` to `main`, gated behind the same production-approval expectations) so `main` and the live Worker don't silently drift again.
