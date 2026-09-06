@@ -38,8 +38,12 @@ describe("RefundForm request idempotency", () => {
     });
 
     const mock = vi.mocked(issueRefundAction);
-    const firstFormData = mock.mock.calls[0][1] as FormData;
-    const secondFormData = mock.mock.calls[1][1] as FormData;
+    const [firstCall, secondCall] = mock.mock.calls;
+    if (!firstCall || !secondCall) {
+      throw new Error("Expected issueRefundAction to have been called twice");
+    }
+    const firstFormData = firstCall[1] as FormData;
+    const secondFormData = secondCall[1] as FormData;
 
     const firstToken = firstFormData.get("requestToken");
     const secondToken = secondFormData.get("requestToken");

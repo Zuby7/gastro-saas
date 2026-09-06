@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { issueRefundAction, type RefundActionState } from "./actions";
 
 const initialState: RefundActionState = {};
@@ -26,20 +26,31 @@ export function RefundForm({
   // `crypto.randomUUID()` there would produce a different value on the
   // server-rendered HTML than on the client's first render, causing a
   // hydration mismatch. Starting from "" (identical on server and client)
-  // and filling it in only after mount avoids that.
+  // and filling it in only after mount avoids that. This is a genuine
+  // "synchronize with an external system" effect (the browser's crypto RNG
+  // is only available/meaningful post-mount), so the one-time mint is
+  // exempted from `react-hooks/set-state-in-effect` below.
   const [requestToken, setRequestToken] = useState("");
-  const lastRotatedForSuccessRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above: client-only RNG value, not derivable during render/SSR.
     setRequestToken(crypto.randomUUID());
   }, []);
 
-  useEffect(() => {
-    if (state.success && state.success !== lastRotatedForSuccessRef.current) {
-      lastRotatedForSuccessRef.current = state.success;
-      setRequestToken(crypto.randomUUID());
-    }
-  }, [state.success]);
+  // Rotate the token after a successful submission -- derived directly during
+  // render (React's documented "storing information from previous renders"
+  // pattern), mirroring this codebase's existing convention of avoiding
+  // effects for state that can be computed from the current render's props/
+  // state (see `cart-line.tsx`). Calling `setState` conditionally here, while
+  // rendering, triggers an immediate re-render before the browser paints --
+  // it is not a `set-state-in-effect` violation since there is no effect.
+  const [lastRotatedForSuccess, setLastRotatedForSuccess] = useState<string | undefined>(
+    undefined,
+  );
+  if (state.success && state.success !== lastRotatedForSuccess) {
+    setLastRotatedForSuccess(state.success);
+    setRequestToken(crypto.randomUUID());
+  }
 
   return (
     <form
