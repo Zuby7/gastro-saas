@@ -14,6 +14,37 @@
 export const AWAITING_PAYMENT_TIMEOUT_MINUTES = 30;
 
 /**
+ * Stripe hard-rejects `Checkout.Session.create()` with `expires_at` less than
+ * 30 minutes in the future *at the moment Stripe processes the request* --
+ * not at the moment this process computed `Date.now()`. Issue #88: computing
+ * `expires_at` as exactly `AWAITING_PAYMENT_TIMEOUT_MINUTES * 60` seconds from
+ * `Date.now()`, with no margin, risks landing under Stripe's 30-minute floor
+ * once real network latency between this call and Stripe's request
+ * processing is accounted for -- an `invalid_request_error` that mocked
+ * tests can never catch. `createCheckoutSessionForOrder()` clamps the
+ * timeout-derived seconds to at least this floor and adds
+ * `CHECKOUT_EXPIRY_SAFETY_MARGIN_SECONDS` on top.
+ */
+export const STRIPE_MIN_CHECKOUT_EXPIRY_SECONDS = 30 * 60;
+
+/**
+ * Extra buffer added on top of the (clamped) timeout-derived expiry so a
+ * realistic amount of request latency can never push the actual `expires_at`
+ * Stripe receives below its 30-minute floor.
+ */
+export const CHECKOUT_EXPIRY_SAFETY_MARGIN_SECONDS = 60;
+
+// Defense in depth: AWAITING_PAYMENT_TIMEOUT_MINUTES must never silently drop
+// below Stripe's 30-minute floor for expires_at (see above) -- fail fast at
+// module load rather than only in production Stripe API errors.
+if (AWAITING_PAYMENT_TIMEOUT_MINUTES < 30) {
+  throw new Error(
+    "AWAITING_PAYMENT_TIMEOUT_MINUTES must be at least 30: Stripe rejects Checkout Session " +
+      "expires_at values less than 30 minutes in the future.",
+  );
+}
+
+/**
  * Order snapshot fields this ticket needs to create a Stripe Checkout
  * Session. Deliberately a small, explicit projection of `orders` (never a
  * `select *`) -- see `apps/web/src/lib/payments/service.ts`.

@@ -131,12 +131,12 @@ describe("createCheckoutSessionForOrder", () => {
     expect(params.cancel_url).toContain("/r/demo/orders/raw-token");
 
     // Issue #88: Stripe's own session expiry must line up with the
-    // awaiting-payment timeout sweep's default (30 minutes), not Stripe's
-    // 24-hour default, so a guest can't pay hours after the sweep already
-    // cancelled the order.
+    // awaiting-payment timeout sweep's default (30 minutes plus a fixed
+    // safety margin -- see service.ts), not Stripe's 24-hour default, so a
+    // guest can't pay hours after the sweep already cancelled the order.
     const nowSeconds = Math.floor(Date.now() / 1000);
-    expect(params.expires_at).toBeGreaterThanOrEqual(nowSeconds + 30 * 60 - 5);
-    expect(params.expires_at).toBeLessThanOrEqual(nowSeconds + 30 * 60 + 5);
+    expect(params.expires_at).toBeGreaterThanOrEqual(nowSeconds + 30 * 60 + 60 - 5);
+    expect(params.expires_at).toBeLessThanOrEqual(nowSeconds + 30 * 60 + 60 + 5);
 
     expect(paymentsInsertCalls[0]).toMatchObject({
       tenant_id: "tenant-1",
@@ -251,6 +251,34 @@ describe("createCheckoutSessionForOrder", () => {
       }),
     ).rejects.toThrow("not awaiting payment");
     expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("issue #88: keeps expires_at at least Stripe's 30-minute floor plus a real safety margin, even accounting for latency between Date.now() here and Stripe's request-processing time", async () => {
+    const { createCheckoutSessionForOrder } = await import("./service");
+
+    const beforeSeconds = Math.floor(Date.now() / 1000);
+    await createCheckoutSessionForOrder({
+      tenantId: "tenant-1",
+      tenantSlug: "demo",
+      orderId: "order-1",
+      guestAccessToken: "raw-token",
+    });
+
+    const [params] = createCheckoutSessionMock.mock.calls[0] as [{ expires_at: number }];
+
+    // Even measured from the *latest* possible "now" (right after the call
+    // returns), the margin above Stripe's hard 30-minute floor must still be
+    // strictly positive -- i.e. this never resolves to exactly 1800s, which
+    // is the bug: zero margin risks landing under the floor once Stripe's
+    // own request-processing latency is added.
+    const afterSeconds = Math.floor(Date.now() / 1000);
+    const worstCaseSecondsUntilExpiry = params.expires_at - afterSeconds;
+    expect(worstCaseSecondsUntilExpiry).toBeGreaterThan(30 * 60);
+
+    // And from the earliest possible "now" (right before the call), it must
+    // not have drifted an unreasonable amount above the expected margin.
+    const bestCaseSecondsUntilExpiry = params.expires_at - beforeSeconds;
+    expect(bestCaseSecondsUntilExpiry).toBeLessThanOrEqual(30 * 60 + 60 + 5);
   });
 
   it("never trusts a caller-supplied total: the Checkout Session amount always comes from the order's own DB row", async () => {
