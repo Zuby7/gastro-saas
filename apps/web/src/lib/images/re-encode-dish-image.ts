@@ -37,12 +37,21 @@ import { PhotonImage, resize, SamplingFilter } from "@cf-wasm/photon";
 export const MAX_DIMENSION_PX = 1600;
 export const JPEG_QUALITY = 82;
 
+/**
+ * Upper bound on decoded pixel count, checked *before* any resize/RGBA
+ * allocation. Guards against a decompression-bomb upload: a small JPEG can
+ * declare huge dimensions (e.g. 30000x30000), which would otherwise make
+ * photon allocate a full-resolution RGBA buffer in WASM memory before
+ * downscaling ever runs. 40 megapixels comfortably covers any real dish
+ * photo (well beyond typical phone camera output) while bounding worst-case
+ * memory use.
+ */
+export const MAX_DECODED_PIXELS = 40_000_000;
+
 export const REENCODED_CONTENT_TYPE = "image/jpeg";
 export const REENCODED_EXTENSION = "jpg";
 
-export type ReEncodeResult =
-  | { ok: true; buffer: Buffer }
-  | { ok: false; error: "invalid_image" };
+export type ReEncodeResult = { ok: true; buffer: Buffer } | { ok: false; error: "invalid_image" };
 
 /**
  * Decodes `input` as an image, downscales it to fit within
@@ -63,6 +72,10 @@ export function reEncodeDishImage(input: Uint8Array): ReEncodeResult {
     const height = photonImage.get_height();
 
     if (!width || !height) {
+      return { ok: false, error: "invalid_image" };
+    }
+
+    if (width * height > MAX_DECODED_PIXELS) {
       return { ok: false, error: "invalid_image" };
     }
 

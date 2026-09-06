@@ -66,9 +66,13 @@ function allowPermission() {
 // runtimes do -- this fake stands in only where the action actually reads
 // the file's bytes.
 function fakeFile(name: string, type: string, bytes: Uint8Array): File {
-  const file = new File([bytes], name, { type });
+  // Copy into a fresh `ArrayBuffer`-backed `Uint8Array`: `bytes` may be a
+  // view over a generic `ArrayBufferLike` (e.g. from `PhotonImage`'s
+  // `get_bytes_jpeg`), which isn't assignable to `BlobPart`.
+  const copy = new Uint8Array(bytes);
+  const file = new File([copy], name, { type });
   Object.defineProperty(file, "arrayBuffer", {
-    value: async () => bytes.buffer,
+    value: async () => copy.buffer,
   });
   return file;
 }
