@@ -3,6 +3,7 @@ import { createStripeClient } from "@/lib/stripe/client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { recordOrderAuditEvent } from "@/lib/audit/record-order-audit-event";
 import {
+  AWAITING_PAYMENT_TIMEOUT_MINUTES,
   PaymentAccountNotReadyError,
   type CreateCheckoutSessionInput,
   type CreateCheckoutSessionResult,
@@ -157,6 +158,16 @@ export async function createCheckoutSessionForOrder(
       tenant_id: input.tenantId,
       order_id: input.orderId,
     },
+    // Issue #88: without this, Stripe defaults an unpaid Checkout Session to
+    // stay payable for 24 hours -- long after the awaiting-payment timeout
+    // sweep has already cancelled the underlying order (default 30 minutes,
+    // see AWAITING_PAYMENT_TIMEOUT_MINUTES). Aligning Stripe's own expiry
+    // with the sweep's timeout closes almost all of that window; the
+    // webhook handler's `payment_after_order_cancelled_flagged` path is the
+    // remaining safety net for the sweep's own cron interval. Stripe
+    // requires `expires_at` to be at least 30 minutes in the future, which
+    // this constant's current value (30) satisfies exactly.
+    expires_at: Math.floor(Date.now() / 1000) + AWAITING_PAYMENT_TIMEOUT_MINUTES * 60,
   };
 
   const session = await stripe.checkout.sessions.create(sessionParams, {

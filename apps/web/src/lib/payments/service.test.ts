@@ -120,6 +120,7 @@ describe("createCheckoutSessionForOrder", () => {
         payment_intent_data: { on_behalf_of: string; transfer_data: { destination: string } };
         success_url: string;
         cancel_url: string;
+        expires_at: number;
       },
     ];
     expect(params.line_items[0]!.price_data.unit_amount).toBe(2599);
@@ -128,6 +129,14 @@ describe("createCheckoutSessionForOrder", () => {
     expect(params.payment_intent_data.transfer_data.destination).toBe("acct_123");
     expect(params.success_url).toContain("/r/demo/orders/raw-token");
     expect(params.cancel_url).toContain("/r/demo/orders/raw-token");
+
+    // Issue #88: Stripe's own session expiry must line up with the
+    // awaiting-payment timeout sweep's default (30 minutes), not Stripe's
+    // 24-hour default, so a guest can't pay hours after the sweep already
+    // cancelled the order.
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    expect(params.expires_at).toBeGreaterThanOrEqual(nowSeconds + 30 * 60 - 5);
+    expect(params.expires_at).toBeLessThanOrEqual(nowSeconds + 30 * 60 + 5);
 
     expect(paymentsInsertCalls[0]).toMatchObject({
       tenant_id: "tenant-1",

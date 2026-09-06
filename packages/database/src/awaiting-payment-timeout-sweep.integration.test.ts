@@ -215,9 +215,9 @@ describe.skipIf(!dbAvailable)(
       fixture = await seedTwoTenantFixture(admin);
       await seedAwaitingPaymentOrder(admin, fixture.tenantA.tenantId, 60);
 
-      await expect(
-        admin.query(`select sweep_stale_awaiting_payment_orders(0)`),
-      ).rejects.toThrow(/p_timeout_minutes must be a positive integer/);
+      await expect(admin.query(`select sweep_stale_awaiting_payment_orders(0)`)).rejects.toThrow(
+        /p_timeout_minutes must be a positive integer/,
+      );
     });
 
     it("is only callable by service_role, never by an authenticated session directly", async () => {
