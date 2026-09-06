@@ -71,34 +71,50 @@ export async function middleware(request: NextRequest) {
   // banner (`gastro_cookie_consent=accepted`, written client-side by
   // `CookieConsentBanner`) -- never set unconditionally/before consent.
   const menuRouteMatch = PUBLIC_MENU_ROUTE_PATTERN.exec(request.nextUrl.pathname);
-  if (menuRouteMatch && isConsentAccepted(request.cookies.get(CONSENT_COOKIE_NAME)?.value)) {
+  if (menuRouteMatch) {
     const tenantSlug = menuRouteMatch[1]!;
     const cookieName = menuViewCookieName(tenantSlug);
-    if (!request.cookies.get(cookieName)) {
-      const token = randomBytes(32).toString("base64url");
-      const cookieOptions = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax" as const,
-        path: "/",
-        maxAge: MENU_VIEW_COOKIE_MAX_AGE_SECONDS,
-      };
-      // Set on `request` (so this same request's Server Component can read
-      // it via `cookies()` -- Server Components see the incoming request's
-      // cookies, not the outgoing response's) *before* rebuilding
-      // `response` from the updated request, exactly mirroring the
-      // Supabase `setAll` callback above. Any Set-Cookie headers the
-      // Supabase callback already applied to the previous `response` are
-      // preserved explicitly (`NextResponse.next({ request })` returns a
-      // fresh response with no cookies of its own) so they aren't lost by
-      // this reassignment.
+    if (isConsentAccepted(request.cookies.get(CONSENT_COOKIE_NAME)?.value)) {
+      if (!request.cookies.get(cookieName)) {
+        const token = randomBytes(32).toString("base64url");
+        const cookieOptions = {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax" as const,
+          path: "/",
+          maxAge: MENU_VIEW_COOKIE_MAX_AGE_SECONDS,
+        };
+        // Set on `request` (so this same request's Server Component can read
+        // it via `cookies()` -- Server Components see the incoming request's
+        // cookies, not the outgoing response's) *before* rebuilding
+        // `response` from the updated request, exactly mirroring the
+        // Supabase `setAll` callback above. Any Set-Cookie headers the
+        // Supabase callback already applied to the previous `response` are
+        // preserved explicitly (`NextResponse.next({ request })` returns a
+        // fresh response with no cookies of its own) so they aren't lost by
+        // this reassignment.
+        const previousSetCookies = response.cookies.getAll();
+        request.cookies.set(cookieName, token);
+        response = NextResponse.next({ request });
+        for (const cookie of previousSetCookies) {
+          response.cookies.set(cookie);
+        }
+        response.cookies.set(cookieName, token, cookieOptions);
+      }
+    } else if (request.cookies.get(cookieName)) {
+      // Ticket #146 Opus repair-cycle finding: consent that is missing/
+      // declined must also retroactively clear an existing menu_view cookie
+      // from a visit before this deploy (or before the visitor declined) --
+      // gating only the mint, not the cookie's continued presence, would let
+      // an already-set cookie keep being counted for up to its remaining
+      // 24h lifetime after a decline.
       const previousSetCookies = response.cookies.getAll();
-      request.cookies.set(cookieName, token);
+      request.cookies.delete(cookieName);
       response = NextResponse.next({ request });
       for (const cookie of previousSetCookies) {
         response.cookies.set(cookie);
       }
-      response.cookies.set(cookieName, token, cookieOptions);
+      response.cookies.delete(cookieName);
     }
   }
 

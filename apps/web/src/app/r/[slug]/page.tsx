@@ -6,7 +6,7 @@ import { recordDishViewsOnce, recordMenuViewOnce } from "@/lib/menu-view/service
 import { getPublicMenu } from "@/lib/public-menu/fetch";
 import { loadCartViewForDisplay } from "./cart/actions";
 import { CategoryNav } from "./category-nav";
-import { CookieConsentBanner } from "./cookie-consent-banner";
+import { CookieConsentBanner, CookieSettingsLink } from "./cookie-consent-banner";
 import { DishCard } from "./dish-card";
 
 interface PublicMenuPageProps {
@@ -133,6 +133,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
           >
             AGB
           </Link>
+          <CookieSettingsLink />
         </div>
       </footer>
 

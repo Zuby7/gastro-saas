@@ -47,7 +47,12 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
   }, []);
 
   function decide(value: ConsentValue) {
-    document.cookie = `${CONSENT_COOKIE_NAME}=${value}; path=/; max-age=${CONSENT_COOKIE_MAX_AGE_SECONDS}; samesite=lax`;
+    // `secure` is appended only over https -- a local/preview http origin
+    // (e.g. `wrangler dev`) must still be able to write the cookie, and
+    // `document.cookie` silently drops a `secure` cookie set from a
+    // non-secure context rather than erroring.
+    const secureAttr = window.location.protocol === "https:" ? "; secure" : "";
+    document.cookie = `${CONSENT_COOKIE_NAME}=${value}; path=/; max-age=${CONSENT_COOKIE_MAX_AGE_SECONDS}; samesite=lax${secureAttr}`;
     setVisible(false);
     router.refresh();
   }
@@ -92,5 +97,30 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Ticket #146 Opus repair-cycle finding: withdrawing consent must be as easy
+ * as giving it, not just a one-time banner. A plain footer link that clears
+ * the decision cookie and reloads -- the reload re-runs middleware (which
+ * then also clears the now-unconsented `menu_view` cookie, see
+ * `middleware.ts`) and remounts `CookieConsentBanner`, whose own effect
+ * re-detects the missing decision cookie and shows the banner again.
+ */
+export function CookieSettingsLink() {
+  function resetConsent() {
+    document.cookie = `${CONSENT_COOKIE_NAME}=; path=/; max-age=0; samesite=lax`;
+    window.location.reload();
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={resetConsent}
+      className="text-sm font-medium text-link-foreground underline hover:text-brand-700"
+    >
+      Cookie-Einstellungen
+    </button>
   );
 }
