@@ -137,7 +137,11 @@ export default function RegisterPage() {
             />
             <span>
               Ich akzeptiere die{" "}
-              <Link href="/agb" target="_blank" className="font-medium text-link-foreground underline">
+              <Link
+                href="/agb"
+                target="_blank"
+                className="font-medium text-link-foreground underline"
+              >
                 AGB
               </Link>{" "}
               und die{" "}

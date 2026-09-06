@@ -26,11 +26,9 @@ export const RegisterSchema = z.object({
   // required before an account can be created -- checked server-side (never
   // just a disabled submit button), since the checkbox's `required`
   // HTML attribute alone is not authorization.
-  acceptTerms: z
-    .string()
-    .refine((value) => value === "on", {
-      message: "Bitte akzeptieren Sie die AGB und die Datenschutzerklärung.",
-    }),
+  acceptTerms: z.string().refine((value) => value === "on", {
+    message: "Bitte akzeptieren Sie die AGB und die Datenschutzerklärung.",
+  }),
 });
 
 export type RegisterInput = z.infer<typeof RegisterSchema>;

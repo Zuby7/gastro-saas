@@ -21,6 +21,7 @@ Betrifft: alle personenbezogenen Daten (Gäste, Restaurant-Mitarbeitende,
 Betreiber-Konten).
 
 Technische Bausteine im Produkt:
+
 - Tenant-editierbare Datenschutzerklärung pro Restaurant
   (`/r/[slug]/datenschutz`, Ticket #41).
 - Export-/Löschantrag für personenbezogene Daten (`/account/privacy`,
@@ -42,6 +43,7 @@ Betrifft: jede geschäftsmäßige Website, hier: jede veröffentlichte
 Restaurant-Speisekarte.
 
 Technische Bausteine:
+
 - Tenant-editierbares Impressum-Freitextfeld (`/r/[slug]/impressum`,
   Ticket #41), verlinkt im Footer der öffentlichen Speisekarte.
 - Hinweistext im Restaurant-Profil-Formular, dass das Impressum vollständige
@@ -66,6 +68,7 @@ sind, ist nicht Teil dieses Tickets.
 Betrifft: online abgeschlossene Bestellverträge zwischen Restaurant und Gast.
 
 Technische Bausteine:
+
 - Tenant-editierbares AGB-Freitextfeld inkl. Widerrufsrecht-/
   Rückerstattungsrichtlinie (`/r/[slug]/agb`, Ticket #146) — der tatsächliche
   Rechtstext (z. B. ob und wie ein Widerrufsrecht bei zubereiteten

@@ -204,9 +204,9 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
           </label>
           <p className="text-sm text-neutral-500">
             Freitext (inkl. Ihrer Widerrufsrecht-/Rückerstattungsrichtlinie für Bestellungen), wird
-            1:1 (ohne HTML-Formatierung) auf der öffentlichen AGB-Seite angezeigt. Dies ist kein
-            von gastro-saas bereitgestellter Rechtstext -- bitte vor Produktivbetrieb anwaltlich
-            prüfen lassen.
+            1:1 (ohne HTML-Formatierung) auf der öffentlichen AGB-Seite angezeigt. Dies ist kein von
+            gastro-saas bereitgestellter Rechtstext -- bitte vor Produktivbetrieb anwaltlich prüfen
+            lassen.
           </p>
           <textarea
             id="legalTermsText"
@@ -214,7 +214,9 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
             rows={8}
             defaultValue={initial.legalTermsText}
             aria-invalid={state.fieldErrors?.legalTermsText ? true : undefined}
-            aria-describedby={state.fieldErrors?.legalTermsText ? "legalTermsText-error" : undefined}
+            aria-describedby={
+              state.fieldErrors?.legalTermsText ? "legalTermsText-error" : undefined
+            }
             className="rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm text-foreground"
           />
           {state.fieldErrors?.legalTermsText ? (
