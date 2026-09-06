@@ -20,7 +20,7 @@ export function AcceptInvitationForm({ token }: AcceptInvitationFormProps) {
         <p
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-foreground"
         >
           {state.error}
         </p>

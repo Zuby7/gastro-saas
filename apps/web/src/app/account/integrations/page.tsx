@@ -33,7 +33,7 @@ export default async function IntegrationsPage() {
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return (
-        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-neutral-50 p-8">
+        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-surface-secondary p-8">
           <p role="alert" className="text-foreground">
             Sie haben nicht die erforderliche Berechtigung, um Integrationen zu verwalten.
           </p>
@@ -53,7 +53,7 @@ export default async function IntegrationsPage() {
   const jobs = await listIntegrationSyncJobs(supabase, membership.tenantId, account.id);
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       <div className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-2xl font-semibold text-foreground">Integrationen</h1>

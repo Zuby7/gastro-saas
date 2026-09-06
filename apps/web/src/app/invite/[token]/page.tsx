@@ -25,7 +25,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
       {user ? (
         <AcceptInvitationForm token={token} />
       ) : (
-        <p className="rounded-md border border-neutral-300 bg-neutral-100 p-3 text-sm text-foreground">
+        <p className="rounded-md border border-neutral-300 bg-surface-muted p-3 text-sm text-foreground">
           Bitte{" "}
           <Link href="/login" className="font-medium text-link-foreground underline">
             melden Sie sich an

@@ -20,7 +20,7 @@ export default async function CartPage({ params }: CartPageProps) {
   const cart = await loadCartViewForDisplay(slug);
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       {/*
         Quieter version of the public menu's hero gradient (design pass v2,
         see `packages/ui/src/tokens.ts`'s header comment) -- kept modest
@@ -48,7 +48,7 @@ export default async function CartPage({ params }: CartPageProps) {
 
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-8">
         {!cart || cart.items.length === 0 ? (
-          <p className="rounded-md border border-neutral-300 bg-neutral-0 p-4 text-foreground">
+          <p className="rounded-md border border-neutral-300 bg-surface p-4 text-foreground">
             Ihr Warenkorb ist leer.
           </p>
         ) : (
@@ -67,7 +67,7 @@ export default async function CartPage({ params }: CartPageProps) {
             {cart.hasUnavailableItems ? (
               <p
                 role="alert"
-                className="rounded-md border border-danger-500 bg-danger-500/10 px-4 py-3 text-sm font-medium text-danger-600"
+                className="rounded-md border border-danger-500 bg-danger-500/10 px-4 py-3 text-sm font-medium text-danger-foreground"
               >
                 Ein oder mehrere Artikel sind nicht mehr verfügbar. Bitte entfernen Sie diese, um
                 fortzufahren.
@@ -80,7 +80,7 @@ export default async function CartPage({ params }: CartPageProps) {
               this card literally IS the order total, so the torn-receipt
               motif is functionally motivated here, not decorative.
             */}
-            <div className="ticket-edge rounded-t-lg border border-b-0 border-neutral-200 bg-neutral-0 px-4 pt-4 shadow-sm">
+            <div className="ticket-edge rounded-t-lg border border-b-0 border-neutral-200 bg-surface px-4 pt-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-lg font-semibold text-foreground">Gesamtsumme</span>
                 <span className="font-display text-2xl font-semibold text-ember-700">

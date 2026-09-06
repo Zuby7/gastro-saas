@@ -64,7 +64,7 @@ export default async function OrderDetailPage({
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return (
-        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-neutral-50 p-8">
+        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-surface-secondary p-8">
           <p role="alert" className="text-foreground">
             Sie haben nicht die erforderliche Berechtigung, um Zahlungs-/Rückerstattungsdaten
             einzusehen.
@@ -108,7 +108,7 @@ export default async function OrderDetailPage({
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       <div className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-2xl font-semibold text-foreground">
@@ -124,7 +124,7 @@ export default async function OrderDetailPage({
 
         <section
           aria-labelledby="order-details-heading"
-          className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="order-details-heading" className="text-lg font-medium text-foreground">
             Bestelldetails
@@ -145,7 +145,7 @@ export default async function OrderDetailPage({
 
         <section
           aria-labelledby="refund-history-heading"
-          className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="refund-history-heading" className="text-lg font-medium text-foreground">
             Zahlung &amp; Rückerstattungen

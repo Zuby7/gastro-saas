@@ -21,7 +21,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
   const checkoutReady = Boolean(cart?.checkoutReady);
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       {/*
         Same quieter hero-gradient treatment as `../cart/page.tsx` -- see
         that file's comment for rationale.
@@ -43,7 +43,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
 
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-8">
         {!cart || cart.items.length === 0 ? (
-          <p className="rounded-md border border-neutral-300 bg-neutral-0 p-4 text-foreground">
+          <p className="rounded-md border border-neutral-300 bg-surface p-4 text-foreground">
             Ihr Warenkorb ist leer.{" "}
             <Link href={`/r/${slug}`} className="font-medium text-ember-700 underline">
               Zurück zur Speisekarte
@@ -58,7 +58,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
               summary and the order-status card, since all three literally
               represent the customer's order.
             */}
-            <div className="ticket-edge rounded-t-lg border border-b-0 border-neutral-300 bg-neutral-0 px-4 pt-3 shadow-sm">
+            <div className="ticket-edge rounded-t-lg border border-b-0 border-neutral-300 bg-surface px-4 pt-3 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-foreground">Gesamtsumme</span>
                 <span className="font-display text-xl font-semibold text-ember-700">
