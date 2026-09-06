@@ -54,7 +54,7 @@ export default async function PrivacyPage() {
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return (
-        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-neutral-50 p-8">
+        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-surface-secondary p-8">
           <p role="alert" className="text-foreground">
             Sie haben nicht die erforderliche Berechtigung, um Datenschutz-Einstellungen zu sehen.
           </p>
@@ -94,7 +94,7 @@ export default async function PrivacyPage() {
     : { data: [] as DeletionRequestRow[] };
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       <div className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-2xl font-semibold text-foreground">Datenschutz</h1>
@@ -106,7 +106,7 @@ export default async function PrivacyPage() {
           </Link>
         </div>
 
-        <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+        <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground">Tenant-Datenexport</h2>
           <p className="text-sm text-foreground">
             Exportiert die wesentlichen Tenant-Daten (Profil, Öffnungszeiten, Team, Speisekarte,
@@ -114,7 +114,7 @@ export default async function PrivacyPage() {
           </p>
           <a
             href="/api/account/privacy/export"
-            className="w-fit rounded-md border border-neutral-300 px-4 py-2 font-medium text-foreground hover:bg-neutral-100"
+            className="w-fit rounded-md border border-neutral-300 px-4 py-2 font-medium text-foreground hover:bg-surface-muted"
           >
             Daten exportieren
           </a>
@@ -129,7 +129,7 @@ export default async function PrivacyPage() {
             <DeletionRequestForm />
 
             {deletionRequests && deletionRequests.length > 0 ? (
-              <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+              <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
                 <h2 className="text-lg font-semibold text-foreground">Bisherige Löschanträge</h2>
                 <ul className="flex flex-col gap-2 text-sm text-foreground">
                   {deletionRequests.map((request) => (
@@ -139,7 +139,7 @@ export default async function PrivacyPage() {
                         {new Date(request.requested_at).toLocaleString("de-DE")})
                       </div>
                       {request.status === "completed" ? (
-                        <div className="text-neutral-600">
+                        <div className="text-foreground-secondary">
                           Erhalten (Aufbewahrungsfrist): {request.retained_orders_count ?? 0}{" "}
                           Bestellungen · Anonymisiert: {request.anonymized_orders_count ?? 0}{" "}
                           Bestellungen · Gelöscht: {request.analytics_events_purged_count ?? 0}{" "}

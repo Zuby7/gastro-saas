@@ -31,14 +31,14 @@ function useCartFeedback(dish: PublicMenuDish, tenantSlug: string, state: CartAc
       {state.error ? (
         <p
           role="alert"
-          className="mt-2 rounded-md border border-danger-500 bg-danger-500/10 px-3 py-2 text-sm text-danger-600"
+          className="mt-2 rounded-md border border-danger-500 bg-danger-500/10 px-3 py-2 text-sm text-danger-foreground"
         >
           {state.error}
         </p>
       ) : null}
 
       {state.cart ? (
-        <p className="mt-2 rounded-md border border-neutral-300 bg-neutral-0 px-3 py-2 text-sm text-foreground">
+        <p className="mt-2 rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-foreground">
           Im Warenkorb: {state.cart.itemCount} Artikel ·{" "}
           <Link href={`/r/${tenantSlug}/cart`} className="font-medium text-ember-700 underline">
             Warenkorb ansehen
@@ -145,7 +145,7 @@ export function DishOptionChooser({ dish, tenantSlug }: DishDetailProps) {
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-4 rounded-md border border-neutral-200 bg-neutral-50 p-3"
+      className="flex flex-col gap-4 rounded-md border border-neutral-200 bg-surface-secondary p-3"
     >
       <input type="hidden" name="dishId" value={dish.id} />
       <input type="hidden" name="dishVariantId" value={selectedVariantId} />

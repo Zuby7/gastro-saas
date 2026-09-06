@@ -68,7 +68,7 @@ export function CategoryNav({ categories }: CategoryNavProps) {
   return (
     <nav
       aria-label="Kategorien"
-      className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-0/95 backdrop-blur"
+      className="sticky top-0 z-10 border-b border-neutral-200 bg-surface/95 backdrop-blur"
     >
       <div className="mx-auto flex max-w-5xl gap-8 overflow-x-auto px-5 sm:px-8">
         {categories.map((category) => {

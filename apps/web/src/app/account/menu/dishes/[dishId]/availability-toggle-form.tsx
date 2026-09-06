@@ -68,7 +68,7 @@ export function AvailabilityToggleForm({
   return (
     <form
       action={formAction}
-      className="flex flex-wrap items-end gap-2 rounded-md bg-neutral-50 p-2"
+      className="flex flex-wrap items-end gap-2 rounded-md bg-surface-secondary p-2"
     >
       {Object.entries(hiddenFields).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
@@ -79,7 +79,7 @@ export function AvailabilityToggleForm({
         className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold ${
           isEffectivelyAvailable
             ? "border-success-500 text-success-700"
-            : "border-danger-500 text-danger-600"
+            : "border-danger-500 text-danger-foreground"
         }`}
       >
         {isEffectivelyAvailable ? "Verfügbar" : "Ausverkauft"}
@@ -108,7 +108,7 @@ export function AvailabilityToggleForm({
         }
         className={`inline-flex min-h-12 items-center justify-center rounded-md border px-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 ${
           isEffectivelyAvailable
-            ? "border-danger-500 text-danger-600 focus-visible:outline-danger-600"
+            ? "border-danger-500 text-danger-foreground focus-visible:outline-danger-600"
             : "border-success-500 text-success-700 focus-visible:outline-success-600"
         }`}
       >
@@ -120,7 +120,7 @@ export function AvailabilityToggleForm({
       </button>
 
       {state.error ? (
-        <p role="alert" className="w-full text-sm text-danger-600">
+        <p role="alert" className="w-full text-sm text-danger-foreground">
           {state.error}
         </p>
       ) : null}

@@ -1,6 +1,6 @@
 export default function PublicMenuNotFound() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-3 bg-neutral-50 p-8">
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-3 bg-surface-secondary p-8">
       <h1 className="font-display text-2xl font-semibold text-foreground">
         Speisekarte nicht verfügbar
       </h1>
