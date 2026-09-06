@@ -2,7 +2,7 @@
 -- Batched dish_view recording + dish_engagement_attempts retention (PR #136 review findings)
 -- ============================================================================
 -- Two fixes against
--- supabase/migrations/20260906090000_dish_view_and_add_to_cart_analytics.sql
+-- supabase/migrations/20260906091000_dish_view_and_add_to_cart_analytics.sql
 -- (ticket #120 part B), found in Opus review of PR #136:
 --
 -- 1. `apps/web/src/app/r/[slug]/page.tsx` previously called

@@ -72,7 +72,7 @@ export async function recordMenuViewOnce(tenantSlug: string, tenantId: string): 
  * Records one rate-limited, deduplicated `dish_view` analytics event for a
  * single dish, mirroring `recordMenuViewOnce()` exactly (see
  * `record_dish_view()`,
- * supabase/migrations/20260906090000_dish_view_and_add_to_cart_analytics.sql).
+ * supabase/migrations/20260906091000_dish_view_and_add_to_cart_analytics.sql).
  *
  * Reuses the same per-tenant menu-view session cookie as `recordMenuViewOnce`
  * (ticket #67) -- both are "this anonymous browser session on this tenant's
@@ -166,7 +166,7 @@ export async function recordDishViewsOnce(
 /**
  * Records one rate-limited, deduplicated `add_to_cart` analytics event for a
  * single dish (see `record_add_to_cart_event()`,
- * supabase/migrations/20260906090000_dish_view_and_add_to_cart_analytics.sql).
+ * supabase/migrations/20260906091000_dish_view_and_add_to_cart_analytics.sql).
  *
  * Called from the `add_cart_item()` success path
  * (`apps/web/src/app/r/[slug]/cart/actions.ts`'s `addToCartAction`), after

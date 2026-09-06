@@ -1,7 +1,7 @@
 // Integration tests for `record_dish_view()`/`record_add_to_cart_event()`
 // (ticket #120 part B, "Öffentliche Speisekarte: dish_view/add_to_cart
 // Event-Instrumentierung" -- see
-// supabase/migrations/20260906090000_dish_view_and_add_to_cart_analytics.sql).
+// supabase/migrations/20260906091000_dish_view_and_add_to_cart_analytics.sql).
 //
 // Mirrors packages/database/src/menu-view-analytics.integration.test.ts
 // (ticket #67) exactly, proving the same three properties for each of the
