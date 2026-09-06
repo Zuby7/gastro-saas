@@ -130,10 +130,7 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
 
       {/*
         Ticket #41: privacy notice shown before order submission, with a
-        link to the full Datenschutzerklärung. Required by the acceptance
-        criteria -- not gated behind a checkbox (the ticket's non-goal
-        explicitly rules out building a general cookie-consent-banner
-        toolkit beyond what Turnstile/PostHog need).
+        link to the full Datenschutzerklärung.
       */}
       <p className="text-sm text-foreground-secondary">
         Mit dem Absenden der Bestellung werden Ihre Angaben (Name, Kontaktdaten, Bestellinhalt) zur
@@ -146,6 +143,43 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
         </Link>
         .
       </p>
+
+      {/*
+        Ticket #146: explicit, required consent checkbox linking to both the
+        tenant's AGB (incl. Widerrufsrecht) and Datenschutzerklärung --
+        server-validated by `CheckoutSchema.acceptTerms`, not just the
+        `required` HTML attribute.
+      */}
+      <div className="flex flex-col gap-1">
+        <label className="flex items-start gap-2 text-sm text-foreground">
+          <input
+            id="acceptTerms"
+            name="acceptTerms"
+            type="checkbox"
+            required
+            className="mt-0.5 h-4 w-4 accent-brand-600"
+          />
+          <span>
+            Ich akzeptiere die{" "}
+            <Link
+              href={`/r/${tenantSlug}/agb`}
+              target="_blank"
+              className="font-medium text-link-foreground underline hover:text-brand-700"
+            >
+              AGB
+            </Link>{" "}
+            und die{" "}
+            <Link
+              href={`/r/${tenantSlug}/datenschutz`}
+              target="_blank"
+              className="font-medium text-link-foreground underline hover:text-brand-700"
+            >
+              Datenschutzerklärung
+            </Link>
+            .
+          </span>
+        </label>
+      </div>
 
       <button
         type="submit"

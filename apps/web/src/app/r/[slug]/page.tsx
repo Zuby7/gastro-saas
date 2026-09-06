@@ -6,6 +6,7 @@ import { recordDishViewsOnce, recordMenuViewOnce } from "@/lib/menu-view/service
 import { getPublicMenu } from "@/lib/public-menu/fetch";
 import { loadCartViewForDisplay } from "./cart/actions";
 import { CategoryNav } from "./category-nav";
+import { CookieConsentBanner } from "./cookie-consent-banner";
 import { DishCard } from "./dish-card";
 
 interface PublicMenuPageProps {
@@ -108,7 +109,10 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
         ))}
       </div>
 
-      {/* Ticket #41: footer links to the tenant-maintained Impressum/Datenschutz pages. */}
+      {/*
+        Ticket #41/#146: footer links to the tenant-maintained
+        Impressum/Datenschutz/AGB pages.
+      */}
       <footer className="border-t border-neutral-200 px-5 py-6 sm:px-8">
         <div className="mx-auto flex max-w-5xl flex-wrap gap-4 text-sm">
           <Link
@@ -123,8 +127,16 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
           >
             Datenschutz
           </Link>
+          <Link
+            href={`/r/${slug}/agb`}
+            className="font-medium text-link-foreground underline hover:text-brand-700"
+          >
+            AGB
+          </Link>
         </div>
       </footer>
+
+      <CookieConsentBanner tenantSlug={slug} />
     </main>
   );
 }

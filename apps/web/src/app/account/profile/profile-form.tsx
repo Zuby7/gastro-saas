@@ -12,6 +12,7 @@ export interface ProfileFormInitialValues {
   brandColor: string;
   legalImprintText: string;
   legalPrivacyText: string;
+  legalTermsText: string;
 }
 
 const initialState: ProfileFormState = {};
@@ -193,6 +194,32 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
           {state.fieldErrors?.legalPrivacyText ? (
             <span id="legalPrivacyText-error" className="text-sm text-danger-600">
               {state.fieldErrors.legalPrivacyText}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="legalTermsText" className="text-sm font-medium text-foreground">
+            AGB &amp; Widerrufsrecht
+          </label>
+          <p className="text-sm text-neutral-500">
+            Freitext (inkl. Ihrer Widerrufsrecht-/Rückerstattungsrichtlinie für Bestellungen), wird
+            1:1 (ohne HTML-Formatierung) auf der öffentlichen AGB-Seite angezeigt. Dies ist kein
+            von gastro-saas bereitgestellter Rechtstext -- bitte vor Produktivbetrieb anwaltlich
+            prüfen lassen.
+          </p>
+          <textarea
+            id="legalTermsText"
+            name="legalTermsText"
+            rows={8}
+            defaultValue={initial.legalTermsText}
+            aria-invalid={state.fieldErrors?.legalTermsText ? true : undefined}
+            aria-describedby={state.fieldErrors?.legalTermsText ? "legalTermsText-error" : undefined}
+            className="rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm text-foreground"
+          />
+          {state.fieldErrors?.legalTermsText ? (
+            <span id="legalTermsText-error" className="text-sm text-danger-600">
+              {state.fieldErrors.legalTermsText}
             </span>
           ) : null}
         </div>

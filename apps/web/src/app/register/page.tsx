@@ -124,6 +124,40 @@ export default function RegisterPage() {
           ) : null}
         </div>
 
+        <div className="flex flex-col gap-1">
+          <label className="flex items-start gap-2 text-sm text-foreground">
+            <input
+              id="acceptTerms"
+              name="acceptTerms"
+              type="checkbox"
+              required
+              aria-invalid={state.fieldErrors?.acceptTerms ? true : undefined}
+              aria-describedby={state.fieldErrors?.acceptTerms ? "acceptTerms-error" : undefined}
+              className="mt-0.5 h-4 w-4 accent-brand-600"
+            />
+            <span>
+              Ich akzeptiere die{" "}
+              <Link href="/agb" target="_blank" className="font-medium text-link-foreground underline">
+                AGB
+              </Link>{" "}
+              und die{" "}
+              <Link
+                href="/datenschutz"
+                target="_blank"
+                className="font-medium text-link-foreground underline"
+              >
+                Datenschutzerklärung
+              </Link>
+              .
+            </span>
+          </label>
+          {state.fieldErrors?.acceptTerms ? (
+            <span id="acceptTerms-error" className="text-sm text-danger-foreground">
+              {state.fieldErrors.acceptTerms}
+            </span>
+          ) : null}
+        </div>
+
         <button
           type="submit"
           disabled={isPending}

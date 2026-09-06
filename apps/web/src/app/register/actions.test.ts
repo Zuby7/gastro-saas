@@ -40,6 +40,7 @@ function validFormData(overrides: Partial<Record<string, string>> = {}): FormDat
   fd.set("tenantSlug", overrides.tenantSlug ?? "testrestaurant");
   fd.set("email", overrides.email ?? "owner@example.com");
   fd.set("password", overrides.password ?? "Sup3rSecurePassw0rd!");
+  fd.set("acceptTerms", overrides.acceptTerms ?? "on");
   return fd;
 }
 
@@ -161,5 +162,15 @@ describe("registerAction", () => {
 
     expect(result.fieldErrors?.tenantSlug).toBeDefined();
     expect(result.error).toContain("bereits vergeben");
+  });
+
+  // Ticket #146: explicit AGB/Datenschutz consent is required server-side,
+  // not just enforced by the checkbox's `required` HTML attribute.
+  it("rejects registration when the AGB/Datenschutz consent checkbox was not accepted", async () => {
+    const { registerAction } = await import("./actions");
+    const result = await registerAction({}, validFormData({ acceptTerms: "" }));
+
+    expect(result.fieldErrors?.acceptTerms).toBeDefined();
+    expect(signUpMock).not.toHaveBeenCalled();
   });
 });

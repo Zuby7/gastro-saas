@@ -20,6 +20,14 @@ export function ImageUploadForm({
     <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Bild</h2>
 
+      {/*
+        Ticket #146, item 9: image-rights are not technically checkable, so
+        this is a short static reminder text only, not enforcement.
+      */}
+      <p className="text-sm text-foreground-secondary">
+        Lade nur Fotos hoch, die du selbst gemacht hast oder für die du die Rechte besitzt.
+      </p>
+
       {currentImageUrl ? (
         <img
           src={currentImageUrl}

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { menuViewCookieName } from "@/lib/menu-view/cookie-name";
+import { CONSENT_COOKIE_NAME, isConsentAccepted } from "@/lib/consent/cookie";
 
 // Matches only the base public menu route (`/r/<slug>`), not its
 // cart/checkout/order-status sub-routes -- ticket #67's menu-view analytics
@@ -64,8 +65,13 @@ export async function middleware(request: NextRequest) {
   // apps/web/src/lib/menu-view/service.ts) and this cookie is never trusted
   // as a tenant id -- tenant_id is always re-resolved server-side from the
   // route slug.
+  //
+  // Ticket #146: this cookie is non-essential (analytics purpose only), so
+  // it is only minted once the visitor has explicitly accepted the cookie
+  // banner (`gastro_cookie_consent=accepted`, written client-side by
+  // `CookieConsentBanner`) -- never set unconditionally/before consent.
   const menuRouteMatch = PUBLIC_MENU_ROUTE_PATTERN.exec(request.nextUrl.pathname);
-  if (menuRouteMatch) {
+  if (menuRouteMatch && isConsentAccepted(request.cookies.get(CONSENT_COOKIE_NAME)?.value)) {
     const tenantSlug = menuRouteMatch[1]!;
     const cookieName = menuViewCookieName(tenantSlug);
     if (!request.cookies.get(cookieName)) {

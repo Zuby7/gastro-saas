@@ -51,6 +51,7 @@ function profileFormData(overrides: Partial<Record<string, string>> = {}): FormD
   fd.set("brandColor", overrides.brandColor ?? "#166534");
   fd.set("legalImprintText", overrides.legalImprintText ?? "");
   fd.set("legalPrivacyText", overrides.legalPrivacyText ?? "");
+  fd.set("legalTermsText", overrides.legalTermsText ?? "");
   return fd;
 }
 
@@ -119,7 +120,7 @@ describe("saveProfileAction", () => {
     });
   });
 
-  it("saves the Impressum/Datenschutz free-text fields scoped to the caller's own tenant", async () => {
+  it("saves the Impressum/Datenschutz/AGB free-text fields scoped to the caller's own tenant", async () => {
     rpcMock.mockResolvedValue({ data: null, error: null });
     let capturedUpsert: unknown;
     fromMock.mockImplementation((table: string) => {
@@ -140,6 +141,7 @@ describe("saveProfileAction", () => {
       profileFormData({
         legalImprintText: "Musterfirma GmbH, Musterstraße 1",
         legalPrivacyText: "Wir verarbeiten Ihre Daten gemäß DSGVO.",
+        legalTermsText: "AGB-Text inkl. Widerrufsrecht.",
       }),
     );
 
@@ -148,6 +150,7 @@ describe("saveProfileAction", () => {
       tenant_id: "tenant-1",
       legal_imprint_text: "Musterfirma GmbH, Musterstraße 1",
       legal_privacy_text: "Wir verarbeiten Ihre Daten gemäß DSGVO.",
+      legal_terms_text: "AGB-Text inkl. Widerrufsrecht.",
     });
   });
 });

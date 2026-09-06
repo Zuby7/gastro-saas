@@ -51,7 +51,7 @@ export interface PublicMenu {
   categories: PublicMenuCategory[];
 }
 
-export type PublicLegalPageKind = "imprint" | "privacy";
+export type PublicLegalPageKind = "imprint" | "privacy" | "terms";
 
 export interface PublicLegalPage {
   tenantName: string;
