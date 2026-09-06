@@ -267,6 +267,75 @@ describe.skipIf(!dbAvailable)(
       expect(remaining.rows.map((r) => r.id)).toEqual([keptEventId]);
     });
 
+    // Ticket #123: purge_expired_analytics_events() previously wrote no
+    // audit_logs entry, unlike process_tenant_data_deletion_request() and
+    // the export endpoint. Pins the fix: an audit_logs row must exist
+    // recording the actor, tenant, and deleted-row count.
+    it("records an audit_logs entry with the actor, tenant, and deleted count", async () => {
+      fixture = await seedTwoTenantFixture(admin);
+      const { tenantA } = fixture;
+
+      await admin.query(
+        `insert into privacy_retention_settings (tenant_id, analytics_events_retention_days) values ($1, $2)`,
+        [tenantA.tenantId, 30],
+      );
+
+      const pastRetention = new Date();
+      pastRetention.setDate(pastRetention.getDate() - 31);
+      await admin.query(
+        `insert into analytics_events (id, tenant_id, event_type, created_at) values ($1, $2, 'page_view', $3)`,
+        [randomUUID(), tenantA.tenantId, pastRetention.toISOString()],
+      );
+
+      await queryAsUser<{ purge_expired_analytics_events: number }>(
+        admin,
+        tenantA.ownerId,
+        `select purge_expired_analytics_events($1)`,
+        [tenantA.tenantId],
+      );
+
+      const auditRows = await admin.query<{
+        actor_user_id: string;
+        action: string;
+        target_type: string;
+        target_id: string;
+        metadata: { deletedCount: number; retentionDays: number };
+      }>(
+        `select actor_user_id, action, target_type, target_id, metadata
+           from audit_logs
+          where tenant_id = $1 and action = 'privacy.analytics_events.purged'`,
+        [tenantA.tenantId],
+      );
+
+      expect(auditRows.rows).toHaveLength(1);
+      const auditRow = auditRows.rows[0]!;
+      expect(auditRow.actor_user_id).toBe(tenantA.ownerId);
+      expect(auditRow.target_type).toBe("tenant");
+      expect(auditRow.target_id).toBe(tenantA.tenantId);
+      expect(auditRow.metadata.deletedCount).toBe(1);
+      expect(auditRow.metadata.retentionDays).toBe(30);
+    });
+
+    it("records an audit_logs entry even when nothing was actually expired (deletedCount: 0)", async () => {
+      fixture = await seedTwoTenantFixture(admin);
+      const { tenantA } = fixture;
+
+      await queryAsUser<{ purge_expired_analytics_events: number }>(
+        admin,
+        tenantA.ownerId,
+        `select purge_expired_analytics_events($1)`,
+        [tenantA.tenantId],
+      );
+
+      const auditRows = await admin.query<{ metadata: { deletedCount: number } }>(
+        `select metadata from audit_logs where tenant_id = $1 and action = 'privacy.analytics_events.purged'`,
+        [tenantA.tenantId],
+      );
+
+      expect(auditRows.rows).toHaveLength(1);
+      expect(auditRows.rows[0]!.metadata.deletedCount).toBe(0);
+    });
+
     it("falls back to the 365-day default retention when the tenant has no privacy_retention_settings row", async () => {
       fixture = await seedTwoTenantFixture(admin);
       const { tenantA } = fixture;

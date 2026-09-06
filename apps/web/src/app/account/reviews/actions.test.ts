@@ -43,18 +43,44 @@ beforeEach(() => {
   rpcMock.mockImplementation(async (fn: string) => {
     if (fn === "require_tenant_permission") return { data: null, error: null };
     if (fn === "moderate_rating") {
-      return { data: { ratingId: "rating-1", status: "released" }, error: null };
+      return {
+        data: { ratingId: "11111111-1111-4111-8111-111111111111", status: "released" },
+        error: null,
+      };
     }
     throw new Error(`unexpected rpc: ${fn}`);
   });
 });
 
 describe("moderateRatingAction", () => {
+  // Ticket #121, Epic-10 Opus review finding 2: Zod validation boundary.
+  it("rejects a malformed ratingId before touching Supabase (Zod boundary)", async () => {
+    const { moderateRatingAction } = await import("./actions");
+    const result = await moderateRatingAction("not-a-uuid", "released");
+
+    expect(result.error).toBeDefined();
+    expect(getUserMock).not.toHaveBeenCalled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid status value before touching Supabase (Zod boundary)", async () => {
+    const { moderateRatingAction } = await import("./actions");
+    const result = await moderateRatingAction(
+      "11111111-1111-4111-8111-111111111111",
+      // @ts-expect-error -- deliberately invalid at the runtime boundary
+      "not-a-real-status",
+    );
+
+    expect(result.error).toBeDefined();
+    expect(getUserMock).not.toHaveBeenCalled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
   it("returns an error when the caller is not authenticated", async () => {
     getUserMock.mockResolvedValue({ data: { user: null } });
 
     const { moderateRatingAction } = await import("./actions");
-    const result = await moderateRatingAction("rating-1", "released");
+    const result = await moderateRatingAction("11111111-1111-4111-8111-111111111111", "released");
 
     expect(result.error).toBeDefined();
     expect(rpcMock).not.toHaveBeenCalledWith("moderate_rating", expect.anything());
@@ -67,7 +93,7 @@ describe("moderateRatingAction", () => {
     });
 
     const { moderateRatingAction } = await import("./actions");
-    const result = await moderateRatingAction("rating-1", "released");
+    const result = await moderateRatingAction("11111111-1111-4111-8111-111111111111", "released");
 
     expect(result.error).toBeDefined();
   });
@@ -83,7 +109,7 @@ describe("moderateRatingAction", () => {
     });
 
     const { moderateRatingAction } = await import("./actions");
-    const result = await moderateRatingAction("rating-1", "released");
+    const result = await moderateRatingAction("11111111-1111-4111-8111-111111111111", "released");
 
     expect(result.error).toBeDefined();
     expect(result.status).toBeUndefined();
@@ -97,20 +123,23 @@ describe("moderateRatingAction", () => {
         return { data: null, error: null };
       }
       if (fn === "moderate_rating") {
-        return { data: { ratingId: "rating-1", status: "released" }, error: null };
+        return {
+          data: { ratingId: "11111111-1111-4111-8111-111111111111", status: "released" },
+          error: null,
+        };
       }
       throw new Error(`unexpected rpc: ${fn}`);
     });
 
     const { moderateRatingAction } = await import("./actions");
-    await moderateRatingAction("rating-1", "released");
+    await moderateRatingAction("11111111-1111-4111-8111-111111111111", "released");
 
     expect(requestedTenantId).toBe("tenant-1");
   });
 
   it("succeeds and returns the new status for an authorized caller", async () => {
     const { moderateRatingAction } = await import("./actions");
-    const result = await moderateRatingAction("rating-1", "released");
+    const result = await moderateRatingAction("11111111-1111-4111-8111-111111111111", "released");
 
     expect(result.error).toBeUndefined();
     expect(result.status).toBe("released");
@@ -126,7 +155,7 @@ describe("moderateRatingAction", () => {
     });
 
     const { moderateRatingAction } = await import("./actions");
-    const result = await moderateRatingAction("rating-1", "released");
+    const result = await moderateRatingAction("11111111-1111-4111-8111-111111111111", "released");
 
     expect(result.error).toBe("Diese Bewertung wurde nicht gefunden.");
   });
