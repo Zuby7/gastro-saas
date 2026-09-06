@@ -51,10 +51,14 @@ describe("getClientIp", () => {
     await expect(getClientIp()).resolves.toBe("1.2.3.4");
   });
 
-  it("returns 'unknown' when neither header is present", async () => {
+  it("returns 'unknown' when neither header is present, and warns", async () => {
     headersMock.mockResolvedValue(fakeHeaders({}));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const { getClientIp } = await import("./client-ip");
     await expect(getClientIp()).resolves.toBe("unknown");
+    expect(warnSpy).toHaveBeenCalledOnce();
+
+    warnSpy.mockRestore();
   });
 });

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { menuViewCookieName } from "@/lib/menu-view/cookie-name";
 
 // Matches only the base public menu route (`/r/<slug>`), not its
 // cart/checkout/order-status sub-routes -- ticket #67's menu-view analytics
@@ -11,10 +12,12 @@ const PUBLIC_MENU_ROUTE_PATTERN = /^\/r\/([^/]+)\/?$/;
 
 const MENU_VIEW_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24; // 24 hours -- short-lived/ephemeral by design (ticket #67)
 
-function menuViewCookieName(tenantSlug: string): string {
-  const safeSlug = tenantSlug.replace(/[^a-z0-9-]/g, "");
-  return `gastro_view_${safeSlug}`;
-}
+// `menuViewCookieName` itself lives in `@/lib/menu-view/cookie-name` (no
+// `next/headers` import there), shared with
+// `apps/web/src/lib/menu-view/cookie.ts` which reads this same cookie from a
+// Server Component -- previously each duplicated the sanitizing regex
+// independently, which risked the two copies drifting apart and letting
+// distinct slugs collide on the same cookie name (Opus finding, PR #129).
 
 /**
  * Refreshes the Supabase session cookie on every request. Required because

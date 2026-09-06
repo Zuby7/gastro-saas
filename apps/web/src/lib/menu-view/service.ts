@@ -35,12 +35,24 @@ export async function recordMenuViewOnce(tenantSlug: string, tenantId: string): 
       return;
     }
 
+    const sessionTokenHash = hashMenuViewToken(token);
     const ip = await getClientIp();
+    // `getClientIp()` returns the literal string "unknown" (and warns) when
+    // neither cf-connecting-ip nor x-forwarded-for resolved -- if that were
+    // hashed and used as-is, EVERY such visitor would share one
+    // (tenant_id, ip_hash) rate-limit bucket, capping the whole tenant at
+    // MENU_VIEW_IP_RATE_LIMIT_MAX events total instead of per-visitor (Opus
+    // finding, PR #129). Fall back to the session token's own hash as the
+    // rate-limit bucket key in that case, so each anonymous browser still
+    // gets its own independent bucket, same as it would with a real,
+    // distinct IP.
+    const ipHash = ip === "unknown" ? hashIp(`session-fallback:${sessionTokenHash}`) : hashIp(ip);
+
     const admin = createSupabaseAdminClient();
     const { error } = await admin.rpc("record_menu_view", {
       p_tenant_id: tenantId,
-      p_session_token_hash: hashMenuViewToken(token),
-      p_ip_hash: hashIp(ip),
+      p_session_token_hash: sessionTokenHash,
+      p_ip_hash: ipHash,
     });
 
     if (error) {

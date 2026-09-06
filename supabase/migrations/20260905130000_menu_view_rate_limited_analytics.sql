@@ -45,6 +45,10 @@
 --   - Only inserts `analytics_events` (event_type = 'menu_viewed') on the
 --     first-seen-today dedup insert; every other call (deduped or
 --     rate-limited) returns false and writes nothing to analytics_events.
+--     The rate-limited case additionally `raise log`s server-side (tenant_id,
+--     ip_hash, window_count) so it's distinguishable from an ordinary dedup
+--     in Postgres logs, even though the boolean return value alone can't
+--     tell the two apart (PR #129 Opus finding).
 --
 -- Distinguishing real vs. synthetic/test events: `analytics_events` already
 -- has no `anon` grant (see 20260801050000's header) and this new RPC is
@@ -158,6 +162,19 @@ begin
     -- Rate-limited: reject outright, write nothing at all. This is what
     -- bounds row growth even against an attacker rotating session tokens
     -- specifically to defeat the per-session dedup below.
+    --
+    -- Both this branch and the dedup branch below return plain `false`, so
+    -- the boolean return value alone can't distinguish "rate-limited" from
+    -- "already recorded today" -- the app layer doesn't currently need that
+    -- distinction to behave correctly (either way, nothing is written), but
+    -- an operator investigating a suspiciously flat menu_viewed count for a
+    -- tenant does. `raise log` (server-side Postgres log, never returned to
+    -- the caller) makes the rate-limited case specifically greppable without
+    -- changing the function's return type or the app's handling of it
+    -- (Opus finding, PR #129).
+    raise log
+      'record_menu_view rate-limited: tenant_id=%, ip_hash=%, window_count=%',
+      p_tenant_id, p_ip_hash, v_ip_window_count;
     return false;
   end if;
 

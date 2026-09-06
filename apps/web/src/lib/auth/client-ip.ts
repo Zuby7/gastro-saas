@@ -45,5 +45,12 @@ export async function getClientIp(): Promise<string> {
     }
   }
 
+  // Neither header resolved -- callers that bucket by IP (e.g. rate
+  // limiters) must not silently collapse every such visitor into one shared
+  // "unknown" bucket (Opus finding, PR #129: this previously capped an
+  // entire tenant's public menu-view rate limit at one shared bucket instead
+  // of per-visitor). Warn so this is visible in server logs/monitoring
+  // rather than only showing up as a mysterious rate-limit ceiling.
+  console.warn("[client-ip] unable to resolve client IP from cf-connecting-ip or x-forwarded-for");
   return "unknown";
 }
