@@ -8,7 +8,7 @@ vi.mock("./actions", () => ({
 }));
 
 const rating: ModerationQueueRatingView = {
-  ratingId: "11111111-1111-1111-1111-111111111111",
+  ratingId: "11111111-1111-4111-8111-111111111111",
   stars: 3,
   comment: "Sehr lecker!",
   ratedAt: "2026-08-19T10:00:00.000Z",

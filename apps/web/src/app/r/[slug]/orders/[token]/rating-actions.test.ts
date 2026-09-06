@@ -68,7 +68,12 @@ describe("submitRatingAction", () => {
     const { submitRatingAction } = await import("./rating-actions");
     const initialState = {};
 
-    const result = await submitRatingAction("tenant-slug", "raw-token", initialState, validFormData());
+    const result = await submitRatingAction(
+      "tenant-slug",
+      "raw-token",
+      initialState,
+      validFormData(),
+    );
 
     expect(result.success).toBe(true);
     expect(markSucceededMock).toHaveBeenCalledTimes(1);
@@ -89,12 +94,21 @@ describe("submitRatingAction", () => {
   });
 
   it("never calls submitOrderRating (or markSucceeded) once the rate limit is hit", async () => {
-    reserveAttemptMock.mockResolvedValueOnce({ attemptId: "attempt-1", ipCount: 999, ipEmailCount: 999 });
+    reserveAttemptMock.mockResolvedValueOnce({
+      attemptId: "attempt-1",
+      ipCount: 999,
+      ipEmailCount: 999,
+    });
 
     const { submitRatingAction } = await import("./rating-actions");
     const initialState = {};
 
-    const result = await submitRatingAction("tenant-slug", "raw-token", initialState, validFormData());
+    const result = await submitRatingAction(
+      "tenant-slug",
+      "raw-token",
+      initialState,
+      validFormData(),
+    );
 
     expect(result.error).toBeDefined();
     expect(submitOrderRatingMock).not.toHaveBeenCalled();
