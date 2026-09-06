@@ -154,11 +154,23 @@ grant all on manual_sales_entries to service_role;
 -- `payment_accounts_select_payments_read`'s same reasoning
 -- (20260808130000_stripe_connect_payment_accounts.sql) for deviating from
 -- the shared helper's plain-membership SELECT default.
+--
+-- Gated on (analytics.read OR analytics.manualsales.write), not
+-- analytics.read alone (Opus repair-cycle finding): a role holding only
+-- analytics.manualsales.write passes the UI's own record-a-sale gate and can
+-- INSERT, but a SELECT policy scoped to analytics.read alone would then
+-- block that same actor from reading back their own entries -- the "already
+-- recorded" list on the dish page would render permanently empty with no
+-- error. Mirrors sales_import_batches' identical SELECT gate
+-- (20260906150000_sales_import_batches.sql) for the same reason.
 create policy manual_sales_entries_select_analytics_read
   on manual_sales_entries
   for select
   to authenticated
-  using (public.has_tenant_permission(tenant_id, 'analytics.read'));
+  using (
+    public.has_tenant_permission(tenant_id, 'analytics.read')
+    or public.has_tenant_permission(tenant_id, 'analytics.manualsales.write')
+  );
 
 create policy manual_sales_entries_insert_write
   on manual_sales_entries

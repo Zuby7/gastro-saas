@@ -94,7 +94,7 @@ async function ensurePermission(
  * (this is analytics/sales data entry, not menu content editing) and NOT
  * `analytics.read` (read must never also authorize a write) -- see the
  * migration header comment in
- * `20260906090000_manual_sales_entries.sql` for the full rationale.
+ * `20260906140000_manual_sales_entries.sql` for the full rationale.
  */
 async function ensureManualSalesPermission(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
