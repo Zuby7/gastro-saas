@@ -58,7 +58,7 @@ export default async function DishPage({ params }: DishPageProps) {
   const [canEditMenu, canManageAvailability, canRecordManualSales] = await Promise.all([
     hasTenantPermission(supabase, membership.tenantId, "menu.write"),
     hasTenantPermission(supabase, membership.tenantId, "menu.availability.manage"),
-    hasTenantPermission(supabase, membership.tenantId, "analytics.manual_sales.write"),
+    hasTenantPermission(supabase, membership.tenantId, "analytics.manualsales.write"),
   ]);
 
   if (!canEditMenu && !canManageAvailability && !canRecordManualSales) {

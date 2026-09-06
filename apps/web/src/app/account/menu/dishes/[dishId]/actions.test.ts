@@ -381,7 +381,7 @@ describe("uploadDishImageAction", () => {
 });
 
 describe("recordManualSaleAction", () => {
-  it("denies logging a manual sale when the caller lacks analytics.manual_sales.write", async () => {
+  it("denies logging a manual sale when the caller lacks analytics.manualsales.write", async () => {
     denyPermission();
     const fd = new FormData();
     fd.set("dishId", "dish-1");
@@ -410,11 +410,44 @@ describe("recordManualSaleAction", () => {
     expect(fromMock).not.toHaveBeenCalledWith("manual_sales_entries");
   });
 
+  function dishLookupTable(found = true) {
+    return {
+      select: () => ({
+        eq: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: found ? { id: "dish-1" } : null, error: null }),
+          }),
+        }),
+      }),
+    };
+  }
+
+  it("denies logging a manual sale when dishId does not belong to the caller's own tenant (cross-tenant reference)", async () => {
+    allowPermission();
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") return membershipTable();
+      if (table === "dishes") return dishLookupTable(false);
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const fd = new FormData();
+    fd.set("dishId", "dish-from-other-tenant");
+    fd.set("quantity", "3");
+    fd.set("saleDate", "2026-09-01");
+
+    const { recordManualSaleAction } = await import("./actions");
+    const result = await recordManualSaleAction({}, fd);
+
+    expect(result.error).toBeDefined();
+    expect(fromMock).not.toHaveBeenCalledWith("manual_sales_entries");
+  });
+
   it("inserts only into manual_sales_entries, scoped to the caller's own tenant, with the resolved actor -- never orders/order_items/payments", async () => {
     allowPermission();
     let insertedRow: Record<string, unknown> | undefined;
     fromMock.mockImplementation((table: string) => {
       if (table === "tenant_memberships") return membershipTable();
+      if (table === "dishes") return dishLookupTable(true);
       if (table === "manual_sales_entries") {
         return {
           insert: async (row: Record<string, unknown>) => {
@@ -462,6 +495,7 @@ describe("recordManualSaleAction", () => {
     let insertedRow: Record<string, unknown> | undefined;
     fromMock.mockImplementation((table: string) => {
       if (table === "tenant_memberships") return membershipTable();
+      if (table === "dishes") return dishLookupTable(true);
       if (table === "manual_sales_entries") {
         return {
           insert: async (row: Record<string, unknown>) => {

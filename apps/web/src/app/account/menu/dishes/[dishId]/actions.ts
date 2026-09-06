@@ -90,7 +90,7 @@ async function ensurePermission(
 
 /**
  * Ticket #58: gates manual sales entry on its own dedicated
- * `analytics.manual_sales.write` permission, deliberately NOT `menu.write`
+ * `analytics.manualsales.write` permission, deliberately NOT `menu.write`
  * (this is analytics/sales data entry, not menu content editing) and NOT
  * `analytics.read` (read must never also authorize a write) -- see the
  * migration header comment in
@@ -101,7 +101,7 @@ async function ensureManualSalesPermission(
   tenantId: string,
 ): Promise<DishActionState | null> {
   try {
-    await requireTenantPermission(supabase, tenantId, "analytics.manual_sales.write");
+    await requireTenantPermission(supabase, tenantId, "analytics.manualsales.write");
     return null;
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
@@ -760,7 +760,7 @@ export async function uploadDishImageAction(
  * the authenticated session server-side, never taken from the client.
  * `tenant_id` likewise always comes from the caller's own resolved
  * membership -- never a client-supplied value -- and the underlying table's
- * RLS INSERT policy independently re-checks `analytics.manual_sales.write`
+ * RLS INSERT policy independently re-checks `analytics.manualsales.write`
  * as the second enforcement layer (see the migration header comment).
  */
 export async function recordManualSaleAction(
@@ -786,6 +786,24 @@ export async function recordManualSaleAction(
   const { supabase, tenantId, user } = await requireMenuWriteContext();
   const denied = await ensureManualSalesPermission(supabase, tenantId);
   if (denied) return denied;
+
+  // Defense in depth: `dishId` is client-supplied (hidden form field). The
+  // FK on `manual_sales_entries.dish_id` only checks that SOME dish exists,
+  // not that it belongs to this tenant, so without this explicit check a
+  // tampered request could log a manual sale against another tenant's dish
+  // (cross-tenant reference -- see tenant-isolation rule). Mirrors the
+  // `.eq("tenant_id", tenantId)` guard every other dish mutation in this file
+  // already applies.
+  const { data: dishRow } = await supabase
+    .from("dishes")
+    .select("id")
+    .eq("id", dishId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (!dishRow) {
+    return { error: "Gericht wurde nicht gefunden." };
+  }
 
   const channel = parsed.data.channel?.trim() || null;
 

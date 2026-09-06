@@ -46,8 +46,8 @@ export function ManualSalesSection({ dishId, entries }: ManualSalesSectionProps)
       <p className="text-sm text-foreground-secondary">
         Nur für Verkäufe außerhalb unseres Bestellsystems (z. B. Lieferando, vor Ort ohne
         Bestellsystem). Diese Einträge fließen als klar gekennzeichnete, zusätzliche Kennzahlen in
-        die Analytics ein -- sie werden nie mit echten, über diese Plattform bezahlten
-        Bestellungen vermischt.
+        die Analytics ein -- sie werden nie mit echten, über diese Plattform bezahlten Bestellungen
+        vermischt.
       </p>
 
       {state.error ? (

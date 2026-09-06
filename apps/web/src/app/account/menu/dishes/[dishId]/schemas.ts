@@ -108,7 +108,10 @@ export const ManualSaleEntrySchema = z.object({
     .string()
     .trim()
     .min(1, "Bitte geben Sie ein Datum an.")
-    .refine((value) => !Number.isNaN(new Date(value).getTime()), "Bitte geben Sie ein gültiges Datum an.")
+    .refine(
+      (value) => !Number.isNaN(new Date(value).getTime()),
+      "Bitte geben Sie ein gültiges Datum an.",
+    )
     .refine((value) => new Date(value).getTime() <= Date.now() + 24 * 60 * 60 * 1000, {
       message: "Das Datum darf nicht in der Zukunft liegen.",
     }),

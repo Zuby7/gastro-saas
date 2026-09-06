@@ -141,9 +141,7 @@ describe("AnalyticsDashboardPage (ticket #30)", () => {
     const element = await AnalyticsDashboardPage();
     render(element);
 
-    expect(
-      screen.getByText(/Manuell nachgetragene Verkäufe heute/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Manuell nachgetragene Verkäufe heute/)).toBeInTheDocument();
     expect(screen.getByText("3 Stück")).toBeInTheDocument();
     expect(screen.getByText(/36.00 EUR/)).toBeInTheDocument();
     expect(screen.getByText(/NICHT Teil von "Umsatz heute \(netto\)"/)).toBeInTheDocument();

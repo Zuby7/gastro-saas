@@ -29,7 +29,7 @@
 -- persisting a price snapshot here, since a manual entry is explicitly not a
 -- priced transaction the business actually settled through this platform.
 --
--- Permission: a new, narrow `analytics.manual_sales.write`, rather than
+-- Permission: a new, narrow `analytics.manualsales.write`, rather than
 -- reusing `menu.write` (this is sales/analytics data entry, not menu
 -- content editing -- a Marketing-role user with only `analytics.read` should
 -- not automatically gain menu-editing rights just to log a sale, and a
@@ -46,7 +46,7 @@
 --      helper as every other tenant-scoped admin table) -- SELECT open to any
 --      tenant member (matches this repo's convention for dish/menu-adjacent
 --      tables; not itself highly sensitive financial data), INSERT/UPDATE/
---      DELETE gated on `analytics.manual_sales.write`.
+--      DELETE gated on `analytics.manualsales.write`.
 --   2. The server action inserting a row (`recordManualSaleAction`) calls
 --      `requireTenantPermission` itself before writing, exactly like every
 --      other dish-admin mutation in this codebase.
@@ -79,23 +79,23 @@
 -- ----------------------------------------------------------------------------
 insert into permissions (key, description)
 values
-  ('analytics.manual_sales.write', 'Log manual sales entries for external/offline channels')
+  ('analytics.manualsales.write', 'Log manual sales entries for external/offline channels')
 on conflict (key) do update set description = excluded.description;
 
 -- Backfill for tenants that already exist at migration-apply time (mirrors
 -- every prior permission-introducing migration's own pattern).
 insert into role_permissions (role_id, permission_key)
-select r.id, 'analytics.manual_sales.write' from roles r where r.key = 'owner'
+select r.id, 'analytics.manualsales.write' from roles r where r.key = 'owner'
 on conflict do nothing;
 
 insert into role_permissions (role_id, permission_key)
-select r.id, 'analytics.manual_sales.write' from roles r where r.key = 'manager'
+select r.id, 'analytics.manualsales.write' from roles r where r.key = 'manager'
 on conflict do nothing;
 
 -- ----------------------------------------------------------------------------
 -- seed_standard_roles_for_tenant(): reconstructed from the actual latest
 -- accumulated body (20260819110000_privacy_export_retention_and_deletion_requests.sql),
--- plus this ticket's `analytics.manual_sales.write` grant for Manager. Owner
+-- plus this ticket's `analytics.manualsales.write` grant for Manager. Owner
 -- keeps getting every permission via the unchanged wildcard subquery below.
 -- ----------------------------------------------------------------------------
 create or replace function seed_standard_roles_for_tenant()
@@ -146,7 +146,7 @@ begin
     (v_manager_role_id, 'payments.refund'),
     (v_manager_role_id, 'payments.read'),
     (v_manager_role_id, 'analytics.read'),
-    (v_manager_role_id, 'analytics.manual_sales.write'),
+    (v_manager_role_id, 'analytics.manualsales.write'),
     (v_manager_role_id, 'audit.read'),
     (v_manager_role_id, 'reviews.read'),
     (v_manager_role_id, 'reviews.moderate'),
@@ -199,7 +199,7 @@ alter table manual_sales_entries enable row level security;
 grant select, insert, update, delete on manual_sales_entries to authenticated;
 grant all on manual_sales_entries to service_role;
 
-select apply_basic_tenant_policies('manual_sales_entries', 'analytics.manual_sales.write');
+select apply_basic_tenant_policies('manual_sales_entries', 'analytics.manualsales.write');
 
 -- ----------------------------------------------------------------------------
 -- get_analytics_dashboard_summary(): additive manual-sales fields
@@ -302,7 +302,7 @@ begin
          coalesce(sum(mse.quantity * coalesce(d.price_cents, 0)), 0)
     into v_manual_sales_units, v_manual_sales_estimated_revenue_cents
     from public.manual_sales_entries mse
-    join public.dishes d on d.id = mse.dish_id
+    join public.dishes d on d.id = mse.dish_id and d.tenant_id = mse.tenant_id
    where mse.tenant_id = p_tenant_id
      and mse.sale_date = v_local_date;
 

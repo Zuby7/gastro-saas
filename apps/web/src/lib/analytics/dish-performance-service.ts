@@ -74,7 +74,10 @@ export async function getDishPerformanceAnalysis(
   const manualByDishId = new Map(
     rawStats.map((row) => [
       row.dishId,
-      { manualUnitsSold: row.manualUnitsSold, manualEstimatedRevenueCents: row.manualEstimatedRevenueCents },
+      {
+        manualUnitsSold: row.manualUnitsSold,
+        manualEstimatedRevenueCents: row.manualEstimatedRevenueCents,
+      },
     ]),
   );
 

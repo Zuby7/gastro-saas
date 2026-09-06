@@ -59,7 +59,14 @@ async function seedPublishedDish(
   await admin.query(
     `insert into dishes (id, tenant_id, menu_version_id, category_id, name, price_cents, allergen_reviewed)
      values ($1, $2, $3, $4, $5, $6, true)`,
-    [dishId, tenantId, menuVersionId, categoryId, options.name ?? "Margherita", options.priceCents ?? 1000],
+    [
+      dishId,
+      tenantId,
+      menuVersionId,
+      categoryId,
+      options.name ?? "Margherita",
+      options.priceCents ?? 1000,
+    ],
   );
   await admin.query(
     `update menu_versions set status = 'published', published_at = now() where id = $1`,
@@ -109,7 +116,7 @@ describe.skipIf(!dbAvailable)("manual_sales_entries (ticket #58)", () => {
     return { fixture: seeded, managerId, staffId };
   }
 
-  it("lets a manager (analytics.manual_sales.write) insert a manual sales entry scoped to their own tenant", async () => {
+  it("lets a manager (analytics.manualsales.write) insert a manual sales entry scoped to their own tenant", async () => {
     const seed = await seedFixtureWithManagerAndStaff();
     fixture = seed.fixture;
     const dishId = await seedPublishedDish(admin, fixture.tenantA.tenantId);
@@ -124,7 +131,7 @@ describe.skipIf(!dbAvailable)("manual_sales_entries (ticket #58)", () => {
     expect(result.rows).toHaveLength(1);
   });
 
-  it("denies a staff member without analytics.manual_sales.write from inserting a manual sale (permission-denied case)", async () => {
+  it("denies a staff member without analytics.manualsales.write from inserting a manual sale (permission-denied case)", async () => {
     const seed = await seedFixtureWithManagerAndStaff();
     fixture = seed.fixture;
     const dishId = await seedPublishedDish(admin, fixture.tenantB.tenantId);
@@ -177,6 +184,38 @@ describe.skipIf(!dbAvailable)("manual_sales_entries (ticket #58)", () => {
     expect(ownRead.rows).toEqual([{ dish_id: dishIdB }]);
   });
 
+  it("get_analytics_dashboard_summary() ignores a manual entry whose dish_id points to another tenant's dish (defense in depth against a tampered/foreign dish_id)", async () => {
+    const seed = await seedFixtureWithManagerAndStaff();
+    fixture = seed.fixture;
+    await seedPublishedDish(admin, fixture.tenantA.tenantId, { priceCents: 1000 });
+    const foreignDishId = await seedPublishedDish(admin, fixture.tenantB.tenantId, {
+      priceCents: 999_999,
+    });
+
+    // Simulate a row that should never legitimately exist (the app layer now
+    // rejects this before insert -- see actions.ts's dish-ownership check),
+    // but the FK alone would still allow it: tenant_id = tenant A, dish_id
+    // belonging to tenant B. Inserted directly as admin since RLS/app checks
+    // would otherwise block it.
+    await admin.query(
+      `insert into manual_sales_entries (tenant_id, dish_id, quantity, sale_date) values ($1, $2, 4, '2026-09-01')`,
+      [fixture.tenantA.tenantId, foreignDishId],
+    );
+
+    const result = await queryAsUser(
+      admin,
+      seed.managerId,
+      `select get_analytics_dashboard_summary($1, $2) as summary`,
+      [fixture.tenantA.tenantId, new Date("2026-09-01T12:00:00Z").toISOString()],
+    );
+    const summary = result.rows[0]!.summary as Record<string, unknown>;
+
+    // Must not use tenant B's dish price to compute tenant A's estimated
+    // revenue -- the mismatched-tenant row is excluded entirely.
+    expect(summary.manualSalesTodayUnits).toBe(0);
+    expect(summary.manualSalesTodayEstimatedRevenueCents).toBe(0);
+  });
+
   it("never writes to or reads from orders/order_items/payments -- structurally separate from real order data", async () => {
     const seed = await seedFixtureWithManagerAndStaff();
     fixture = seed.fixture;
@@ -190,9 +229,10 @@ describe.skipIf(!dbAvailable)("manual_sales_entries (ticket #58)", () => {
       [fixture.tenantA.tenantId, dishId, seed.managerId],
     );
 
-    const orders = await admin.query(`select count(*)::int as count from orders where tenant_id = $1`, [
-      fixture.tenantA.tenantId,
-    ]);
+    const orders = await admin.query(
+      `select count(*)::int as count from orders where tenant_id = $1`,
+      [fixture.tenantA.tenantId],
+    );
     const orderItems = await admin.query(
       `select count(*)::int as count from order_items where tenant_id = $1`,
       [fixture.tenantA.tenantId],
