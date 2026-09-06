@@ -92,15 +92,19 @@ async function createAccount(
   // `create_integration_account` returns the `integration_accounts` composite
   // row type. Selecting it as a single scalar column (`select f() as alias`)
   // makes `pg` hand back the row's raw, un-decoded composite text
-  // representation instead of an object with named fields (unlike
-  // `list_integration_accounts`/`list_integration_sync_jobs` below, which are
-  // set-returning functions called in the FROM clause so `pg` sees their
-  // individual, plain-typed output columns). `(f()).*` expands the composite
-  // into its individual columns so `pg` decodes each one properly.
+  // representation instead of an object with named fields. Using the
+  // `(f()).*` target-list expansion instead avoids that, but re-evaluates
+  // a volatile function once *per expanded column* (a well-known Postgres
+  // gotcha) -- harmless here only because the write is an idempotent
+  // upsert, but the same shape bit `record_integration_sync_job` below
+  // (a plain INSERT, not idempotent -- see its own comment). Call the
+  // function in the FROM clause instead: exactly one evaluation, and
+  // `select *` still decodes every column individually, the same pattern
+  // `list_integration_accounts`/`list_integration_sync_jobs` already use.
   const result = await queryAsUser<IntegrationAccountRow>(
     admin,
     actorUserId,
-    `select (create_integration_account($1, 'mock', $2)).*`,
+    `select * from create_integration_account($1, 'mock', $2)`,
     [tenantId, label],
   );
   return result.rows[0]!;
@@ -173,13 +177,18 @@ describe.skipIf(!dbAvailable)(
       const account = await createAccount(admin, seed.staffAId, fixture.tenantA.tenantId);
       expect(account.status).toBe("mock");
 
-      // Same composite-decoding concern as `createAccount()` above: expand
-      // via `(f()).*` rather than selecting the scalar composite as a single
-      // aliased column, so `pg` returns plain, individually-typed columns.
+      // Same composite-decoding concern as `createAccount()` above -- but
+      // `record_integration_sync_job` is a plain INSERT (not an idempotent
+      // upsert), so it must be called in the FROM clause (`select * from
+      // f(...)`), not as `(f()).*` in the SELECT list: the latter is a
+      // documented Postgres gotcha where a function referenced via `.*`
+      // target-list expansion gets re-evaluated once per expanded output
+      // column -- 9 columns on `integration_sync_jobs` silently insert the
+      // same "succeeded" job 9 times instead of once.
       const jobResult = await queryAsUser<{ id: string; status: string; job_type: string }>(
         admin,
         seed.staffAId,
-        `select (record_integration_sync_job($1, $2, 'menu_export', 'succeeded', $3::jsonb, null)).*`,
+        `select * from record_integration_sync_job($1, $2, 'menu_export', 'succeeded', $3::jsonb, null)`,
         [fixture.tenantA.tenantId, account.id, JSON.stringify({ categoryCount: 2, dishCount: 5 })],
       );
       expect(jobResult.rows[0]!.status).toBe("succeeded");
