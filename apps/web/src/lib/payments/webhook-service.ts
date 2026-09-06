@@ -197,7 +197,10 @@ function tenantIdentityIsConsistent(params: {
 async function flagPaymentForReview(
   admin: SupabaseClient,
   payment: PaymentRecord,
-  action: "payment_amount_mismatch_flagged" | "payment_webhook_tenant_mismatch_flagged",
+  action:
+    | "payment_amount_mismatch_flagged"
+    | "payment_webhook_tenant_mismatch_flagged"
+    | "payment_after_order_cancelled_flagged",
   metadata: Record<string, unknown>,
 ): Promise<void> {
   await admin.from("payments").update({ status: "flagged_for_review" }).eq("id", payment.id);
@@ -369,6 +372,31 @@ async function handleCheckoutSessionCompleted(
   }
 
   if (order.status !== "awaiting_payment") {
+    // Issue #88: if the order was cancelled (e.g. by the awaiting-payment
+    // timeout sweep) and Stripe is now telling us the guest paid anyway --
+    // most likely a race between the sweep and a Stripe Checkout Session
+    // that hadn't yet expired -- this must NEVER be silently ignored: money
+    // was actually taken for an order that will never be fulfilled. Flag the
+    // payment for manual reconciliation/refund review, the same mechanism
+    // already used for amount/tenant mismatches above. `createCheckoutSessionForOrder`
+    // additionally sets Stripe's own `expires_at` to line up with the
+    // sweep's timeout so this race is rare in practice; this is the safety
+    // net for whatever remains (e.g. the up-to-5-minute gap between sweep
+    // runs). A full automatic-refund workflow for this edge case is a
+    // worthwhile follow-up ticket, not built here.
+    if (order.status === "cancelled" && session.payment_status === "paid") {
+      console.error(
+        "[payments-webhook] checkout.session.completed paid AFTER order already cancelled -- flagged for review",
+        order.id,
+      );
+      await flagPaymentForReview(admin, payment, "payment_after_order_cancelled_flagged", {
+        stripeEventId: event.id,
+        stripeCheckoutSessionId: session.id,
+        orderStatus: order.status,
+      });
+      return;
+    }
+
     // Stale/out-of-order delivery: the order already moved on (paid by an
     // earlier delivery of this same event, or already cancelled/expired).
     // Never re-derive state from a delayed event -- the state machine has
