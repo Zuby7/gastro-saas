@@ -5,13 +5,13 @@ import { describe, expect, it } from "vitest";
  * Verifies every distinct foreground/background color pair actually
  * rendered by `page.tsx` meets WCAG 2.1 AA contrast.
  *
- * Light mode only: automatic OS-driven dark mode was removed from
- * `globals.css` (see that file's comment) because almost every surface in
- * this app hardcodes light-mode utility classes (`bg-neutral-0`, etc.)
- * rather than the `--background`/`--foreground` variables, so flipping just
- * those two root variables produced invisible text on still-white cards
- * instead of a real dark theme. Re-add dark-mode assertions here only once
- * a real, fully-audited dark mode ships.
+ * Light mode only: this file enumerates the concrete color pairs `page.tsx`
+ * renders, which are unaffected by the issue #83 dark-mode token migration
+ * (the homepage doesn't use `bg-neutral-0`/`bg-neutral-50`/`bg-neutral-100`).
+ * For the scheme-aware `--surface`/`--surface-secondary`/`--surface-muted`/
+ * `--danger-foreground` tokens now used elsewhere in the app, and their
+ * dark-mode contrast verification, see
+ * `apps/web/src/app/dark-mode-tokens.a11y.test.ts`.
  *
  * Keep this list in sync with `page.tsx`: every text element there should
  * have a corresponding entry below, keyed by the Tailwind class it uses.

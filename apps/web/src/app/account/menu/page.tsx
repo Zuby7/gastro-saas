@@ -51,7 +51,7 @@ export default async function MenuPage() {
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return (
-        <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-neutral-50 p-8">
+        <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-surface-secondary p-8">
           <p role="alert" className="text-foreground">
             Sie haben nicht die erforderliche Berechtigung, um den Menüplan zu bearbeiten.
           </p>
@@ -93,7 +93,7 @@ export default async function MenuPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
         <div className="flex items-center justify-between">
           <div>
@@ -115,13 +115,13 @@ export default async function MenuPage() {
           </Link>
         </div>
 
-        <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm">
+        <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground">Kategorien</h2>
           <CategoryForm />
         </section>
 
         {(categories ?? []).length === 0 ? (
-          <p className="rounded-lg border border-neutral-200 bg-neutral-0 p-4 text-foreground shadow-sm">
+          <p className="rounded-lg border border-neutral-200 bg-surface p-4 text-foreground shadow-sm">
             Noch keine Kategorien angelegt.
           </p>
         ) : null}
@@ -129,7 +129,7 @@ export default async function MenuPage() {
         {(categories ?? []).map((category) => (
           <section
             key={category.id}
-            className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm"
+            className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm"
           >
             <CategoryRow id={category.id} name={category.name} />
 

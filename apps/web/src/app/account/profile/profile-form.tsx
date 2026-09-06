@@ -20,14 +20,14 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
   const [state, formAction, isPending] = useActionState(saveProfileAction, initialState);
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Restaurant-Profil</h2>
 
       {state.error ? (
         <p
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-foreground"
         >
           {state.error}
         </p>
@@ -36,7 +36,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
         <p
           role="status"
           aria-live="polite"
-          className="rounded-md border border-neutral-300 bg-neutral-100 p-3 text-sm text-foreground"
+          className="rounded-md border border-neutral-300 bg-surface-muted p-3 text-sm text-foreground"
         >
           {state.success}
         </p>
@@ -58,7 +58,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.displayName ? (
-            <span id="displayName-error" className="text-sm text-danger-600">
+            <span id="displayName-error" className="text-sm text-danger-foreground">
               {state.fieldErrors.displayName}
             </span>
           ) : null}
@@ -90,7 +90,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.contactEmail ? (
-            <span className="text-sm text-danger-600">{state.fieldErrors.contactEmail}</span>
+            <span className="text-sm text-danger-foreground">{state.fieldErrors.contactEmail}</span>
           ) : null}
         </div>
 
@@ -122,7 +122,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.timezone ? (
-            <span className="text-sm text-danger-600">{state.fieldErrors.timezone}</span>
+            <span className="text-sm text-danger-foreground">{state.fieldErrors.timezone}</span>
           ) : null}
         </div>
 
@@ -141,7 +141,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.brandColor ? (
-            <span className="text-sm text-danger-600">{state.fieldErrors.brandColor}</span>
+            <span className="text-sm text-danger-foreground">{state.fieldErrors.brandColor}</span>
           ) : null}
         </div>
 

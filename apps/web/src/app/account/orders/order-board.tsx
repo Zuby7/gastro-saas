@@ -139,7 +139,7 @@ export function OrderBoard({ initialOrders, initialHasMore, canManageOrders }: O
       {transitionError ? (
         <p
           role="alert"
-          className="rounded-md border border-danger-500 bg-neutral-0 p-3 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 bg-surface p-3 text-sm text-danger-foreground"
         >
           {transitionError}
         </p>
@@ -163,7 +163,7 @@ export function OrderBoard({ initialOrders, initialHasMore, canManageOrders }: O
         <button
           type="button"
           onClick={handleLoadMore}
-          className="w-fit rounded-md border border-neutral-300 bg-neutral-0 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
+          className="w-fit rounded-md border border-neutral-300 bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
         >
           Mehr laden
         </button>
@@ -194,7 +194,7 @@ function OrderColumn({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4"
+      className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4"
     >
       <h2 id={headingId} className="text-sm font-semibold text-foreground">
         {staffOrderStatusColumnLabel(status)}{" "}
@@ -233,7 +233,7 @@ function OrderColumn({
                   </span>
                 ) : null}
               </div>
-              <span className="w-fit rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-foreground">
+              <span className="w-fit rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-foreground">
                 {paymentStatusLabel(order.paymentStatus)}
               </span>
 

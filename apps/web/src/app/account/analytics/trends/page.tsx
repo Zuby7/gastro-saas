@@ -112,7 +112,7 @@ export default async function TrendsAndExtrasPage({
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return (
-        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-neutral-50 p-8">
+        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-surface-secondary p-8">
           <p role="alert" className="text-foreground">
             Sie haben nicht die erforderliche Berechtigung, um Trend- und Extras-Analysen
             einzusehen.
@@ -159,7 +159,7 @@ export default async function TrendsAndExtrasPage({
   const currency = trend?.currency ?? "EUR";
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       <div className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-2xl font-semibold text-foreground">
@@ -175,7 +175,7 @@ export default async function TrendsAndExtrasPage({
 
         <section
           aria-labelledby="trend-widget-heading"
-          className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="trend-widget-heading" className="text-lg font-medium text-foreground">
             Zeitraumvergleich
@@ -269,7 +269,7 @@ export default async function TrendsAndExtrasPage({
 
         <section
           aria-labelledby="extras-heading"
-          className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="extras-heading" className="text-lg font-medium text-foreground">
             Extras-Auswertung
@@ -290,7 +290,7 @@ export default async function TrendsAndExtrasPage({
 
         <section
           aria-labelledby="removed-ingredients-heading"
-          className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-6"
+          className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-surface p-6"
         >
           <h2 id="removed-ingredients-heading" className="text-lg font-medium text-foreground">
             Entfernte Zutaten

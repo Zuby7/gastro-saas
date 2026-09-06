@@ -31,7 +31,7 @@ export function CategoryForm() {
         {isPending ? "Wird angelegt…" : "Anlegen"}
       </button>
       {state.error ? (
-        <p role="alert" className="w-full text-sm text-danger-600">
+        <p role="alert" className="w-full text-sm text-danger-foreground">
           {state.error}
         </p>
       ) : null}

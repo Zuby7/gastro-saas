@@ -16,9 +16,9 @@ interface IntegrationsPanelProps {
 }
 
 const STATUS_BADGE_CLASSNAME: Record<IntegrationAccountView["status"], string> = {
-  mock: "bg-neutral-100 text-foreground",
-  connected: "border border-success-500 bg-neutral-0 text-success-600",
-  error: "border border-danger-500 bg-neutral-0 text-danger-600",
+  mock: "bg-surface-muted text-foreground",
+  connected: "border border-success-500 bg-surface text-success-600",
+  error: "border border-danger-500 bg-surface text-danger-600",
 };
 
 /**
@@ -70,13 +70,13 @@ export function IntegrationsPanel({ initialAccount, initialJobs }: IntegrationsP
       {error ? (
         <p
           role="alert"
-          className="rounded-md border border-danger-500 bg-neutral-0 p-3 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 bg-surface p-3 text-sm text-danger-600"
         >
           {error}
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-medium text-foreground">Mock-Integration</h2>
           <span
@@ -98,7 +98,7 @@ export function IntegrationsPanel({ initialAccount, initialJobs }: IntegrationsP
             type="button"
             disabled={isExporting}
             onClick={handleExport}
-            className="min-h-11 rounded-md border border-neutral-300 bg-neutral-0 px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Menü exportieren (Mock)
           </button>
@@ -106,7 +106,7 @@ export function IntegrationsPanel({ initialAccount, initialJobs }: IntegrationsP
             type="button"
             disabled={isSimulating}
             onClick={handleSimulateOrder}
-            className="min-h-11 rounded-md border border-neutral-300 bg-neutral-0 px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Bestelleingang simulieren (Mock)
           </button>
@@ -122,14 +122,14 @@ export function IntegrationsPanel({ initialAccount, initialJobs }: IntegrationsP
             {jobs.map((job) => (
               <li
                 key={job.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-white p-3 text-sm text-foreground"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-surface p-3 text-sm text-foreground"
               >
                 <span className="font-medium">{integrationSyncJobTypeLabel(job.jobType)}</span>
                 <span
                   className={
                     job.status === "failed"
-                      ? "rounded-full border border-danger-500 bg-neutral-0 px-2 py-0.5 text-xs font-medium text-danger-600"
-                      : "rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-foreground"
+                      ? "rounded-full border border-danger-500 bg-surface px-2 py-0.5 text-xs font-medium text-danger-600"
+                      : "rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-foreground"
                   }
                 >
                   {integrationSyncJobStatusLabel(job.status)}
