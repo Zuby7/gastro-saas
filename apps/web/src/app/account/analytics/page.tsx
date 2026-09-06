@@ -50,7 +50,7 @@ export default async function AnalyticsDashboardPage() {
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return (
-        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-neutral-50 p-8">
+        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-surface-secondary p-8">
           <p role="alert" className="text-foreground">
             Sie haben nicht die erforderliche Berechtigung, um das Analytics-Dashboard einzusehen.
           </p>
@@ -70,7 +70,7 @@ export default async function AnalyticsDashboardPage() {
   const hasPaidOrdersToday = summary.paidOrdersTodayCount > 0;
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       <div className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-2xl font-semibold text-foreground">
@@ -111,7 +111,7 @@ export default async function AnalyticsDashboardPage() {
           <section
             role="listitem"
             aria-labelledby="revenue-heading"
-            className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-white p-6"
+            className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-surface p-6"
           >
             <h2 id="revenue-heading" className="text-sm font-medium text-foreground">
               Umsatz heute (netto)
@@ -134,7 +134,7 @@ export default async function AnalyticsDashboardPage() {
           <section
             role="listitem"
             aria-labelledby="paid-orders-heading"
-            className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-white p-6"
+            className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-surface p-6"
           >
             <h2 id="paid-orders-heading" className="text-sm font-medium text-foreground">
               Bezahlte Bestellungen heute
@@ -148,7 +148,7 @@ export default async function AnalyticsDashboardPage() {
           <section
             role="listitem"
             aria-labelledby="avg-order-value-heading"
-            className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-white p-6"
+            className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-surface p-6"
           >
             <h2 id="avg-order-value-heading" className="text-sm font-medium text-foreground">
               Ø-Bestellwert
@@ -168,7 +168,7 @@ export default async function AnalyticsDashboardPage() {
           <section
             role="listitem"
             aria-labelledby="open-orders-heading"
-            className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-white p-6"
+            className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-surface p-6"
           >
             <h2 id="open-orders-heading" className="text-sm font-medium text-foreground">
               Offene Bestellungen
@@ -182,7 +182,7 @@ export default async function AnalyticsDashboardPage() {
           <section
             role="listitem"
             aria-labelledby="payment-failures-heading"
-            className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-white p-6"
+            className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-surface p-6"
           >
             <h2 id="payment-failures-heading" className="text-sm font-medium text-foreground">
               Zahlungsfehlschläge heute

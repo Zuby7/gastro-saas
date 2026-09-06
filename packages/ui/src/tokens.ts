@@ -233,6 +233,12 @@ export const colors = {
     900: "#2b1c14",
   },
   danger: {
+    // `300` exists only as the dark-scheme-safe text color for error/alert
+    // copy (see `--danger-foreground` in `apps/web/src/app/globals.css`) --
+    // `500`/`600` fail WCAG AA against the dark-mode surface tokens, so error
+    // text needs a lighter tint when the OS prefers dark. Verified against
+    // `packages/ui/src/contrast.test.ts`.
+    300: "#f3a8bc",
     500: "#c21f4b",
     600: "#9c1a3d",
   },

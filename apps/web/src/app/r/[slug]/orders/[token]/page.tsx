@@ -46,7 +46,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
 
   if (!order || order.tenantSlug !== slug) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-3 bg-neutral-50 p-8">
+      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-3 bg-surface-secondary p-8">
         <h1 className="font-display text-2xl font-semibold text-foreground">
           Bestellung nicht gefunden
         </h1>
@@ -67,7 +67,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
       : "Abholung";
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       {/*
         Same quieter hero-gradient treatment as `../../cart/page.tsx` -- see
         that file's comment for rationale.
@@ -89,7 +89,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
           orderId={order.orderId}
         />
 
-        <section className="rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+        <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground">Details</h2>
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             <dt className="text-foreground-secondary">Bestellart</dt>
@@ -107,7 +107,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
           </dl>
         </section>
 
-        <section className="rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+        <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground">Bestellte Artikel</h2>
           <ul className="mt-3 flex flex-col gap-3">
             {order.items.map((item, index) => (
@@ -138,7 +138,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
         </section>
 
         {order.statusHistory.length > 0 ? (
-          <section className="rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+          <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
             <h2 className="text-sm font-semibold text-foreground">Verlauf</h2>
             <ol className="mt-3 flex flex-col gap-2 border-l border-neutral-200 pl-4">
               {order.statusHistory.map((entry, index) => (
@@ -155,7 +155,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
 
         {order.status === "completed" ? (
           order.rating ? (
-            <section className="rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+            <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <h2 className="text-sm font-semibold text-foreground">Ihre Bewertung</h2>
               <p className="mt-1 text-sm text-foreground">
                 {order.rating.stars} {order.rating.stars === 1 ? "Stern" : "Sterne"}

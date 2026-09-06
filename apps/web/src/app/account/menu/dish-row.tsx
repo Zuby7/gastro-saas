@@ -17,7 +17,7 @@ export function DishRow({ id, name, priceCents, allergenReviewed }: DishRowProps
   const [state, formAction] = useActionState(archiveDishAction, initialState);
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-2">
+    <li className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-200 bg-surface-secondary p-2">
       <div>
         <Link
           href={`/account/menu/dishes/${id}`}
@@ -38,13 +38,13 @@ export function DishRow({ id, name, priceCents, allergenReviewed }: DishRowProps
         <input type="hidden" name="dishId" value={id} />
         <button
           type="submit"
-          className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-foreground"
         >
           Archivieren
         </button>
       </form>
       {state.error ? (
-        <span role="alert" className="w-full text-sm text-danger-600">
+        <span role="alert" className="w-full text-sm text-danger-foreground">
           {state.error}
         </span>
       ) : null}

@@ -39,7 +39,7 @@ export function CreateTenantForm({
         <p
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-foreground"
         >
           {state.error}
         </p>
@@ -62,7 +62,7 @@ export function CreateTenantForm({
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.tenantName ? (
-            <span id="tenantName-error" className="text-sm text-danger-600">
+            <span id="tenantName-error" className="text-sm text-danger-foreground">
               {state.fieldErrors.tenantName}
             </span>
           ) : null}
@@ -84,7 +84,7 @@ export function CreateTenantForm({
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.tenantSlug ? (
-            <span id="tenantSlug-error" className="text-sm text-danger-600">
+            <span id="tenantSlug-error" className="text-sm text-danger-foreground">
               {state.fieldErrors.tenantSlug}
             </span>
           ) : null}

@@ -66,7 +66,7 @@ export function DishForm({ categoryId }: { categoryId: string }) {
         {isPending ? "Wird angelegt…" : "Gericht anlegen"}
       </button>
       {state.error ? (
-        <p role="alert" className="w-full text-sm text-danger-600">
+        <p role="alert" className="w-full text-sm text-danger-foreground">
           {state.error}
         </p>
       ) : null}
