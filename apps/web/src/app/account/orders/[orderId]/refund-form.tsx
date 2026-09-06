@@ -79,7 +79,7 @@ export function RefundForm({
           className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
         />
         {state.fieldErrors?.amountCents ? (
-          <p id="refund-amount-error" role="alert" className="text-sm text-danger-600">
+          <p id="refund-amount-error" role="alert" className="text-sm text-danger-foreground">
             {state.fieldErrors.amountCents}
           </p>
         ) : null}
@@ -99,7 +99,7 @@ export function RefundForm({
           className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
         />
         {state.fieldErrors?.reason ? (
-          <p id="refund-reason-error" role="alert" className="text-sm text-danger-600">
+          <p id="refund-reason-error" role="alert" className="text-sm text-danger-foreground">
             {state.fieldErrors.reason}
           </p>
         ) : null}
@@ -114,7 +114,7 @@ export function RefundForm({
       </button>
 
       {state.error ? (
-        <p role="alert" className="text-sm text-danger-600">
+        <p role="alert" className="text-sm text-danger-foreground">
           {state.error}
         </p>
       ) : null}

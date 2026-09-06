@@ -90,7 +90,7 @@ export function OrderStatusLive({
     // and the stamped order-number badge are functionally motivated here.
     <section
       aria-live="polite"
-      className="ticket-edge rounded-t-lg border border-b-0 border-ember-300 bg-neutral-0 p-5 shadow-sm"
+      className="ticket-edge rounded-t-lg border border-b-0 border-ember-300 bg-surface p-5 shadow-sm"
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-foreground-secondary">Aktueller Status</p>

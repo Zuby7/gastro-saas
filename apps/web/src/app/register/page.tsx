@@ -22,7 +22,7 @@ export default function RegisterPage() {
         <p
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-foreground"
         >
           {state.error}
         </p>
@@ -32,7 +32,7 @@ export default function RegisterPage() {
         <p
           role="status"
           aria-live="polite"
-          className="rounded-md border border-neutral-300 bg-neutral-100 p-3 text-sm text-foreground"
+          className="rounded-md border border-neutral-300 bg-surface-muted p-3 text-sm text-foreground"
         >
           {state.info}
         </p>
@@ -54,7 +54,7 @@ export default function RegisterPage() {
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.tenantName ? (
-            <span id="tenantName-error" className="text-sm text-danger-600">
+            <span id="tenantName-error" className="text-sm text-danger-foreground">
               {state.fieldErrors.tenantName}
             </span>
           ) : null}
@@ -75,7 +75,7 @@ export default function RegisterPage() {
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.tenantSlug ? (
-            <span id="tenantSlug-error" className="text-sm text-danger-600">
+            <span id="tenantSlug-error" className="text-sm text-danger-foreground">
               {state.fieldErrors.tenantSlug}
             </span>
           ) : null}
@@ -96,7 +96,7 @@ export default function RegisterPage() {
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.email ? (
-            <span id="email-error" className="text-sm text-danger-600">
+            <span id="email-error" className="text-sm text-danger-foreground">
               {state.fieldErrors.email}
             </span>
           ) : null}
@@ -118,7 +118,7 @@ export default function RegisterPage() {
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.password ? (
-            <span id="password-error" className="text-sm text-danger-600">
+            <span id="password-error" className="text-sm text-danger-foreground">
               {state.fieldErrors.password}
             </span>
           ) : null}

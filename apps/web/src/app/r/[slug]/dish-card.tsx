@@ -57,7 +57,7 @@ function startingPriceLabel(dish: PublicMenuDish): string {
 
 export function DishCard({ dish, tenantSlug }: DishCardProps) {
   return (
-    <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-neutral-0 shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_20px_rgba(0,0,0,.06)]">
+    <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-surface shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_20px_rgba(0,0,0,.06)]">
       <div
         className={`relative flex h-[120px] w-full items-center justify-center ${
           dish.soldOut
@@ -85,7 +85,7 @@ export function DishCard({ dish, tenantSlug }: DishCardProps) {
           // `public-menu-design.a11y.test.ts` for why a translucent
           // `danger-500/*` overlay wasn't safe here (no danger-50 token
           // exists, and the placeholder's darker gray step failed AA).
-          <span className="absolute right-2 top-2 rounded-full border border-danger-500 bg-neutral-0 px-2 py-1 text-xs font-semibold text-danger-600">
+          <span className="absolute right-2 top-2 rounded-full border border-danger-500 bg-surface px-2 py-1 text-xs font-semibold text-danger-foreground">
             Ausverkauft
           </span>
         ) : null}
