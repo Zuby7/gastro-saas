@@ -248,7 +248,7 @@ export function buildOrderConfirmationEmailContent(params: {
   ];
 
   return {
-    subject: `Bestellbestätigung – ${tenantName} (${orderReference})`,
+    subject: `Bestellbestätigung: ${tenantName} (${orderReference})`,
     html,
     text: textLines.join("\n"),
   };

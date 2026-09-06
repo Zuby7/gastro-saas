@@ -21,7 +21,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
             Einladung annehmen
           </h1>
           <p className="mt-1 text-sm text-foreground-secondary">
-            BestÃ¤tigen Sie die Einladung mit dem Konto, dessen E-Mail-Adresse eingeladen wurde.
+            Bestätigen Sie die Einladung mit dem Konto, dessen E-Mail-Adresse eingeladen wurde.
           </p>
         </div>
 

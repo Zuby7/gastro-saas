@@ -56,7 +56,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
       <div>
         <p className="font-medium text-foreground">
           {line.dishName}
-          {line.variantName ? ` – ${line.variantName}` : ""}
+          {line.variantName ? ` (${line.variantName})` : ""}
         </p>
         {line.selections.length > 0 ? (
           <ul className="mt-1 text-sm text-foreground-secondary">
@@ -66,7 +66,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
                 {selection.priceDeltaCents !== 0
                   ? ` (${formatPrice(selection.priceDeltaCents, currency)})`
                   : ""}
-                {!selection.isAvailable ? " – nicht mehr verfügbar" : ""}
+                {!selection.isAvailable ? " (nicht mehr verfügbar)" : ""}
               </li>
             ))}
           </ul>

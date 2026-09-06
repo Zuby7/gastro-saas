@@ -35,7 +35,7 @@ describe("ImpressumPage", () => {
     render(await ImpressumPage({ params: Promise.resolve({ slug: "demo" }) }));
 
     expect(
-      screen.getByRole("heading", { name: "Impressum – Mario's Pizzeria" }),
+      screen.getByRole("heading", { name: "Impressum: Mario's Pizzeria" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Mario GmbH/)).toBeInTheDocument();
   });

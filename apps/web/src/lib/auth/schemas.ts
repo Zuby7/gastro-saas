@@ -44,8 +44,8 @@ export const LoginSchema = z.object({
 export type LoginInput = z.infer<typeof LoginSchema>;
 
 export const InviteMemberSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Bitte geben Sie eine gÃ¼ltige E-Mail-Adresse ein."),
-  roleId: z.string().uuid("Bitte wÃ¤hlen Sie eine Rolle aus."),
+  email: z.string().trim().toLowerCase().email("Bitte geben Sie eine gültige E-Mail-Adresse ein."),
+  roleId: z.string().uuid("Bitte wählen Sie eine Rolle aus."),
 });
 
 export type InviteMemberInput = z.infer<typeof InviteMemberSchema>;
