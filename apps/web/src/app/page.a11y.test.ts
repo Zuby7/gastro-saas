@@ -1,17 +1,22 @@
-import { colors, validateContrastRatio, type ContrastTextSize } from "@gastro-saas/ui";
+import { colors, parseHexColor, validateContrastRatio } from "@gastro-saas/ui";
 import { describe, expect, it } from "vitest";
 
 /**
  * Verifies every distinct foreground/background color pair actually
- * rendered by `page.tsx` meets WCAG 2.1 AA contrast.
+ * rendered by `page.tsx` meets WCAG 2.1 AA contrast, in both the light
+ * (`:root`) and dark (`@media (prefers-color-scheme: dark)`) token values.
  *
- * Light mode only: this file enumerates the concrete color pairs `page.tsx`
- * renders, which are unaffected by the issue #83 dark-mode token migration
- * (the homepage doesn't use `bg-neutral-0`/`bg-neutral-50`/`bg-neutral-100`).
- * For the scheme-aware `--surface`/`--surface-secondary`/`--surface-muted`/
- * `--danger-foreground` tokens now used elsewhere in the app, and their
- * dark-mode contrast verification, see
- * `apps/web/src/app/dark-mode-tokens.a11y.test.ts`.
+ * Since issue #83 re-enabled automatic OS-driven dark mode, `page.tsx` uses
+ * the scheme-aware `--surface`/`--surface-secondary`/`--background`/
+ * `--foreground`/`--foreground-secondary`/`--link-foreground` tokens
+ * (`bg-surface`, `bg-surface-secondary`, `text-foreground`,
+ * `text-foreground-secondary`, `text-link-foreground`) for its header,
+ * footer, features section and feature cards — those pairs are checked
+ * below for BOTH schemes, mirroring `dark-mode-tokens.a11y.test.ts`'s
+ * pattern. `brand`/`gold`/`espresso` are NOT scheme-aware (no dark-mode
+ * override in `globals.css`), so the hero, closing CTA band and
+ * "how it works" step badges — all fixed brand/gold/espresso colors — only
+ * need a single check, same as `public-menu-design.a11y.test.ts`.
  *
  * Keep this list in sync with `page.tsx`: every text element there should
  * have a corresponding entry below, keyed by the Tailwind class it uses.
@@ -20,46 +25,163 @@ import { describe, expect, it } from "vitest";
  * text element without an accompanying contrast assertion should stand out
  * in review.
  */
-interface RenderedTextPair {
-  /** Human-readable description, matched to the element in page.tsx. */
-  description: string;
-  foreground: string;
-  background: string;
-  /**
-   * "h1" (text-3xl font-semibold, 30px) qualifies as WCAG "large text"
-   * (>=18.66px), so the relaxed 3:1 threshold applies. Everything else on
-   * the page renders at 16px or smaller (normal text), which needs 4.5:1.
-   */
-  textSize: ContrastTextSize;
+
+function compositeOverBackground(
+  foregroundHex: string,
+  alpha: number,
+  backgroundHex: string,
+): string {
+  const fg = parseHexColor(foregroundHex);
+  const bg = parseHexColor(backgroundHex);
+  const blend = (fgChannel: number, bgChannel: number) =>
+    Math.round(alpha * fgChannel + (1 - alpha) * bgChannel);
+  const toHexChannel = (value: number) => value.toString(16).padStart(2, "0");
+
+  return `#${toHexChannel(blend(fg.r, bg.r))}${toHexChannel(blend(fg.g, bg.g))}${toHexChannel(blend(fg.b, bg.b))}`;
 }
 
-const renderedTextPairs: RenderedTextPair[] = [
-  {
-    description: "h1 (text-foreground on background)",
-    foreground: colors.neutral[900],
-    background: colors.neutral[0],
-    textSize: "large",
-  },
-  {
-    description: "p (text-foreground-secondary on background)",
-    foreground: colors.neutral[500],
-    background: colors.neutral[0],
-    textSize: "normal",
-  },
-  {
-    description:
-      "nav links 'Restaurant registrieren' / 'Anmelden' (text-link-foreground on background, text-sm)",
-    foreground: colors.brand[600],
-    background: colors.neutral[0],
-    textSize: "normal",
-  },
-];
+describe("homepage scheme-aware token pairs (WCAG AA) — light", () => {
+  it("header/footer: text-foreground on bg-surface", () => {
+    const result = validateContrastRatio(colors.neutral[900], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
 
-describe("homepage color contrast (WCAG AA)", () => {
-  for (const pair of renderedTextPairs) {
-    it(`${pair.description} passes AA for ${pair.textSize} text`, () => {
-      const result = validateContrastRatio(pair.foreground, pair.background, pair.textSize);
-      expect(result.passesAA).toBe(true);
-    });
-  }
+  it("header/footer nav: text-link-foreground on bg-surface", () => {
+    const result = validateContrastRatio(colors.brand[600], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("footer: text-foreground-secondary on bg-surface", () => {
+    const result = validateContrastRatio(colors.neutral[500], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("features section heading: text-foreground on bg-surface-secondary", () => {
+    const result = validateContrastRatio(colors.neutral[900], colors.neutral[50]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("features section subheading: text-foreground-secondary on bg-surface-secondary", () => {
+    const result = validateContrastRatio(colors.neutral[500], colors.neutral[50]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("feature card: text-foreground on bg-surface", () => {
+    const result = validateContrastRatio(colors.neutral[900], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("feature card: text-foreground-secondary on bg-surface", () => {
+    const result = validateContrastRatio(colors.neutral[500], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("'how it works' section (default page background): text-foreground on bg-background", () => {
+    const result = validateContrastRatio(colors.neutral[900], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("'how it works' section (default page background): text-foreground-secondary on bg-background", () => {
+    const result = validateContrastRatio(colors.neutral[500], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+});
+
+describe("homepage scheme-aware token pairs (WCAG AA) — dark (prefers-color-scheme: dark)", () => {
+  it("header/footer: text-foreground on bg-surface (dark)", () => {
+    const result = validateContrastRatio(colors.neutral[50], colors.neutral[800]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("header/footer nav: text-link-foreground on bg-surface (dark)", () => {
+    const result = validateContrastRatio(colors.brand[300], colors.neutral[800]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("footer: text-foreground-secondary on bg-surface (dark)", () => {
+    const result = validateContrastRatio(colors.neutral[300], colors.neutral[800]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("features section heading: text-foreground on bg-surface-secondary (dark)", () => {
+    const result = validateContrastRatio(colors.neutral[50], colors.neutral[900]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("features section subheading: text-foreground-secondary on bg-surface-secondary (dark)", () => {
+    const result = validateContrastRatio(colors.neutral[300], colors.neutral[900]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("feature card: text-foreground on bg-surface (dark)", () => {
+    const result = validateContrastRatio(colors.neutral[50], colors.neutral[800]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("feature card: text-foreground-secondary on bg-surface (dark)", () => {
+    const result = validateContrastRatio(colors.neutral[300], colors.neutral[800]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("'how it works' section (default page background): text-foreground on bg-background (dark)", () => {
+    const result = validateContrastRatio(colors.neutral[50], colors.neutral[900]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("'how it works' section (default page background): text-foreground-secondary on bg-background (dark)", () => {
+    const result = validateContrastRatio(colors.neutral[300], colors.neutral[900]);
+    expect(result.passesAA).toBe(true);
+  });
+});
+
+describe("homepage fixed-color pairs (WCAG AA) — brand/gold/espresso are not scheme-aware", () => {
+  const HERO_WORST_CASE_STOP = colors.espresso[800];
+
+  it("hero h1 (white, large text) on the hero's worst-case (lighter) gradient stop passes AA", () => {
+    const result = validateContrastRatio("#ffffff", HERO_WORST_CASE_STOP, "large");
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("hero subheadline (white/80) on the worst-case (lighter) gradient stop passes AA", () => {
+    const composited = compositeOverBackground("#ffffff", 0.8, HERO_WORST_CASE_STOP);
+    const result = validateContrastRatio(composited, HERO_WORST_CASE_STOP);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("hero secondary 'Anmelden' link (white) on its translucent white/12 background (composited over the worst-case gradient stop) passes AA", () => {
+    const pillBackground = compositeOverBackground("#ffffff", 0.12, HERO_WORST_CASE_STOP);
+    const result = validateContrastRatio("#ffffff", pillBackground);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("header/hero primary CTA text (neutral-0) on its solid brand-600 background passes AA", () => {
+    const result = validateContrastRatio(colors.neutral[0], colors.brand[600]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("feature card icon (brand-600) on its solid brand-50 background passes AA (non-text UI, 3:1 minimum)", () => {
+    const result = validateContrastRatio(colors.brand[600], colors.brand[50], "large");
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("'how it works' step number badge (gold-800) on its solid gold-100 background passes AA", () => {
+    const result = validateContrastRatio(colors.gold[800], colors.gold[100]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("closing CTA heading (white, large text) on its solid brand-700 background passes AA", () => {
+    const result = validateContrastRatio("#ffffff", colors.brand[700], "large");
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("closing CTA subheadline (white/85) on its solid brand-700 background passes AA", () => {
+    const composited = compositeOverBackground("#ffffff", 0.85, colors.brand[700]);
+    const result = validateContrastRatio(composited, colors.brand[700]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("closing CTA button text (brand-700) on its solid brand-50 background passes AA", () => {
+    const result = validateContrastRatio(colors.brand[700], colors.brand[50]);
+    expect(result.passesAA).toBe(true);
+  });
 });
