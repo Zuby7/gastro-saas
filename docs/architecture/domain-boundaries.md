@@ -36,3 +36,7 @@ packages/testing     — shared test utilities, fixtures, tenant test harness
 ```
 
 If the multi-package overhead doesn't pay for itself early on, collapse `packages/domain` folders into `apps/web/src/modules/*` instead — record that change as a new ADR if it happens, don't silently drift.
+
+## Integrations module (ticket #38)
+
+The **integrations** module's provider-neutral interface and pure mock-provider logic live in `packages/domain/src/integrations/` (`provider.ts`'s `IntegrationProvider` interface, `mock-provider.ts`'s `createMockIntegrationProvider()`); the Supabase-touching wiring (reading the tenant's own published menu, invoking the provider, persisting the outcome) lives in `apps/web/src/lib/integrations/service.ts`, gated on the `integrations.manage` permission, with its admin UI at `apps/web/src/app/account/integrations/`. Only the mock provider exists today — no real Lieferando/Wolt/Uber-Eats/POS adapter (`.claude/rules/integrations.md`, this ticket's explicit non-goals). `integration_accounts`/`integration_sync_jobs`/`integration_errors` are tenant-scoped tables, each with RLS (`supabase/migrations/20260820090000_integration_accounts_sync_jobs_mock_provider.sql`).

@@ -7,6 +7,8 @@ node_modules/
 dist/
 build/
 out/
+.open-next/
+.wrangler/
 
 # Environment / secrets
 .env
@@ -41,3 +43,6 @@ supabase/.temp/
 
 # Claude Code local settings (machine-specific permissions)
 .claude/settings.local.json
+.claude/worktrees/
+apps/web/.open-next/
+apps/web/.wrangler/
