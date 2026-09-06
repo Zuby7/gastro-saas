@@ -29,7 +29,7 @@ describe("DatenschutzPage", () => {
     render(await DatenschutzPage({ params: Promise.resolve({ slug: "demo" }) }));
 
     expect(
-      screen.getByRole("heading", { name: "Datenschutzerklärung – Mario's Pizzeria" }),
+      screen.getByRole("heading", { name: "Datenschutzerklärung: Mario's Pizzeria" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Wir verarbeiten Ihre Daten gemäß DSGVO\./)).toBeInTheDocument();
   });

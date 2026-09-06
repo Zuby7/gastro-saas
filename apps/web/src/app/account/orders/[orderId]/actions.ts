@@ -6,11 +6,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import {
+  DuplicateRefundRequestError,
   issueRefundForOrder,
   PaymentNotRefundableError,
   RefundAwaitingReconciliationError,
   RefundExceedsRemainingAmountError,
   RefundInvalidAmountError,
+  RefundInvalidRequestTokenError,
 } from "@/lib/payments/refund-service";
 import { RefundSchema } from "./schemas";
 
@@ -36,6 +38,7 @@ export async function issueRefundAction(
     orderId: formData.get("orderId"),
     amountCents: formData.get("amountCents"),
     reason: formData.get("reason"),
+    requestToken: formData.get("requestToken"),
   });
 
   if (!parsed.success) {
@@ -81,13 +84,16 @@ export async function issueRefundAction(
       actorUserId: user.id,
       amountCents: Number(parsed.data.amountCents),
       reason: parsed.data.reason,
+      requestToken: parsed.data.requestToken,
     });
   } catch (error) {
     if (
       error instanceof RefundExceedsRemainingAmountError ||
       error instanceof PaymentNotRefundableError ||
       error instanceof RefundInvalidAmountError ||
-      error instanceof RefundAwaitingReconciliationError
+      error instanceof RefundAwaitingReconciliationError ||
+      error instanceof DuplicateRefundRequestError ||
+      error instanceof RefundInvalidRequestTokenError
     ) {
       return { error: error.message };
     }

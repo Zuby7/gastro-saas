@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { RatingNotFoundError, moderateRating } from "@/lib/ratings/moderation-service";
+import { ModerateRatingSchema } from "@/lib/ratings/schemas";
 import type { RatingModerationStatus } from "@/lib/ratings/types";
 
 export interface ModerateRatingActionResult {
@@ -27,6 +28,11 @@ export async function moderateRatingAction(
   ratingId: string,
   status: RatingModerationStatus,
 ): Promise<ModerateRatingActionResult> {
+  const parsed = ModerateRatingSchema.safeParse({ ratingId, status });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Ungültige Anfrage." };
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -55,8 +61,8 @@ export async function moderateRatingAction(
   try {
     const result = await moderateRating(supabase, {
       tenantId: membership.tenantId,
-      ratingId,
-      status,
+      ratingId: parsed.data.ratingId,
+      status: parsed.data.status,
     });
 
     revalidatePath("/account/reviews");
@@ -65,6 +71,10 @@ export async function moderateRatingAction(
     if (error instanceof RatingNotFoundError) {
       return { error: error.message };
     }
+    // Ticket #121, Epic-10 Opus review finding 3: log server-side, matching
+    // `submitRatingAction`'s catch-all (`apps/web/src/app/r/[slug]/orders/[token]/rating-actions.ts`)
+    // -- an unexpected failure here previously left no durable trail.
+    console.error("[reviews] moderateRatingAction failed", error);
     return {
       error: "Der Moderationsstatus konnte nicht geändert werden. Bitte versuchen Sie es erneut.",
     };

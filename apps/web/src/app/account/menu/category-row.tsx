@@ -19,7 +19,7 @@ export function CategoryRow({ id, name }: { id: string; name: string }) {
   const [archiveState, archiveFormAction] = useActionState(archiveCategoryAction, initialState);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-surface-secondary p-2">
       <form action={renameFormAction} className="flex items-center gap-2">
         <input type="hidden" name="categoryId" value={id} />
         <label htmlFor={`category-name-${id}`} className="sr-only">
@@ -67,24 +67,24 @@ export function CategoryRow({ id, name }: { id: string; name: string }) {
         <input type="hidden" name="categoryId" value={id} />
         <button
           type="submit"
-          className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-foreground"
         >
           Archivieren
         </button>
       </form>
 
       {renameState.error ? (
-        <span role="alert" className="w-full text-sm text-danger-600">
+        <span role="alert" className="w-full text-sm text-danger-foreground">
           {renameState.error}
         </span>
       ) : null}
       {moveState.error ? (
-        <span role="alert" className="w-full text-sm text-danger-600">
+        <span role="alert" className="w-full text-sm text-danger-foreground">
           {moveState.error}
         </span>
       ) : null}
       {archiveState.error ? (
-        <span role="alert" className="w-full text-sm text-danger-600">
+        <span role="alert" className="w-full text-sm text-danger-foreground">
           {archiveState.error}
         </span>
       ) : null}

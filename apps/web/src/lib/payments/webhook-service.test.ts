@@ -391,13 +391,46 @@ describe("handleStripePaymentWebhookEvent -- tenant/connected-account mismatch",
 });
 
 describe("handleStripePaymentWebhookEvent -- out-of-order / stale events", () => {
-  it("ignores a delayed success event for an order that has already moved on (e.g. already cancelled)", async () => {
+  it("ignores a delayed success event for an order that has already moved on to a non-cancelled status", async () => {
+    state.order!.status = "received";
+
+    const { handleStripePaymentWebhookEvent } = await import("./webhook-service");
+    const admin = makeAdmin();
+
+    await handleStripePaymentWebhookEvent(admin as never, checkoutSessionCompletedEvent());
+
+    expect(orderStatusEventInserts).toHaveLength(0);
+    expect(state.order?.status).toBe("received");
+    expect(state.payment?.status).toBe("pending");
+  });
+
+  it("issue #88: never silently ignores a paid session for an order the awaiting-payment sweep already cancelled -- flags it for review instead", async () => {
     state.order!.status = "cancelled";
 
     const { handleStripePaymentWebhookEvent } = await import("./webhook-service");
     const admin = makeAdmin();
 
     await handleStripePaymentWebhookEvent(admin as never, checkoutSessionCompletedEvent());
+
+    expect(orderStatusEventInserts).toHaveLength(0);
+    expect(state.order?.status).toBe("cancelled");
+    expect(state.payment?.status).toBe("flagged_for_review");
+    expect(recordOrderAuditEventMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "payment_after_order_cancelled_flagged" }),
+    );
+  });
+
+  it("does not flag when the cancelled order's session did not actually complete payment", async () => {
+    state.order!.status = "cancelled";
+
+    const { handleStripePaymentWebhookEvent } = await import("./webhook-service");
+    const admin = makeAdmin();
+
+    await handleStripePaymentWebhookEvent(
+      admin as never,
+      checkoutSessionCompletedEvent({ payment_status: "unpaid" }),
+    );
 
     expect(orderStatusEventInserts).toHaveLength(0);
     expect(state.order?.status).toBe("cancelled");

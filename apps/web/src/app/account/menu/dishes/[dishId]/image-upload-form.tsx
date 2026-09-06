@@ -17,7 +17,7 @@ export function ImageUploadForm({
   const [state, formAction, isPending] = useActionState(uploadDishImageAction, initialState);
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm">
+    <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Bild</h2>
 
       {currentImageUrl ? (
@@ -31,7 +31,7 @@ export function ImageUploadForm({
       )}
 
       {state.error ? (
-        <p role="alert" className="text-sm text-danger-600">
+        <p role="alert" className="text-sm text-danger-foreground">
           {state.error}
         </p>
       ) : null}
