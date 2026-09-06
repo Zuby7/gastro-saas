@@ -16,9 +16,11 @@ export type PermissionKey =
   | "payments.refund"
   | "payments.connect"
   | "analytics.read"
+  | "analytics.manualsales.write"
   | "audit.read"
   | "reviews.read"
-  | "reviews.moderate";
+  | "reviews.moderate"
+  | "integrations.manage";
 
 export class PermissionDeniedError extends Error {
   constructor(

@@ -26,7 +26,7 @@ export function CreateTenantForm({
   const [state, formAction, isPending] = useActionState(createTenantAction, initialState);
 
   return (
-    <div className="flex flex-col gap-4 rounded-md border border-neutral-300 p-4">
+    <div className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
       <div>
         <h2 className="text-lg font-semibold text-foreground">Restaurant anlegen</h2>
         <p className="mt-1 text-sm text-foreground-secondary">
@@ -39,7 +39,7 @@ export function CreateTenantForm({
         <p
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-foreground"
         >
           {state.error}
         </p>
@@ -62,7 +62,7 @@ export function CreateTenantForm({
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.tenantName ? (
-            <span id="tenantName-error" className="text-sm text-danger-600">
+            <span id="tenantName-error" className="text-sm text-danger-foreground">
               {state.fieldErrors.tenantName}
             </span>
           ) : null}
@@ -84,7 +84,7 @@ export function CreateTenantForm({
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />
           {state.fieldErrors?.tenantSlug ? (
-            <span id="tenantSlug-error" className="text-sm text-danger-600">
+            <span id="tenantSlug-error" className="text-sm text-danger-foreground">
               {state.fieldErrors.tenantSlug}
             </span>
           ) : null}

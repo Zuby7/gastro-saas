@@ -46,7 +46,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
   return (
     <li
       className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${
-        line.isAvailable ? "border-neutral-200 bg-neutral-0" : "border-danger-500 bg-danger-500/5"
+        line.isAvailable ? "border-neutral-200 bg-surface" : "border-danger-500 bg-danger-500/5"
       }`}
     >
       <p role="status" aria-live="polite" className="sr-only">
@@ -56,7 +56,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
       <div>
         <p className="font-medium text-foreground">
           {line.dishName}
-          {line.variantName ? ` – ${line.variantName}` : ""}
+          {line.variantName ? ` (${line.variantName})` : ""}
         </p>
         {line.selections.length > 0 ? (
           <ul className="mt-1 text-sm text-foreground-secondary">
@@ -66,14 +66,14 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
                 {selection.priceDeltaCents !== 0
                   ? ` (${formatPrice(selection.priceDeltaCents, currency)})`
                   : ""}
-                {!selection.isAvailable ? " – nicht mehr verfügbar" : ""}
+                {!selection.isAvailable ? " (nicht mehr verfügbar)" : ""}
               </li>
             ))}
           </ul>
         ) : null}
 
         {!line.isAvailable ? (
-          <p className="mt-2 rounded-md border border-danger-500 bg-danger-500/10 px-2 py-1 text-sm font-medium text-danger-600">
+          <p className="mt-2 rounded-md border border-danger-500 bg-danger-500/10 px-2 py-1 text-sm font-medium text-danger-foreground">
             Dieses Gericht ist zwischenzeitlich nicht mehr verfügbar. Bitte entfernen Sie es, um
             fortzufahren.
           </p>
@@ -113,7 +113,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
           <button
             type="submit"
             disabled={isRemoving}
-            className="rounded-md border border-neutral-300 px-3 py-1 text-sm font-medium text-danger-600 hover:border-danger-500 disabled:opacity-60"
+            className="rounded-md border border-neutral-300 px-3 py-1 text-sm font-medium text-danger-foreground hover:border-danger-500 disabled:opacity-60"
           >
             Entfernen
           </button>
@@ -121,12 +121,12 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
       </div>
 
       {updateState.error ? (
-        <p role="alert" className="text-sm text-danger-600">
+        <p role="alert" className="text-sm text-danger-foreground">
           {updateState.error}
         </p>
       ) : null}
       {removeState.error ? (
-        <p role="alert" className="text-sm text-danger-600">
+        <p role="alert" className="text-sm text-danger-foreground">
           {removeState.error}
         </p>
       ) : null}

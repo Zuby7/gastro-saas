@@ -27,6 +27,20 @@ export interface AnalyticsDashboardSummary {
   avgOrderValueCents: number | null;
   openOrdersCount: number;
   paymentFailuresTodayCount: number;
+  /**
+   * Ticket #58: units manually logged as sold today via external/offline
+   * channels (Lieferando, walk-in without the ordering system). ADDITIVE --
+   * never included in grossRevenueTodayCents/netRevenueTodayCents/
+   * paidOrdersTodayCount above, which stay exclusively derived from real
+   * `payments` rows.
+   */
+  manualSalesTodayUnits: number;
+  /**
+   * Ticket #58: an ESTIMATE (current dish price * quantity) of today's
+   * manually logged sales, in the same currency as the rest of this
+   * summary. Never summed into netRevenueTodayCents/grossRevenueTodayCents.
+   */
+  manualSalesTodayEstimatedRevenueCents: number;
 }
 
 export async function getAnalyticsDashboardSummary(

@@ -8,12 +8,17 @@ import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permi
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-event";
 import {
+  REENCODED_CONTENT_TYPE,
+  REENCODED_EXTENSION,
+  reEncodeDishImage,
+} from "@/lib/images/re-encode-dish-image";
+import {
   ALLOWED_IMAGE_TYPES,
   AssignmentEntitySchema,
   AvailabilitySchema,
   DishBasicsSchema,
-  IMAGE_EXTENSION_BY_MIME,
   LookupNameSchema,
+  ManualSaleEntrySchema,
   MAX_IMAGE_SIZE_BYTES,
   OptionGroupSchema,
   OptionSchema,
@@ -77,6 +82,31 @@ async function ensurePermission(
     if (error instanceof PermissionDeniedError) {
       return {
         error: "Sie haben nicht die erforderliche Berechtigung, den Menüplan zu bearbeiten.",
+      };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Ticket #58: gates manual sales entry on its own dedicated
+ * `analytics.manualsales.write` permission, deliberately NOT `menu.write`
+ * (this is analytics/sales data entry, not menu content editing) and NOT
+ * `analytics.read` (read must never also authorize a write) -- see the
+ * migration header comment in
+ * `20260906140000_manual_sales_entries.sql` for the full rationale.
+ */
+async function ensureManualSalesPermission(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  tenantId: string,
+): Promise<DishActionState | null> {
+  try {
+    await requireTenantPermission(supabase, tenantId, "analytics.manualsales.write");
+    return null;
+  } catch (error) {
+    if (error instanceof PermissionDeniedError) {
+      return {
+        error: "Sie haben nicht die erforderliche Berechtigung, Verkäufe nachzutragen.",
       };
     }
     throw error;
@@ -581,17 +611,31 @@ export async function toggleAssignmentAction(
 }
 
 /**
- * Ticket #12's image upload requirement, minimal scope: validates file
- * type/size server-side (matching the `media_assets` check constraints and
- * the `dish-media` storage bucket's own limits -- defense in depth, not
- * trusting either layer alone), uploads to the tenant-scoped storage path,
- * inserts the `media_assets` row, and attaches it to the dish.
+ * Ticket #12's image upload requirement: validates file type/size
+ * server-side (matching the `media_assets` check constraints and the
+ * `dish-media` storage bucket's own limits -- defense in depth, not trusting
+ * either layer alone), uploads to the tenant-scoped storage path, inserts
+ * the `media_assets` row, and attaches it to the dish.
  *
- * Deliberately NOT re-encoding/re-compressing the uploaded image server-side
- * (out of scope for this pass -- see the follow-up GitHub issue filed for
- * this, referenced in the PR description). Re-encoding matters for
- * stripping EXIF/GPS metadata and normalizing format/size; until it ships,
- * uploaded images are stored as-is (subject to the type/size checks above).
+ * Ticket #72: before upload, the file is decoded and re-encoded server-side
+ * via `reEncodeDishImage` (see that module for why `@cf-wasm/photon`, not
+ * `sharp`, was chosen -- this app deploys to Cloudflare Workers, which
+ * doesn't support `sharp`'s native binaries). This:
+ * - rejects files that pass the MIME-type/size checks above but aren't
+ *   actually decodable as an image (the decode step throws for those);
+ * - strips EXIF/GPS metadata (the re-encode only ever writes fresh pixel
+ *   data, no original metadata segments);
+ * - normalizes resolution (downscaled to fit `MAX_DIMENSION_PX` if larger)
+ *   and re-compresses to a bounded-size JPEG.
+ * The original `file.type`/`file.size` are only used for the pre-upload
+ * gate; the *stored* `content_type`/`size_bytes` always reflect the
+ * re-encoded output, not the original upload.
+ *
+ * Authorization (`requireMenuWriteContext`/`ensurePermission`) runs BEFORE
+ * `reEncodeDishImage` -- the re-encode is real CPU/WASM work, and an
+ * unauthorized caller must not be able to trigger it (Opus review finding on
+ * PR #132: it previously ran the re-encode first, before any permission
+ * check).
  */
 export async function uploadDishImageAction(
   _prevState: DishActionState,
@@ -617,17 +661,32 @@ export async function uploadDishImageAction(
     return { error: "Das Bild darf höchstens 5 MB groß sein." };
   }
 
+  // Authorization runs BEFORE any file read/re-encode work below: the
+  // re-encode (photon WASM decode/resize) is real CPU/memory work, and an
+  // unauthorized caller shouldn't be able to trigger it just by holding a
+  // valid image file (Opus review finding on PR #132).
   const { supabase, tenantId } = await requireMenuWriteContext();
   const denied = await ensurePermission(supabase, tenantId);
   if (denied) return denied;
 
-  const extension = IMAGE_EXTENSION_BY_MIME[file.type as (typeof ALLOWED_IMAGE_TYPES)[number]];
-  const storagePath = `${tenantId}/${randomUUID()}.${extension}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const originalBytes = new Uint8Array(await file.arrayBuffer());
+  const reEncoded = reEncodeDishImage(originalBytes);
+
+  if (!reEncoded.ok) {
+    return { error: "Die Datei konnte nicht als gültiges Bild verarbeitet werden." };
+  }
+
+  const buffer = reEncoded.buffer;
+
+  if (buffer.byteLength > MAX_IMAGE_SIZE_BYTES) {
+    return { error: "Das Bild darf höchstens 5 MB groß sein." };
+  }
+
+  const storagePath = `${tenantId}/${randomUUID()}.${REENCODED_EXTENSION}`;
 
   const { error: uploadError } = await supabase.storage
     .from("dish-media")
-    .upload(storagePath, buffer, { contentType: file.type, upsert: false });
+    .upload(storagePath, buffer, { contentType: REENCODED_CONTENT_TYPE, upsert: false });
 
   if (uploadError) {
     return { error: "Das Bild konnte nicht hochgeladen werden." };
@@ -642,8 +701,8 @@ export async function uploadDishImageAction(
     .insert({
       tenant_id: tenantId,
       storage_path: storagePath,
-      content_type: file.type,
-      size_bytes: file.size,
+      content_type: REENCODED_CONTENT_TYPE,
+      size_bytes: buffer.byteLength,
       alt_text: altText,
       created_by_user_id: user?.id ?? null,
     })
@@ -680,9 +739,96 @@ export async function uploadDishImageAction(
     action: "dish.image_uploaded",
     targetType: "dish",
     targetId: dishId,
-    metadata: { mediaAssetId: mediaAsset.id, contentType: file.type, sizeBytes: file.size },
+    metadata: {
+      mediaAssetId: mediaAsset.id,
+      contentType: REENCODED_CONTENT_TYPE,
+      sizeBytes: buffer.byteLength,
+    },
   });
 
   revalidateDish(dishId);
   return { success: "Bild wurde hochgeladen." };
+}
+
+/**
+ * Ticket #58 ("Manuelle Nacherfassung von Verkäufen"): logs a sale that
+ * happened outside this platform's own order/payment system (e.g.
+ * Lieferando, walk-in without the ordering system) against one dish.
+ * Structurally separate from real orders -- this ONLY ever inserts into
+ * `manual_sales_entries` (a brand-new, dedicated table), never into
+ * `orders`/`order_items`/`payments`. `entered_by_user_id` is resolved from
+ * the authenticated session server-side, never taken from the client.
+ * `tenant_id` likewise always comes from the caller's own resolved
+ * membership -- never a client-supplied value -- and the underlying table's
+ * RLS INSERT policy independently re-checks `analytics.manualsales.write`
+ * as the second enforcement layer (see the migration header comment).
+ */
+export async function recordManualSaleAction(
+  _prevState: DishActionState,
+  formData: FormData,
+): Promise<DishActionState> {
+  const dishId = String(formData.get("dishId") ?? "");
+  const parsed = ManualSaleEntrySchema.safeParse({
+    quantity: formData.get("quantity"),
+    saleDate: formData.get("saleDate"),
+    channel: formData.get("channel") ?? "",
+  });
+
+  if (!dishId || !parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.success ? [] : parsed.error.issues) {
+      const field = issue.path[0];
+      if (typeof field === "string") fieldErrors[field] = issue.message;
+    }
+    return { error: "Bitte korrigieren Sie die markierten Felder.", fieldErrors };
+  }
+
+  const { supabase, tenantId, user } = await requireMenuWriteContext();
+  const denied = await ensureManualSalesPermission(supabase, tenantId);
+  if (denied) return denied;
+
+  // Defense in depth: `dishId` is client-supplied (hidden form field). The
+  // FK on `manual_sales_entries.dish_id` only checks that SOME dish exists,
+  // not that it belongs to this tenant, so without this explicit check a
+  // tampered request could log a manual sale against another tenant's dish
+  // (cross-tenant reference -- see tenant-isolation rule). Mirrors the
+  // `.eq("tenant_id", tenantId)` guard every other dish mutation in this file
+  // already applies.
+  const { data: dishRow } = await supabase
+    .from("dishes")
+    .select("id")
+    .eq("id", dishId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (!dishRow) {
+    return { error: "Gericht wurde nicht gefunden." };
+  }
+
+  const channel = parsed.data.channel?.trim() || null;
+
+  const { error } = await supabase.from("manual_sales_entries").insert({
+    tenant_id: tenantId,
+    dish_id: dishId,
+    quantity: parsed.data.quantity,
+    sale_date: parsed.data.saleDate,
+    channel,
+    entered_by_user_id: user?.id ?? null,
+  });
+
+  if (error) {
+    return { error: "Der Verkauf konnte nicht nachgetragen werden." };
+  }
+
+  await recordMenuAdminAuditEvent(supabase, {
+    tenantId,
+    actorUserId: user?.id ?? null,
+    action: "dish.manual_sale_recorded",
+    targetType: "dish",
+    targetId: dishId,
+    metadata: { quantity: parsed.data.quantity, saleDate: parsed.data.saleDate, channel },
+  });
+
+  revalidateDish(dishId);
+  return { success: "Verkauf wurde nachgetragen." };
 }

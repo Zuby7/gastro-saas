@@ -26,14 +26,14 @@ export function OpeningHoursForm({ initial }: { initial: OpeningHourInitialValue
   const [state, formAction, isPending] = useActionState(saveOpeningHoursAction, initialState);
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-neutral-0 p-5 shadow-sm">
+    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Öffnungszeiten</h2>
 
       {state.error ? (
         <p
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-600"
+          className="rounded-md border border-danger-500 bg-danger-500/10 p-3 text-sm text-danger-foreground"
         >
           {state.error}
         </p>
@@ -42,7 +42,7 @@ export function OpeningHoursForm({ initial }: { initial: OpeningHourInitialValue
         <p
           role="status"
           aria-live="polite"
-          className="rounded-md border border-neutral-300 bg-neutral-100 p-3 text-sm text-foreground"
+          className="rounded-md border border-neutral-300 bg-surface-muted p-3 text-sm text-foreground"
         >
           {state.success}
         </p>
@@ -52,7 +52,7 @@ export function OpeningHoursForm({ initial }: { initial: OpeningHourInitialValue
         {initial.map((row) => (
           <fieldset
             key={row.weekday}
-            className="grid grid-cols-1 items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-3 sm:grid-cols-4"
+            className="grid grid-cols-1 items-center gap-2 rounded-md border border-neutral-200 bg-surface-secondary p-3 sm:grid-cols-4"
           >
             <legend className="sr-only">{WEEKDAY_LABELS[row.weekday]}</legend>
             <span className="font-medium text-foreground">{WEEKDAY_LABELS[row.weekday]}</span>
@@ -91,12 +91,12 @@ export function OpeningHoursForm({ initial }: { initial: OpeningHourInitialValue
             </div>
 
             {state.fieldErrors?.[`opensAt-${row.weekday}`] ? (
-              <span className="text-sm text-danger-600 sm:col-span-4">
+              <span className="text-sm text-danger-foreground sm:col-span-4">
                 {state.fieldErrors[`opensAt-${row.weekday}`]}
               </span>
             ) : null}
             {state.fieldErrors?.[`closesAt-${row.weekday}`] ? (
-              <span className="text-sm text-danger-600 sm:col-span-4">
+              <span className="text-sm text-danger-foreground sm:col-span-4">
                 {state.fieldErrors[`closesAt-${row.weekday}`]}
               </span>
             ) : null}

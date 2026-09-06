@@ -3,8 +3,11 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
-import { getDishPerformanceAnalysis } from "@/lib/analytics/dish-performance-service";
-import type { DishPerformanceLabel, DishPerformanceResult } from "@gastro-saas/domain";
+import {
+  getDishPerformanceAnalysis,
+  type DishPerformanceWithManualSales,
+} from "@/lib/analytics/dish-performance-service";
+import type { DishPerformanceLabel } from "@gastro-saas/domain";
 
 const LABEL_TEXT: Record<DishPerformanceLabel, string> = {
   topseller: "Topseller",
@@ -64,7 +67,7 @@ export default async function DishPerformancePage() {
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return (
-        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-neutral-50 p-8">
+        <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-surface-secondary p-8">
           <p role="alert" className="text-foreground">
             Sie haben nicht die erforderliche Berechtigung, um die Gerichte-Analyse einzusehen.
           </p>
@@ -85,7 +88,7 @@ export default async function DishPerformancePage() {
   const byRevenue = [...dishes].sort((a, b) => a.revenueRank - b.revenueRank);
 
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-surface-secondary">
       <div className="mx-auto flex max-w-5xl flex-col gap-6 p-8">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-2xl font-semibold text-foreground">
@@ -107,7 +110,7 @@ export default async function DishPerformancePage() {
         </p>
 
         {dishes.length === 0 ? (
-          <p className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-foreground">
+          <p className="rounded-lg border border-neutral-200 bg-surface p-6 text-sm text-foreground">
             Noch keine veröffentlichten Gerichte oder noch keine Daten für diesen Zeitraum.
           </p>
         ) : (
@@ -115,7 +118,7 @@ export default async function DishPerformancePage() {
             {dishes.every((dish) => dish.viewsCount === 0 && dish.addToCartCount === 0) ? (
               <p
                 role="status"
-                className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-foreground"
+                className="rounded-lg border border-neutral-200 bg-surface p-6 text-sm text-foreground"
               >
                 Die Spalten &quot;Aufrufe&quot; und &quot;Warenkorb-Hinzufügungen&quot; sind noch
                 nicht verfügbar: Es gibt aktuell keine Erfassung von Gericht-Aufrufen oder
@@ -148,16 +151,21 @@ function DishPerformanceTable({
 }: {
   headingId: string;
   heading: string;
-  dishes: DishPerformanceResult[];
+  dishes: DishPerformanceWithManualSales[];
 }) {
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-6"
+      className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-6"
     >
       <h2 id={headingId} className="text-lg font-medium text-foreground">
         {heading}
       </h2>
+      <p className="text-sm text-foreground-secondary">
+        Ranking und Kennzeichnung basieren ausschließlich auf echten Bestelldaten. Die Spalten
+        &quot;Manuell nachgetragen&quot; zeigen zusätzlich, klar getrennt, außerhalb des
+        Bestellsystems erfasste Verkäufe (nicht Teil des Rankings).
+      </p>
       <table className="w-full text-left text-sm text-foreground">
         <caption className="sr-only">{heading}</caption>
         <thead>
@@ -183,6 +191,12 @@ function DishPerformanceTable({
             <th scope="col" className="py-1">
               Conversion
             </th>
+            <th scope="col" className="py-1">
+              Manuell nachgetragen (Menge)
+            </th>
+            <th scope="col" className="py-1">
+              Manuell nachgetragen (geschätzter Umsatz)
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -195,6 +209,10 @@ function DishPerformanceTable({
               <td className="py-1">{dish.viewsCount}</td>
               <td className="py-1">{dish.addToCartCount}</td>
               <td className="py-1">{formatConversion(dish.conversionRate)}</td>
+              <td className="py-1">{dish.manualUnitsSold}</td>
+              <td className="py-1">
+                {formatMoney(dish.manualEstimatedRevenueCents, dish.currency)}
+              </td>
             </tr>
           ))}
         </tbody>

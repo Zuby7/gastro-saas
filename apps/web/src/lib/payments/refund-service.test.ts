@@ -45,7 +45,7 @@ interface FakeRefundRow {
 interface State {
   payment: FakePayment | null;
   refunds: FakeRefundRow[];
-  refundsInsertError: { message: string; hint?: string } | null;
+  refundsInsertError: { message: string; hint?: string; code?: string } | null;
   refundIdCounter: number;
 }
 
@@ -163,6 +163,7 @@ describe("issueRefundForOrder", () => {
       actorUserId: "user-1",
       amountCents: 2000,
       reason: "Kunde unzufrieden",
+      requestToken: "11111111-1111-4111-8111-111111111111",
     });
 
     expect(result.stripeRefundId).toBe("re_test_abc");
@@ -174,6 +175,7 @@ describe("issueRefundForOrder", () => {
       currency: "EUR",
       reason: "Kunde unzufrieden",
       actor_user_id: "user-1",
+      request_token: "11111111-1111-4111-8111-111111111111",
       status: "pending",
     });
 
@@ -216,6 +218,7 @@ describe("issueRefundForOrder", () => {
       actorUserId: "user-1",
       amountCents: 500,
       reason: "Ein Gericht fehlte",
+      requestToken: "11111111-1111-4111-8111-111111111111",
     });
 
     expect(result.amountCents).toBe(500);
@@ -245,6 +248,7 @@ describe("issueRefundForOrder", () => {
       actorUserId: "user-1",
       amountCents: 1300,
       reason: "Rest erstatten",
+      requestToken: "11111111-1111-4111-8111-111111111111",
     });
 
     expect(result.amountCents).toBe(1300);
@@ -274,6 +278,7 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 500,
         reason: "Zu viel verlangt",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toBeInstanceOf(RefundExceedsRemainingAmountError);
 
@@ -292,6 +297,7 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 5000,
         reason: "zu viel",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toBeInstanceOf(RefundExceedsRemainingAmountError);
     expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
@@ -310,6 +316,7 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 100,
         reason: "grund",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toBeInstanceOf(RefundExceedsRemainingAmountError);
     expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
@@ -346,6 +353,7 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 100,
         reason: "zweiter Versuch",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toBeInstanceOf(RefundAwaitingReconciliationError);
 
@@ -369,6 +377,7 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 100,
         reason: "zweiter Versuch",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toBeInstanceOf(RefundAwaitingReconciliationError);
 
@@ -387,6 +396,7 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 100,
         reason: "grund",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toBeInstanceOf(PaymentNotRefundableError);
     expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
@@ -408,6 +418,7 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 500,
         reason: "grund",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toThrow(/nicht bestätigt werden/);
 
@@ -435,6 +446,7 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 2000,
         reason: "grund",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toThrow(/nicht durchgeführt werden/);
 
@@ -465,6 +477,7 @@ describe("issueRefundForOrder", () => {
       actorUserId: "user-1",
       amountCents: 2000,
       reason: "erneuter Versuch",
+      requestToken: "11111111-1111-4111-8111-111111111111",
     });
     expect(retryResult.stripeRefundId).toBe("re_retry");
   });
@@ -485,6 +498,7 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 2000,
         reason: "grund",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toThrow(/nicht bestätigt werden/);
 
@@ -520,11 +534,58 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 1,
         reason: "erneuter Versuch",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toBeInstanceOf(RefundAwaitingReconciliationError);
     // Still only the one Stripe call from the original ambiguous attempt --
     // the retry must never reach Stripe at all.
     expect(stripeRefundsCreateMock).toHaveBeenCalledTimes(1);
+  });
+
+  // Issue #97, risk:payment: two rapid double-clicked submissions carry the
+  // SAME client-generated request token -- the unique index on
+  // refunds(payment_id, request_token) rejects the repeat INSERT (surfaced
+  // here as a 23505 unique-violation from the fake insert), so only one
+  // refund is ever created and Stripe is called at most once.
+  it("rejects a second refund insert carrying the same request_token for the same payment (double-click), without calling Stripe again", async () => {
+    state.refundsInsertError = {
+      message:
+        'duplicate key value violates unique constraint "refunds_payment_id_request_token_idx"',
+      code: "23505",
+    };
+
+    const { issueRefundForOrder, DuplicateRefundRequestError } = await import("./refund-service");
+
+    await expect(
+      issueRefundForOrder(fakeSupabase() as never, {
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        actorUserId: "user-1",
+        amountCents: 500,
+        reason: "Doppelklick",
+        requestToken: "22222222-2222-4222-8222-222222222222",
+      }),
+    ).rejects.toBeInstanceOf(DuplicateRefundRequestError);
+
+    expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid (non-UUID) request token before ever touching the database", async () => {
+    const { issueRefundForOrder, RefundInvalidRequestTokenError } =
+      await import("./refund-service");
+
+    await expect(
+      issueRefundForOrder(fakeSupabase() as never, {
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        actorUserId: "user-1",
+        amountCents: 500,
+        reason: "grund",
+        requestToken: "not-a-uuid",
+      }),
+    ).rejects.toBeInstanceOf(RefundInvalidRequestTokenError);
+    expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
+    expect(insertedRefund).toBeUndefined();
   });
 
   it("rejects a zero or negative refund amount before ever touching the database", async () => {
@@ -537,6 +598,7 @@ describe("issueRefundForOrder", () => {
         actorUserId: "user-1",
         amountCents: 0,
         reason: "grund",
+        requestToken: "11111111-1111-4111-8111-111111111111",
       }),
     ).rejects.toBeInstanceOf(RefundInvalidAmountError);
     expect(stripeRefundsCreateMock).not.toHaveBeenCalled();
@@ -561,6 +623,7 @@ describe("issueRefundForOrder", () => {
       actorUserId: "user-1",
       amountCents: 2000,
       reason: "grund",
+      requestToken: "11111111-1111-4111-8111-111111111111",
     });
 
     expect(result.stripeRefundId).toBe("re_test_abc");

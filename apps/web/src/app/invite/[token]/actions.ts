@@ -14,7 +14,7 @@ export async function acceptInvitationAction(
 ): Promise<AcceptInvitationFormState> {
   const token = String(formData.get("token") ?? "");
   if (!token) {
-    return { error: "Der Einladungslink ist ungÃ¼ltig." };
+    return { error: "Der Einladungslink ist ungültig." };
   }
 
   const supabase = await createSupabaseServerClient();
