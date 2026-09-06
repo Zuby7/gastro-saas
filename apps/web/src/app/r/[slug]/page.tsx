@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
 import { resolveTenantIdBySlug } from "@/lib/cart/service";
-import { recordMenuViewOnce } from "@/lib/menu-view/service";
+import { recordDishViewsOnce, recordMenuViewOnce } from "@/lib/menu-view/service";
 import { getPublicMenu } from "@/lib/public-menu/fetch";
 import { loadCartViewForDisplay } from "./cart/actions";
 import { CategoryNav } from "./category-nav";
@@ -30,6 +30,16 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
   const tenantId = await resolveTenantIdBySlug(slug);
   if (tenantId) {
     await recordMenuViewOnce(slug, tenantId);
+
+    // Ticket #120 part B: record a rate-limited/deduplicated dish_view event
+    // for every dish shown on this render, resolving both tenant_id and dish
+    // ids server-side from the already-fetched (never client-supplied) menu.
+    // A single batched RPC call (not one call per dish -- see
+    // `recordDishViewsOnce`'s own comment, PR #136 Opus finding: one call
+    // per dish previously took one advisory lock per dish, serializing in
+    // Postgres and blocking TTFB on this SEO-critical page).
+    const dishIds = menu.categories.flatMap((category) => category.dishes.map((dish) => dish.id));
+    await recordDishViewsOnce(slug, tenantId, dishIds);
   }
 
   return (

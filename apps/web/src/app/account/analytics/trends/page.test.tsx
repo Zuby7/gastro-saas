@@ -173,6 +173,29 @@ describe("TrendsAndExtrasPage (ticket #32)", () => {
     expect(screen.getByText(/noch nicht verfügbar/)).toBeInTheDocument();
   });
 
+  it("never renders a raw Postgres error message, only the mapped German text (ticket #120)", async () => {
+    getUserMock.mockResolvedValueOnce({ data: { user: { id: "user-1" } } });
+    fromMock.mockReturnValueOnce(
+      membershipQueryChain({ data: { tenant_id: "tenant-1", role: "owner" } }),
+    );
+    rpcMock.mockResolvedValueOnce({ data: null, error: null });
+    const rawPostgresMessage =
+      'new row for relation "orders" violates check constraint "orders_status_check" (SQLSTATE 23514)';
+    getTrendComparisonMock.mockRejectedValueOnce(new Error(rawPostgresMessage));
+    getExtrasPerformanceMock.mockResolvedValueOnce([]);
+
+    const { default: TrendsAndExtrasPage } = await import("./page");
+    const element = await TrendsAndExtrasPage({ searchParams: Promise.resolve({}) });
+    render(element);
+
+    expect(
+      screen.getByText("Der Zeitraumvergleich konnte nicht geladen werden."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(rawPostgresMessage)).not.toBeInTheDocument();
+    expect(screen.queryByText(/SQLSTATE/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/check constraint/)).not.toBeInTheDocument();
+  });
+
   it("prompts for start/end dates instead of calling the RPC when period=custom and dates are missing", async () => {
     getUserMock.mockResolvedValueOnce({ data: { user: { id: "user-1" } } });
     fromMock.mockReturnValueOnce(

@@ -10,6 +10,20 @@ function hashIp(ip: string): string {
 }
 
 /**
+ * Resolves the rate-limit bucket hash for a request. `getClientIp()` returns
+ * the literal string "unknown" (and warns) when neither cf-connecting-ip nor
+ * x-forwarded-for resolved -- if that were hashed and used as-is, EVERY such
+ * visitor would share one (tenant_id, ip_hash) rate-limit bucket, capping the
+ * whole tenant's budget instead of per-visitor (Opus finding, PR #129, and
+ * the same defect reintroduced in the dish-view/add-to-cart recorders below,
+ * PR #136 repair cycle). Falls back to the session token's own hash so each
+ * anonymous browser still gets its own independent bucket.
+ */
+function resolveRateLimitBucketHash(ip: string, sessionTokenHash: string): string {
+  return ip === "unknown" ? hashIp(`session-fallback:${sessionTokenHash}`) : hashIp(ip);
+}
+
+/**
  * Records one rate-limited, deduplicated `menu_viewed` analytics event for
  * `tenantSlug`, if this browser hasn't already recorded one for this tenant
  * today (see `record_menu_view()`,
@@ -37,16 +51,7 @@ export async function recordMenuViewOnce(tenantSlug: string, tenantId: string): 
 
     const sessionTokenHash = hashMenuViewToken(token);
     const ip = await getClientIp();
-    // `getClientIp()` returns the literal string "unknown" (and warns) when
-    // neither cf-connecting-ip nor x-forwarded-for resolved -- if that were
-    // hashed and used as-is, EVERY such visitor would share one
-    // (tenant_id, ip_hash) rate-limit bucket, capping the whole tenant at
-    // MENU_VIEW_IP_RATE_LIMIT_MAX events total instead of per-visitor (Opus
-    // finding, PR #129). Fall back to the session token's own hash as the
-    // rate-limit bucket key in that case, so each anonymous browser still
-    // gets its own independent bucket, same as it would with a real,
-    // distinct IP.
-    const ipHash = ip === "unknown" ? hashIp(`session-fallback:${sessionTokenHash}`) : hashIp(ip);
+    const ipHash = resolveRateLimitBucketHash(ip, sessionTokenHash);
 
     const admin = createSupabaseAdminClient();
     const { error } = await admin.rpc("record_menu_view", {
@@ -60,5 +65,139 @@ export async function recordMenuViewOnce(tenantSlug: string, tenantId: string): 
     }
   } catch (error) {
     console.error("[menu-view] recordMenuViewOnce failed", error);
+  }
+}
+
+/**
+ * Records one rate-limited, deduplicated `dish_view` analytics event for a
+ * single dish, mirroring `recordMenuViewOnce()` exactly (see
+ * `record_dish_view()`,
+ * supabase/migrations/20260906091000_dish_view_and_add_to_cart_analytics.sql).
+ *
+ * Reuses the same per-tenant menu-view session cookie as `recordMenuViewOnce`
+ * (ticket #67) -- both are "this anonymous browser session on this tenant's
+ * public menu today" signals. `tenantId`/`dishId` must already be resolved
+ * server-side (never client-supplied without independent verification).
+ * Never throws: analytics is best-effort and must never break menu
+ * rendering for a real visitor.
+ */
+export async function recordDishViewOnce(
+  tenantSlug: string,
+  tenantId: string,
+  dishId: string,
+): Promise<void> {
+  try {
+    const token = await readMenuViewToken(tenantSlug);
+    if (!token) {
+      return;
+    }
+
+    const ip = await getClientIp();
+    const sessionTokenHash = hashMenuViewToken(token);
+    const admin = createSupabaseAdminClient();
+    const { error } = await admin.rpc("record_dish_view", {
+      p_tenant_id: tenantId,
+      p_dish_id: dishId,
+      p_session_token_hash: sessionTokenHash,
+      p_ip_hash: resolveRateLimitBucketHash(ip, sessionTokenHash),
+    });
+
+    if (error) {
+      console.error("[menu-view] record_dish_view failed", error);
+    }
+  } catch (error) {
+    console.error("[menu-view] recordDishViewOnce failed", error);
+  }
+}
+
+/**
+ * Records rate-limited, deduplicated `dish_view` analytics events for every
+ * dish id in `dishIds` in a SINGLE database round trip (see
+ * `record_dish_views()`,
+ * supabase/migrations/20260906130000_dish_views_batched_rpc_and_retention.sql).
+ *
+ * Replaces the previous `Promise.all(dishIds.map(recordDishViewOnce))`
+ * pattern at the public menu page's call site
+ * (`apps/web/src/app/r/[slug]/page.tsx`): that fired one RPC call per dish,
+ * each taking its own advisory lock on the SAME (tenant_id, ip_hash) key --
+ * for N dishes shown on one render, N calls serialize against each other in
+ * Postgres, directly blocking TTFB on the SEO-critical public menu page (PR
+ * #136 Opus finding). This function takes one lock, does one rate-limit
+ * count check, and does one bulk insert for the whole batch instead.
+ *
+ * `tenantId` must already be resolved server-side from the route slug, and
+ * `dishIds` must already come from that same tenant's already-fetched (never
+ * client-supplied) menu. Never throws: analytics is best-effort and must
+ * never break menu rendering for a real visitor.
+ */
+export async function recordDishViewsOnce(
+  tenantSlug: string,
+  tenantId: string,
+  dishIds: string[],
+): Promise<void> {
+  if (dishIds.length === 0) {
+    return;
+  }
+
+  try {
+    const token = await readMenuViewToken(tenantSlug);
+    if (!token) {
+      return;
+    }
+
+    const ip = await getClientIp();
+    const sessionTokenHash = hashMenuViewToken(token);
+    const admin = createSupabaseAdminClient();
+    const { error } = await admin.rpc("record_dish_views", {
+      p_tenant_id: tenantId,
+      p_dish_ids: dishIds,
+      p_session_token_hash: sessionTokenHash,
+      p_ip_hash: resolveRateLimitBucketHash(ip, sessionTokenHash),
+    });
+
+    if (error) {
+      console.error("[menu-view] record_dish_views failed", error);
+    }
+  } catch (error) {
+    console.error("[menu-view] recordDishViewsOnce failed", error);
+  }
+}
+
+/**
+ * Records one rate-limited, deduplicated `add_to_cart` analytics event for a
+ * single dish (see `record_add_to_cart_event()`,
+ * supabase/migrations/20260906091000_dish_view_and_add_to_cart_analytics.sql).
+ *
+ * Called from the `add_cart_item()` success path
+ * (`apps/web/src/app/r/[slug]/cart/actions.ts`'s `addToCartAction`), after
+ * the cart mutation itself has already succeeded -- never blocks or fails
+ * the cart action on an analytics error.
+ */
+export async function recordAddToCartEventOnce(
+  tenantSlug: string,
+  tenantId: string,
+  dishId: string,
+): Promise<void> {
+  try {
+    const token = await readMenuViewToken(tenantSlug);
+    if (!token) {
+      return;
+    }
+
+    const ip = await getClientIp();
+    const sessionTokenHash = hashMenuViewToken(token);
+    const admin = createSupabaseAdminClient();
+    const { error } = await admin.rpc("record_add_to_cart_event", {
+      p_tenant_id: tenantId,
+      p_dish_id: dishId,
+      p_session_token_hash: sessionTokenHash,
+      p_ip_hash: resolveRateLimitBucketHash(ip, sessionTokenHash),
+    });
+
+    if (error) {
+      console.error("[menu-view] record_add_to_cart_event failed", error);
+    }
+  } catch (error) {
+    console.error("[menu-view] recordAddToCartEventOnce failed", error);
   }
 }
