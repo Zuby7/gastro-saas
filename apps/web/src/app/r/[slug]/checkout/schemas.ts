@@ -21,11 +21,19 @@ const customerNote = z
   .optional()
   .transform((value) => value ?? "");
 
+// Ticket #146: explicit consent to the tenant's AGB/Datenschutzerklärung,
+// required before an order can be placed -- checked server-side (never just
+// the checkbox's `required` HTML attribute).
+const acceptTerms = z.string().refine((value) => value === "on", {
+  message: "Bitte akzeptieren Sie die AGB und die Datenschutzerklärung, um zu bestellen.",
+});
+
 export const CheckoutSchema = z.discriminatedUnion("fulfillmentType", [
   z.object({
     fulfillmentType: z.literal("pickup"),
     customerName,
     customerNote,
+    acceptTerms,
     customerPhone: z
       .string()
       .trim()
@@ -37,6 +45,7 @@ export const CheckoutSchema = z.discriminatedUnion("fulfillmentType", [
     fulfillmentType: z.literal("table"),
     customerName,
     customerNote,
+    acceptTerms,
     tableIdentifier: z
       .string()
       .trim()

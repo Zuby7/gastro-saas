@@ -63,7 +63,20 @@ describe("CheckoutForm accessibility", () => {
   it("shows a privacy notice linking to the tenant's Datenschutzerklärung before submission", () => {
     render(<CheckoutForm tenantSlug="demo" checkoutReady />);
 
-    const link = screen.getByRole("link", { name: "Datenschutzerklärung" });
-    expect(link).toHaveAttribute("href", "/r/demo/datenschutz");
+    const links = screen.getAllByRole("link", { name: "Datenschutzerklärung" });
+    expect(links.some((link) => link.getAttribute("href") === "/r/demo/datenschutz")).toBe(true);
+  });
+
+  // Ticket #146: required, labeled consent checkbox linking to both the
+  // tenant's AGB (incl. Widerrufsrecht) and Datenschutzerklärung.
+  it("requires an explicit AGB/Datenschutz consent checkbox before submission, linking to both pages", () => {
+    render(<CheckoutForm tenantSlug="demo" checkoutReady />);
+
+    const checkbox = screen.getByRole("checkbox", { name: /AGB.*Datenschutzerklärung/ });
+    expect(checkbox).toBeRequired();
+    expect(checkbox).not.toBeChecked();
+
+    const agbLink = screen.getByRole("link", { name: "AGB" });
+    expect(agbLink).toHaveAttribute("href", "/r/demo/agb");
   });
 });

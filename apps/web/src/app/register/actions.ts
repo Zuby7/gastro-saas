@@ -12,7 +12,9 @@ export interface RegisterFormState {
   error?: string;
   /** Non-error informational message (e.g. "check your email to confirm"). */
   info?: string;
-  fieldErrors?: Partial<Record<"tenantName" | "tenantSlug" | "email" | "password", string>>;
+  fieldErrors?: Partial<
+    Record<"tenantName" | "tenantSlug" | "email" | "password" | "acceptTerms", string>
+  >;
 }
 
 /**
@@ -31,6 +33,7 @@ export async function registerAction(
     tenantSlug: formData.get("tenantSlug"),
     email: formData.get("email"),
     password: formData.get("password"),
+    acceptTerms: formData.get("acceptTerms") ?? "",
   });
 
   if (!parsed.success) {

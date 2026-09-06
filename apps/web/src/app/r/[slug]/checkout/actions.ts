@@ -34,6 +34,7 @@ export async function checkoutAction(
     customerPhone: formData.get("customerPhone") ?? "",
     tableIdentifier: formData.get("tableIdentifier") ?? "",
     customerNote: formData.get("customerNote") ?? "",
+    acceptTerms: formData.get("acceptTerms") ?? "",
   });
 
   if (!parsed.success) {

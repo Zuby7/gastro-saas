@@ -15,6 +15,7 @@ interface RestaurantProfileRow {
   brand_color: string;
   legal_imprint_text: string;
   legal_privacy_text: string;
+  legal_terms_text: string;
 }
 
 interface OpeningHourRow {
@@ -68,7 +69,7 @@ export default async function ProfilePage() {
   const { data: profile } = await supabase
     .from("restaurant_profiles")
     .select(
-      "display_name, description, contact_email, phone, timezone, brand_color, legal_imprint_text, legal_privacy_text",
+      "display_name, description, contact_email, phone, timezone, brand_color, legal_imprint_text, legal_privacy_text, legal_terms_text",
     )
     .eq("tenant_id", membership.tenantId)
     .maybeSingle<RestaurantProfileRow>();
@@ -89,6 +90,7 @@ export default async function ProfilePage() {
     brandColor: profile?.brand_color ?? "#166534",
     legalImprintText: profile?.legal_imprint_text ?? "",
     legalPrivacyText: profile?.legal_privacy_text ?? "",
+    legalTermsText: profile?.legal_terms_text ?? "",
   };
 
   const hoursByWeekday = new Map((hours ?? []).map((row) => [row.weekday, row]));
@@ -114,6 +116,23 @@ export default async function ProfilePage() {
             Zurück
           </Link>
         </div>
+
+        {/*
+          Ticket #146, acceptance criterion 6: reminder that the Impressum
+          free text (ticket #41) must actually carry the legally-required
+          business details, plus a reminder about image rights for
+          dish-photo uploads (see also
+          `image-upload-form.tsx`'s inline hint). Purely informational --
+          the Impressum text itself remains free text and is not validated
+          for completeness (technically not checkable).
+        */}
+        <p className="rounded-md border border-neutral-300 bg-surface-muted p-3 text-sm text-foreground-secondary">
+          Bitte tragen Sie im Impressum-Feld unten vollständige Geschäftsangaben ein (Firmenname,
+          Anschrift, Vertretungsberechtigte, ggf. Handelsregisternummer, Kontaktdaten) — das ist
+          Ihre gesetzliche Impressumspflicht (§ 5 TMG), nicht die des Betreibers dieser Plattform.
+          Laden Sie außerdem nur Gerichte-Fotos hoch, die Sie selbst erstellt haben oder für die Sie
+          die Nutzungsrechte besitzen.
+        </p>
 
         <ProfileForm initial={profileInitial} />
         <OpeningHoursForm initial={hoursInitial} />

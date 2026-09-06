@@ -20,7 +20,8 @@ export interface ProfileFormState {
       | "timezone"
       | "brandColor"
       | "legalImprintText"
-      | "legalPrivacyText",
+      | "legalPrivacyText"
+      | "legalTermsText",
       string
     >
   >;
@@ -51,6 +52,7 @@ export async function saveProfileAction(
     brandColor: formData.get("brandColor"),
     legalImprintText: formData.get("legalImprintText") ?? "",
     legalPrivacyText: formData.get("legalPrivacyText") ?? "",
+    legalTermsText: formData.get("legalTermsText") ?? "",
   });
 
   if (!parsed.success) {
@@ -98,6 +100,7 @@ export async function saveProfileAction(
       brand_color: parsed.data.brandColor,
       legal_imprint_text: parsed.data.legalImprintText,
       legal_privacy_text: parsed.data.legalPrivacyText,
+      legal_terms_text: parsed.data.legalTermsText,
       updated_by_user_id: user.id,
     },
     { onConflict: "tenant_id" },

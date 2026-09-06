@@ -81,6 +81,7 @@ function validFormData(): FormData {
   fd.set("customerPhone", "");
   fd.set("tableIdentifier", "");
   fd.set("customerNote", "");
+  fd.set("acceptTerms", "on");
   return fd;
 }
 
@@ -208,5 +209,18 @@ describe("checkoutAction", () => {
 
     await expect(checkoutAction("demo", {}, validFormData())).rejects.toThrow("NEXT_REDIRECT:");
     expect(createOrderFromCartMock).toHaveBeenCalledOnce();
+  });
+
+  // Ticket #146: explicit AGB/Datenschutz consent is required server-side,
+  // not just enforced by the checkbox's `required` HTML attribute.
+  it("rejects checkout when the AGB/Datenschutz consent checkbox was not accepted", async () => {
+    const fd = validFormData();
+    fd.set("acceptTerms", "");
+
+    const { checkoutAction } = await import("./actions");
+    const result = await checkoutAction("demo", {}, fd);
+
+    expect(result.error).toContain("akzeptieren");
+    expect(createOrderFromCartMock).not.toHaveBeenCalled();
   });
 });

@@ -27,6 +27,7 @@ export const ProfileSchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/, "Bitte geben Sie eine gültige Hex-Farbe an (z. B. #166534)."),
   legalImprintText: z.string().trim().max(20000, "Der Impressum-Text ist zu lang.").default(""),
   legalPrivacyText: z.string().trim().max(20000, "Der Datenschutz-Text ist zu lang.").default(""),
+  legalTermsText: z.string().trim().max(20000, "Der AGB-Text ist zu lang.").default(""),
 });
 
 export type ProfileInput = z.infer<typeof ProfileSchema>;

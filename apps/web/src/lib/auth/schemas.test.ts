@@ -8,6 +8,7 @@ describe("RegisterSchema", () => {
       tenantSlug: "trattoria-da-mario",
       email: "Owner@Example.com",
       password: "Sup3rSecurePassw0rd!",
+      acceptTerms: "on",
     });
 
     expect(result.success).toBe(true);
@@ -15,6 +16,19 @@ describe("RegisterSchema", () => {
       // Normalized: trimmed + lowercased.
       expect(result.data.email).toBe("owner@example.com");
     }
+  });
+
+  // Ticket #146: explicit AGB/Datenschutz consent is required.
+  it("rejects a payload where the AGB/Datenschutz consent checkbox was not checked", () => {
+    expect(
+      RegisterSchema.safeParse({
+        tenantName: "Trattoria Da Mario",
+        tenantSlug: "trattoria-da-mario",
+        email: "owner@example.com",
+        password: "Sup3rSecurePassw0rd!",
+        acceptTerms: "",
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects a slug with uppercase letters or invalid characters", () => {

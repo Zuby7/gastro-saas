@@ -40,6 +40,12 @@ if (!dbAvailable) {
  * columns (reusing that table's existing RLS), the dedicated public
  * `get_public_legal_page()` read function, and the two new non-blocking
  * publish-check warnings.
+ *
+ * Also covers ticket #146's extension
+ * (`supabase/migrations/20260906160000_legal_pages_agb_widerruf.sql`): the
+ * new `legal_terms_text` column (AGB/Widerrufsrecht), the `terms` page kind
+ * on `get_public_legal_page()`, and the `terms-text-missing` publish-check
+ * warning -- same RLS/pattern, no new policy needed.
  */
 describe.skipIf(!dbAvailable)("Impressum/Datenschutz legal pages", () => {
   const admin = new Client({ connectionString: DB_URL });
@@ -139,6 +145,25 @@ describe.skipIf(!dbAvailable)("Impressum/Datenschutz legal pages", () => {
     ).rejects.toThrow(/Unknown legal page/i);
   });
 
+  it("get_public_legal_page() returns the AGB/Widerruf text for the 'terms' page kind (ticket #146)", async () => {
+    fixture = await seedTwoTenantFixture(admin);
+    const { tenantA } = fixture;
+
+    await admin.query(
+      `insert into restaurant_profiles (tenant_id, display_name, legal_terms_text)
+       values ($1, 'Mario', 'AGB-Text inkl. Widerrufsrecht')`,
+      [tenantA.tenantId],
+    );
+
+    const terms = await admin.query<{
+      get_public_legal_page: { tenantName: string; text: string };
+    }>(`select get_public_legal_page($1, 'terms') as get_public_legal_page`, [tenantA.slug]);
+    expect(terms.rows[0]?.get_public_legal_page).toEqual({
+      tenantName: "Mario",
+      text: "AGB-Text inkl. Widerrufsrecht",
+    });
+  });
+
   it("raises non-blocking publish-check warnings when Impressum/Datenschutz text is missing, and clears them once filled in", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA } = fixture;
@@ -177,6 +202,7 @@ describe.skipIf(!dbAvailable)("Impressum/Datenschutz legal pages", () => {
       expect.arrayContaining([
         expect.objectContaining({ severity: "warning", code: "imprint-text-missing" }),
         expect.objectContaining({ severity: "warning", code: "privacy-text-missing" }),
+        expect.objectContaining({ severity: "warning", code: "terms-text-missing" }),
       ]),
     );
     // Never a blocker -- the menu must still be publishable.
@@ -194,11 +220,12 @@ describe.skipIf(!dbAvailable)("Impressum/Datenschutz legal pages", () => {
     await queryAsUser(
       admin,
       tenantA.ownerId,
-      `insert into restaurant_profiles (tenant_id, display_name, legal_imprint_text, legal_privacy_text, updated_by_user_id)
-       values ($1, 'Mario', 'Mario GmbH, Musterstr. 1', 'Wir verarbeiten Ihre Daten gemäß DSGVO.', $2)
+      `insert into restaurant_profiles (tenant_id, display_name, legal_imprint_text, legal_privacy_text, legal_terms_text, updated_by_user_id)
+       values ($1, 'Mario', 'Mario GmbH, Musterstr. 1', 'Wir verarbeiten Ihre Daten gemäß DSGVO.', 'AGB-Text inkl. Widerrufsrecht', $2)
        on conflict (tenant_id) do update
          set legal_imprint_text = excluded.legal_imprint_text,
-             legal_privacy_text = excluded.legal_privacy_text`,
+             legal_privacy_text = excluded.legal_privacy_text,
+             legal_terms_text = excluded.legal_terms_text`,
       [tenantA.tenantId, tenantA.ownerId],
     );
 
@@ -212,6 +239,7 @@ describe.skipIf(!dbAvailable)("Impressum/Datenschutz legal pages", () => {
       expect.arrayContaining([
         expect.objectContaining({ code: "imprint-text-missing" }),
         expect.objectContaining({ code: "privacy-text-missing" }),
+        expect.objectContaining({ code: "terms-text-missing" }),
       ]),
     );
   });
