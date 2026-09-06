@@ -324,7 +324,7 @@ describe.skipIf(!dbAvailable)(
     });
 
     // record_dish_views (batched, PR #136 review finding) --
-    // supabase/migrations/20260906100000_dish_views_batched_rpc_and_retention.sql
+    // supabase/migrations/20260906130000_dish_views_batched_rpc_and_retention.sql
     describe("record_dish_views (batched)", () => {
       async function recordDishViews(
         tenantId: string,

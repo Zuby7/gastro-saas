@@ -108,7 +108,7 @@ export async function recordDishViewOnce(
  * Records rate-limited, deduplicated `dish_view` analytics events for every
  * dish id in `dishIds` in a SINGLE database round trip (see
  * `record_dish_views()`,
- * supabase/migrations/20260906100000_dish_views_batched_rpc_and_retention.sql).
+ * supabase/migrations/20260906130000_dish_views_batched_rpc_and_retention.sql).
  *
  * Replaces the previous `Promise.all(dishIds.map(recordDishViewOnce))`
  * pattern at the public menu page's call site
