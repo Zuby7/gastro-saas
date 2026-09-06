@@ -103,6 +103,13 @@ describe("startStripeOnboardingAction", () => {
             upsertOptions = options;
             return { error: null };
           },
+          // Reconciliation read (issue #92 Opus review finding): no prior
+          // attempt has recorded a stripe_account_id yet.
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null }),
+            }),
+          }),
           update: (payload: unknown) => {
             updatedPayload = payload;
             return {
@@ -178,6 +185,15 @@ describe("startStripeOnboardingAction", () => {
             upsertCalls.push({ payload, options });
             return { error: null };
           },
+          // Reconciliation read (issue #92 Opus review finding): the
+          // provisioning row's stripe_account_id never got persisted by the
+          // first, failed attempt, so both the first attempt and the retry
+          // see it as still unset here -- Stripe itself must be called.
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null }),
+            }),
+          }),
           update: () => ({
             eq: async () => {
               updateCallCount += 1;
@@ -214,8 +230,10 @@ describe("startStripeOnboardingAction", () => {
     // account rather than creating a second, orphaned one.
     expect(createExpressAccountMock).toHaveBeenCalledTimes(2);
     const [firstCallArgs, secondCallArgs] = createExpressAccountMock.mock.calls;
-    expect(firstCallArgs[2]).toEqual({ idempotencyKey: "stripe-express-account:tenant-1" });
-    expect(secondCallArgs[2]).toEqual(firstCallArgs[2]);
+    expect(firstCallArgs).toBeDefined();
+    expect(secondCallArgs).toBeDefined();
+    expect(firstCallArgs![2]).toEqual({ idempotencyKey: "stripe-express-account:tenant-1" });
+    expect(secondCallArgs![2]).toEqual(firstCallArgs![2]);
 
     // Both attempts also (re-)upsert the same provisioning row -- the
     // second, ignoreDuplicates upsert is a no-op against the row the first
@@ -226,6 +244,70 @@ describe("startStripeOnboardingAction", () => {
       options: { onConflict: "tenant_id", ignoreDuplicates: true },
     });
     expect(upsertCalls[1]).toEqual(upsertCalls[0]);
+  });
+
+  it("issue #92 (Opus review finding): a provisioning row that already has a stripe_account_id from a prior attempt is reused, never re-created -- covers the >24h idempotency-key-expiry case where the caller's own session read is stale/misses it", async () => {
+    let adminUpdateCallCount = 0;
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") {
+        return membershipQueryBuilder({ data: { tenant_id: "tenant-1", role: "owner" } });
+      }
+      if (table === "payment_accounts") {
+        return {
+          select: () => ({
+            eq: () => ({
+              // The caller's own session-client read (done once, before
+              // phase 1) does not yet see the row -- simulating either a
+              // stale read or a prior, separate attempt racing ahead.
+              maybeSingle: async () => ({ data: null, error: null }),
+            }),
+          }),
+        };
+      }
+      return { insert: async () => ({ error: null }) };
+    });
+
+    adminFromMock.mockImplementation((table: string) => {
+      if (table === "payment_accounts") {
+        return {
+          upsert: async () => ({ error: null }),
+          // The reconciliation read done via the service-role client right
+          // before calling Stripe *does* see a stripe_account_id already
+          // recorded on the provisioning row -- e.g. from an attempt more
+          // than 24h ago whose Stripe idempotency key has since expired.
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: { stripe_account_id: "acct_from_prior_attempt" },
+                error: null,
+              }),
+            }),
+          }),
+          update: () => {
+            adminUpdateCallCount += 1;
+            return { eq: async () => ({ error: null }) };
+          },
+        };
+      }
+      throw new Error(`unexpected admin table ${table}`);
+    });
+
+    const { startStripeOnboardingAction } = await import("./actions");
+
+    await expect(startStripeOnboardingAction({}, new FormData())).rejects.toThrow(
+      "NEXT_REDIRECT:https://connect.stripe.com/setup/xyz",
+    );
+
+    // The load-bearing assertion (issue #92 real-bug finding): no second
+    // Stripe Express account is ever created -- the reconciled row's
+    // existing stripe_account_id is reused as-is.
+    expect(createExpressAccountMock).not.toHaveBeenCalled();
+    expect(adminUpdateCallCount).toBe(0);
+    expect(createOnboardingAccountLinkMock).toHaveBeenCalledWith(
+      { __fakeStripe: true },
+      expect.objectContaining({ accountId: "acct_from_prior_attempt" }),
+    );
   });
 
   it("reuses an existing Stripe account instead of creating a second one", async () => {
