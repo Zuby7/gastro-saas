@@ -13,7 +13,7 @@ function hashIp(ip: string): string {
  * Records one rate-limited, deduplicated `menu_viewed` analytics event for
  * `tenantSlug`, if this browser hasn't already recorded one for this tenant
  * today (see `record_menu_view()`,
- * supabase/migrations/20260905130000_menu_view_rate_limited_analytics.sql).
+ * supabase/migrations/20260906120000_menu_view_rate_limited_analytics.sql).
  *
  * `tenantId` must already be resolved server-side from the route slug (e.g.
  * via `resolveTenantIdBySlug`) -- never a client-supplied value, per

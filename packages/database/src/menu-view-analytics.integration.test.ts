@@ -1,7 +1,7 @@
 // Integration tests for `record_menu_view()` (ticket #67, "Öffentliche
 // Menü-Ansicht: geratelimitete/deduplizierte View-Analytics statt entfernter
 // Inline-Insert" -- see
-// supabase/migrations/20260905130000_menu_view_rate_limited_analytics.sql).
+// supabase/migrations/20260906120000_menu_view_rate_limited_analytics.sql).
 //
 // Proves the three properties the ticket requires:
 // - Dedup: repeated calls for the same (tenant, session, UTC day) produce
