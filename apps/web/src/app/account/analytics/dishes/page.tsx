@@ -3,8 +3,11 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
-import { getDishPerformanceAnalysis } from "@/lib/analytics/dish-performance-service";
-import type { DishPerformanceLabel, DishPerformanceResult } from "@gastro-saas/domain";
+import {
+  getDishPerformanceAnalysis,
+  type DishPerformanceWithManualSales,
+} from "@/lib/analytics/dish-performance-service";
+import type { DishPerformanceLabel } from "@gastro-saas/domain";
 
 const LABEL_TEXT: Record<DishPerformanceLabel, string> = {
   topseller: "Topseller",
@@ -148,7 +151,7 @@ function DishPerformanceTable({
 }: {
   headingId: string;
   heading: string;
-  dishes: DishPerformanceResult[];
+  dishes: DishPerformanceWithManualSales[];
 }) {
   return (
     <section
@@ -158,6 +161,11 @@ function DishPerformanceTable({
       <h2 id={headingId} className="text-lg font-medium text-foreground">
         {heading}
       </h2>
+      <p className="text-sm text-foreground-secondary">
+        Ranking und Kennzeichnung basieren ausschließlich auf echten Bestelldaten. Die Spalten
+        &quot;Manuell nachgetragen&quot; zeigen zusätzlich, klar getrennt, außerhalb des
+        Bestellsystems erfasste Verkäufe (nicht Teil des Rankings).
+      </p>
       <table className="w-full text-left text-sm text-foreground">
         <caption className="sr-only">{heading}</caption>
         <thead>
@@ -183,6 +191,12 @@ function DishPerformanceTable({
             <th scope="col" className="py-1">
               Conversion
             </th>
+            <th scope="col" className="py-1">
+              Manuell nachgetragen (Menge)
+            </th>
+            <th scope="col" className="py-1">
+              Manuell nachgetragen (geschätzter Umsatz)
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -195,6 +209,10 @@ function DishPerformanceTable({
               <td className="py-1">{dish.viewsCount}</td>
               <td className="py-1">{dish.addToCartCount}</td>
               <td className="py-1">{formatConversion(dish.conversionRate)}</td>
+              <td className="py-1">{dish.manualUnitsSold}</td>
+              <td className="py-1">
+                {formatMoney(dish.manualEstimatedRevenueCents, dish.currency)}
+              </td>
             </tr>
           ))}
         </tbody>

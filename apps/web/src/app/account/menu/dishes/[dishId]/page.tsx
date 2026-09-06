@@ -8,6 +8,7 @@ import { VariantsSection, type VariantRecord } from "./variants-section";
 import { OptionGroupsSection, type OptionGroupRecord } from "./option-groups-section";
 import { AssignableLookupSection, type LookupItem } from "./assignable-lookup-section";
 import { ImageUploadForm } from "./image-upload-form";
+import { ManualSalesSection, type ManualSaleEntryRecord } from "./manual-sales-section";
 
 interface DishPageProps {
   params: Promise<{ dishId: string }>;
@@ -54,12 +55,13 @@ export default async function DishPage({ params }: DishPageProps) {
     redirect("/account");
   }
 
-  const [canEditMenu, canManageAvailability] = await Promise.all([
+  const [canEditMenu, canManageAvailability, canRecordManualSales] = await Promise.all([
     hasTenantPermission(supabase, membership.tenantId, "menu.write"),
     hasTenantPermission(supabase, membership.tenantId, "menu.availability.manage"),
+    hasTenantPermission(supabase, membership.tenantId, "analytics.manualsales.write"),
   ]);
 
-  if (!canEditMenu && !canManageAvailability) {
+  if (!canEditMenu && !canManageAvailability && !canRecordManualSales) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-surface-secondary p-8">
         <p role="alert" className="text-foreground">
@@ -99,6 +101,7 @@ export default async function DishPage({ params }: DishPageProps) {
     { data: allergenAssignments },
     { data: additiveAssignments },
     { data: dietaryLabelAssignments },
+    { data: manualSalesEntries },
   ] = await Promise.all([
     supabase
       .from("dish_variants")
@@ -165,6 +168,18 @@ export default async function DishPage({ params }: DishPageProps) {
       .select("dietary_label_id")
       .eq("dish_id", dishId)
       .returns<{ dietary_label_id: string }[]>(),
+    // Ticket #58: most recent manually logged sales for this dish, purely
+    // for display -- structurally distinct from orders/order_items, this
+    // reads exclusively from `manual_sales_entries`.
+    supabase
+      .from("manual_sales_entries")
+      .select("id, quantity, sale_date, channel, created_at")
+      .eq("dish_id", dishId)
+      .eq("tenant_id", membership.tenantId)
+      .order("sale_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(20)
+      .returns<ManualSaleEntryRecord[]>(),
   ]);
 
   const optionsByGroup = new Map<
@@ -269,6 +284,10 @@ export default async function DishPage({ params }: DishPageProps) {
             currentImageUrl={currentImageUrl}
             currentAltText={currentAltText}
           />
+        ) : null}
+
+        {canRecordManualSales ? (
+          <ManualSalesSection dishId={dish.id} entries={manualSalesEntries ?? []} />
         ) : null}
 
         <VariantsSection

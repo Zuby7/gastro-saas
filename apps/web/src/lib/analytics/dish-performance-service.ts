@@ -27,13 +27,30 @@ export interface RawDishStatsRow {
   revenueCents: number;
   viewsCount: number;
   addToCartCount: number;
+  /** Ticket #58: manually logged (external-channel/walk-in) units sold, ADDITIVE -- never folded into unitsSold above. */
+  manualUnitsSold: number;
+  /** Ticket #58: an ESTIMATE of manual sales revenue (current dish price * quantity), never folded into revenueCents above. */
+  manualEstimatedRevenueCents: number;
+}
+
+/**
+ * Ticket #58: `DishPerformanceResult` (real-order-derived ranking/
+ * classification) plus the additive, clearly-separate manual sales figures.
+ * Deliberately NOT fed into `classifyDishPerformance()`'s inputs below --
+ * ranking/topseller/low-performer classification only ever uses real
+ * `unitsSold`/`revenueCents`, so a tenant can never inflate a dish's ranking
+ * by logging manual entries.
+ */
+export interface DishPerformanceWithManualSales extends DishPerformanceResult {
+  manualUnitsSold: number;
+  manualEstimatedRevenueCents: number;
 }
 
 export async function getDishPerformanceAnalysis(
   supabase: SupabaseClient,
   tenantId: string,
   options: { daysBack?: number; minSampleSize?: number } = {},
-): Promise<DishPerformanceResult[]> {
+): Promise<DishPerformanceWithManualSales[]> {
   const { data, error } = await supabase.rpc("get_dish_performance_stats", {
     p_tenant_id: tenantId,
     p_days_back: options.daysBack ?? 30,
@@ -54,7 +71,25 @@ export async function getDishPerformanceAnalysis(
     addToCartCount: row.addToCartCount,
   }));
 
-  return classifyDishPerformance(inputs, {
+  const manualByDishId = new Map(
+    rawStats.map((row) => [
+      row.dishId,
+      {
+        manualUnitsSold: row.manualUnitsSold,
+        manualEstimatedRevenueCents: row.manualEstimatedRevenueCents,
+      },
+    ]),
+  );
+
+  const classified = classifyDishPerformance(inputs, {
     minSampleSize: options.minSampleSize ?? DEFAULT_MIN_SAMPLE_SIZE,
   });
+
+  return classified.map((result) => ({
+    ...result,
+    ...(manualByDishId.get(result.dishId) ?? {
+      manualUnitsSold: 0,
+      manualEstimatedRevenueCents: 0,
+    }),
+  }));
 }
