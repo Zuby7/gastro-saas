@@ -106,6 +106,15 @@ export default async function AccountPage() {
         </Link>
       ) : null}
 
+      {membership ? (
+        <Link
+          href="/account/integrations"
+          className="w-fit text-sm font-medium text-link-foreground underline hover:text-brand-700"
+        >
+          Integrationen (Mock-Anbindung)
+        </Link>
+      ) : null}
+
       <form action={logoutAction}>
         <button
           type="submit"

@@ -22,6 +22,8 @@ Entities are introduced through tickets as they're needed (§12 of the source br
 
 `roles`, `permissions`, `role_permissions`, `membership_roles`. Permission keys follow `area.resource.action`. Standard MVP permission keys:
 `users.invite`, `users.manage`, `roles.manage`, `menu.publish`, `orders.cancel`, `payments.refund`, `analytics.read`, `audit.read`.
+
+Ticket #121 (Epic-10 Opus review finding 5): this list was stale -- kept only the ticket #9 foundation set above and never accounted for permission keys introduced by later tickets. The full current catalog (see the various `insert into permissions` statements across `supabase/migrations/`) also includes: `tenant.settings.write` (ticket #11), `menu.read`/`menu.write` (public menu queries/menu admin), `payments.read`/`payments.connect` (Stripe Connect onboarding/status), `orders.read`/`orders.manage` (staff order dashboard/kitchen workflow), `menu.availability.manage` (sold-out toggling), `reviews.read`/`reviews.moderate` (ticket #34 moderation queue), and `tenant.data.delete` (ticket #36 privacy deletion requests). Prefer grepping `supabase/migrations/*.sql` for `insert into permissions` over trusting either list as exhaustive going forward.
 Ticket #9 introduces tenant-scoped standard roles (Owner, Manager, Kitchen, Service, Marketing), custom-role storage, `has_tenant_permission()` /
 `require_tenant_permission()` server-side checks, and an `analytics.read` DB gate so revenue/analytics data is not visible to every tenant member.
 

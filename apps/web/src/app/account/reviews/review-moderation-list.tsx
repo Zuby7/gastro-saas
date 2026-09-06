@@ -78,9 +78,21 @@ export function ReviewModerationList({ initialRatings, canModerate }: ReviewMode
             className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-4 text-sm text-foreground"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-medium" aria-label={`${rating.stars} von 5 Sternen`}>
-                {"★".repeat(rating.stars)}
-                {"☆".repeat(5 - rating.stars)}
+              {/*
+                `aria-label` on a bare `<span>` (role=generic) is a
+                prohibited ARIA attribute (axe-core `aria-prohibited-attr`) --
+                screen readers may read the raw glyphs instead of the
+                intended "3 von 5 Sternen" (ticket #121, Epic-10 Opus review
+                finding 1). Fix: hide the glyphs from assistive tech and
+                provide the accessible name via a separate sr-only span
+                instead.
+              */}
+              <span className="font-medium">
+                <span aria-hidden="true">
+                  {"★".repeat(rating.stars)}
+                  {"☆".repeat(5 - rating.stars)}
+                </span>
+                <span className="sr-only">{`${rating.stars} von 5 Sternen`}</span>
               </span>
               <span className="text-xs text-foreground-secondary">
                 {formatOrderTimestamp(rating.ratedAt)}
