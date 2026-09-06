@@ -8,11 +8,15 @@ import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permi
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-event";
 import {
+  REENCODED_CONTENT_TYPE,
+  REENCODED_EXTENSION,
+  reEncodeDishImage,
+} from "@/lib/images/re-encode-dish-image";
+import {
   ALLOWED_IMAGE_TYPES,
   AssignmentEntitySchema,
   AvailabilitySchema,
   DishBasicsSchema,
-  IMAGE_EXTENSION_BY_MIME,
   LookupNameSchema,
   MAX_IMAGE_SIZE_BYTES,
   OptionGroupSchema,
@@ -581,17 +585,31 @@ export async function toggleAssignmentAction(
 }
 
 /**
- * Ticket #12's image upload requirement, minimal scope: validates file
- * type/size server-side (matching the `media_assets` check constraints and
- * the `dish-media` storage bucket's own limits -- defense in depth, not
- * trusting either layer alone), uploads to the tenant-scoped storage path,
- * inserts the `media_assets` row, and attaches it to the dish.
+ * Ticket #12's image upload requirement: validates file type/size
+ * server-side (matching the `media_assets` check constraints and the
+ * `dish-media` storage bucket's own limits -- defense in depth, not trusting
+ * either layer alone), uploads to the tenant-scoped storage path, inserts
+ * the `media_assets` row, and attaches it to the dish.
  *
- * Deliberately NOT re-encoding/re-compressing the uploaded image server-side
- * (out of scope for this pass -- see the follow-up GitHub issue filed for
- * this, referenced in the PR description). Re-encoding matters for
- * stripping EXIF/GPS metadata and normalizing format/size; until it ships,
- * uploaded images are stored as-is (subject to the type/size checks above).
+ * Ticket #72: before upload, the file is decoded and re-encoded server-side
+ * via `reEncodeDishImage` (see that module for why `@cf-wasm/photon`, not
+ * `sharp`, was chosen -- this app deploys to Cloudflare Workers, which
+ * doesn't support `sharp`'s native binaries). This:
+ * - rejects files that pass the MIME-type/size checks above but aren't
+ *   actually decodable as an image (the decode step throws for those);
+ * - strips EXIF/GPS metadata (the re-encode only ever writes fresh pixel
+ *   data, no original metadata segments);
+ * - normalizes resolution (downscaled to fit `MAX_DIMENSION_PX` if larger)
+ *   and re-compresses to a bounded-size JPEG.
+ * The original `file.type`/`file.size` are only used for the pre-upload
+ * gate; the *stored* `content_type`/`size_bytes` always reflect the
+ * re-encoded output, not the original upload.
+ *
+ * Authorization (`requireMenuWriteContext`/`ensurePermission`) runs BEFORE
+ * `reEncodeDishImage` -- the re-encode is real CPU/WASM work, and an
+ * unauthorized caller must not be able to trigger it (Opus review finding on
+ * PR #132: it previously ran the re-encode first, before any permission
+ * check).
  */
 export async function uploadDishImageAction(
   _prevState: DishActionState,
@@ -617,17 +635,32 @@ export async function uploadDishImageAction(
     return { error: "Das Bild darf höchstens 5 MB groß sein." };
   }
 
+  // Authorization runs BEFORE any file read/re-encode work below: the
+  // re-encode (photon WASM decode/resize) is real CPU/memory work, and an
+  // unauthorized caller shouldn't be able to trigger it just by holding a
+  // valid image file (Opus review finding on PR #132).
   const { supabase, tenantId } = await requireMenuWriteContext();
   const denied = await ensurePermission(supabase, tenantId);
   if (denied) return denied;
 
-  const extension = IMAGE_EXTENSION_BY_MIME[file.type as (typeof ALLOWED_IMAGE_TYPES)[number]];
-  const storagePath = `${tenantId}/${randomUUID()}.${extension}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const originalBytes = new Uint8Array(await file.arrayBuffer());
+  const reEncoded = reEncodeDishImage(originalBytes);
+
+  if (!reEncoded.ok) {
+    return { error: "Die Datei konnte nicht als gültiges Bild verarbeitet werden." };
+  }
+
+  const buffer = reEncoded.buffer;
+
+  if (buffer.byteLength > MAX_IMAGE_SIZE_BYTES) {
+    return { error: "Das Bild darf höchstens 5 MB groß sein." };
+  }
+
+  const storagePath = `${tenantId}/${randomUUID()}.${REENCODED_EXTENSION}`;
 
   const { error: uploadError } = await supabase.storage
     .from("dish-media")
-    .upload(storagePath, buffer, { contentType: file.type, upsert: false });
+    .upload(storagePath, buffer, { contentType: REENCODED_CONTENT_TYPE, upsert: false });
 
   if (uploadError) {
     return { error: "Das Bild konnte nicht hochgeladen werden." };
@@ -642,8 +675,8 @@ export async function uploadDishImageAction(
     .insert({
       tenant_id: tenantId,
       storage_path: storagePath,
-      content_type: file.type,
-      size_bytes: file.size,
+      content_type: REENCODED_CONTENT_TYPE,
+      size_bytes: buffer.byteLength,
       alt_text: altText,
       created_by_user_id: user?.id ?? null,
     })
@@ -680,7 +713,11 @@ export async function uploadDishImageAction(
     action: "dish.image_uploaded",
     targetType: "dish",
     targetId: dishId,
-    metadata: { mediaAssetId: mediaAsset.id, contentType: file.type, sizeBytes: file.size },
+    metadata: {
+      mediaAssetId: mediaAsset.id,
+      contentType: REENCODED_CONTENT_TYPE,
+      sizeBytes: buffer.byteLength,
+    },
   });
 
   revalidateDish(dishId);

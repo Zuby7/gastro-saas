@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PhotonImage } from "@cf-wasm/photon";
 
 const getUserMock = vi.fn();
 const rpcMock = vi.fn();
@@ -16,6 +17,14 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
+
+// Wraps the real `reEncodeDishImage` in a spy (rather than a full mock) so
+// that most tests below still exercise its real decode/re-encode behavior,
+// while the authorization-ordering test can assert it was never called.
+vi.mock("@/lib/images/re-encode-dish-image", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/images/re-encode-dish-image")>();
+  return { ...actual, reEncodeDishImage: vi.fn(actual.reEncodeDishImage) };
+});
 
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
@@ -64,13 +73,28 @@ function allowPermission() {
 // empirically against this repo's jsdom version) even though real Node/edge
 // runtimes do -- this fake stands in only where the action actually reads
 // the file's bytes.
-function fakeImageFile(name: string, type: string, sizeBytes: number): File {
-  const bytes = new Uint8Array(sizeBytes);
-  const file = new File([bytes], name, { type });
+function fakeFile(name: string, type: string, bytes: Uint8Array): File {
+  // Copy into a fresh `ArrayBuffer`-backed `Uint8Array`: `bytes` may be a
+  // view over a generic `ArrayBufferLike` (e.g. from `PhotonImage`'s
+  // `get_bytes_jpeg`), which isn't assignable to `BlobPart`.
+  const copy = new Uint8Array(bytes);
+  const file = new File([copy], name, { type });
   Object.defineProperty(file, "arrayBuffer", {
-    value: async () => bytes.buffer,
+    value: async () => copy.buffer,
   });
   return file;
+}
+
+/**
+ * Ticket #72: `uploadDishImageAction` now decodes/re-encodes the upload via
+ * `reEncodeDishImage`, so tests that need the action to reach the storage
+ * upload step must pass real, decodable image bytes -- a zero-filled buffer
+ * (as used pre-#72) is correctly rejected as an invalid image now.
+ */
+function makeValidJpegBytes(width = 4, height = 4): Uint8Array {
+  const pixels = new Uint8Array(width * height * 4).fill(128);
+  const image = new PhotonImage(pixels, width, height);
+  return new Uint8Array(image.get_bytes_jpeg(90));
 }
 
 beforeEach(() => {
@@ -305,13 +329,54 @@ describe("uploadDishImageAction", () => {
     const fd = new FormData();
     fd.set("dishId", "dish-1");
     fd.set("altText", "Ein Teller Pasta");
-    fd.set("file", fakeImageFile("dish.jpg", "image/jpeg", 10));
+    fd.set("file", fakeFile("dish.jpg", "image/jpeg", makeValidJpegBytes()));
 
     const { uploadDishImageAction } = await import("./actions");
     const result = await uploadDishImageAction({}, fd);
 
     expect(result.success).toBeDefined();
     expect(uploadedPath.startsWith("tenant-1/")).toBe(true);
+    // Ticket #72: the action always stores the re-encoded JPEG output, not
+    // the original upload bytes/content-type.
+    expect(uploadedPath.endsWith(".jpg")).toBe(true);
+    expect(storageUploadMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Buffer),
+      expect.objectContaining({ contentType: "image/jpeg" }),
+    );
+  });
+
+  it("denies the upload before re-encoding when the caller lacks menu.write, even with a valid image", async () => {
+    denyPermission();
+    const { reEncodeDishImage } = await import("@/lib/images/re-encode-dish-image");
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("altText", "Ein Teller Pasta");
+    fd.set("file", fakeFile("dish.jpg", "image/jpeg", makeValidJpegBytes()));
+
+    const { uploadDishImageAction } = await import("./actions");
+    const result = await uploadDishImageAction({}, fd);
+
+    expect(result.error).toContain("nicht die erforderliche Berechtigung");
+    // The permission check must run BEFORE the (expensive, WASM) re-encode --
+    // an unauthorized caller must not be able to trigger it at all.
+    expect(reEncodeDishImage).not.toHaveBeenCalled();
+    expect(storageUploadMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file that declares an allowed MIME type but isn't a decodable image", async () => {
+    allowPermission();
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("altText", "Ein Teller Pasta");
+    const bogusBytes = new TextEncoder().encode("this is not a real image".repeat(10));
+    fd.set("file", fakeFile("fake.jpg", "image/jpeg", bogusBytes));
+
+    const { uploadDishImageAction } = await import("./actions");
+    const result = await uploadDishImageAction({}, fd);
+
+    expect(result.error).toMatch(/gültiges Bild/);
+    expect(storageUploadMock).not.toHaveBeenCalled();
   });
 });
 
