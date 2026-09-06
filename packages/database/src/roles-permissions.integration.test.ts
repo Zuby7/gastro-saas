@@ -158,6 +158,7 @@ describe.skipIf(!dbAvailable)("roles / permissions RBAC", () => {
       [
         "analytics.read",
         "audit.read",
+        "integrations.manage",
         "menu.availability.manage",
         "menu.publish",
         "menu.read",

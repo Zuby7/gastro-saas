@@ -34,6 +34,9 @@
 -- Rollback for local/throwaway DBs:
 --   create or replace function seed_standard_roles_for_tenant() ... -- (restore prior hardcoded-VALUES body from 20260819110000)
 --   drop table if exists system_role_default_permissions;
+--   -- Leave the defensive `integrations.manage` permissions row in place if
+--   -- PR #125 has since merged (it owns that row); only delete it if #125 has
+--   -- not merged and this migration is being fully reverted.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -63,6 +66,26 @@ create policy system_role_default_permissions_select_authenticated
   using (true);
 
 -- ----------------------------------------------------------------------------
+-- Defensive permission-catalog entry for 'integrations.manage'.
+--
+-- Ticket #38 (PR #125, `20260820090000_integration_accounts_sync_jobs_mock_provider.sql`,
+-- open at the time this migration was authored) is the authoritative source
+-- for this permission and grants it to Manager via the old hardcoded-VALUES
+-- pattern this migration's own table is replacing. Because this migration's
+-- timestamp sorts after #125's, whichever PR merges to main second will not
+-- change apply order -- `20260820090000` always runs first and (re)inserts
+-- the authoritative catalog row via `on conflict (key) do update`. The
+-- `on conflict (key) do nothing` here only exists so this migration is
+-- self-consistent (its own `system_role_default_permissions` insert below
+-- has an FK to `permissions.key`) if it is ever applied to a database that
+-- does not yet have #125's migration -- it must never overwrite #125's
+-- description.
+-- ----------------------------------------------------------------------------
+insert into permissions (key, description)
+values ('integrations.manage', 'Configure integration accounts and trigger/inspect sync jobs (mock provider today)')
+on conflict (key) do nothing;
+
+-- ----------------------------------------------------------------------------
 -- Populate with the exact current grant set (pinned by
 -- roles-permissions.integration.test.ts's
 -- "grants the exact expected default permission set per system role..." test).
@@ -83,6 +106,7 @@ values
   ('manager', 'audit.read'),
   ('manager', 'reviews.read'),
   ('manager', 'reviews.moderate'),
+  ('manager', 'integrations.manage'),
   ('kitchen', 'menu.read'),
   ('kitchen', 'menu.availability.manage'),
   ('kitchen', 'orders.cancel'),
