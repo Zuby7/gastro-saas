@@ -39,4 +39,28 @@ describe("Home (Startseite / marketing landing page)", () => {
       expect(link).toHaveAttribute("href", "/login");
     }
   });
+
+  it(
+    "the 'how it works' steps form a valid list (3 li directly inside the ol) -- " +
+      "Opus review finding on PR #149: an ol with non-li direct children (a wrapping " +
+      "connector/layout div) breaks the list/listitem ownership relation for assistive tech",
+    () => {
+      render(<Home />);
+
+      const lists = screen.getAllByRole("list");
+      // The "how it works" ol is the only <ol>/<ul> this page renders besides
+      // the ticket mockup's order-line <ul> (hidden below lg, but still in
+      // the DOM) -- find it by its 3 listitems each containing a step title.
+      const howItWorksList = lists.find(
+        (candidate) => candidate.tagName === "OL" && candidate.querySelectorAll("li").length === 3,
+      );
+      expect(howItWorksList).toBeDefined();
+      const items = screen.getAllByRole("listitem", { hidden: true });
+      const stepItems = items.filter((item) => howItWorksList!.contains(item));
+      expect(stepItems).toHaveLength(3);
+      for (const item of stepItems) {
+        expect(item.parentElement).toBe(howItWorksList);
+      }
+    },
+  );
 });

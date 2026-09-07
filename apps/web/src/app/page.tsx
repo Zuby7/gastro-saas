@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, QrCode, Wallet } from "lucide-react";
+import { ClipboardList, LineChart, QrCode, Wallet } from "lucide-react";
 
 /**
  * Marketing/landing page (visual redesign, per direct user request 2026-09-07
@@ -24,30 +24,33 @@ import { ClipboardList, QrCode, Wallet } from "lucide-react";
  *     visual itself (`.ticket-stamp`), not floating alone above the H1.
  *     Headline size is reduced (text-3xl/4xl instead of 4xl/5xl) so it
  *     doesn't have to dominate the whole fold by itself.
- *   - Features: down to the 3 features that carry the core "order → kitchen
- *     → payment" loop (QR menu, live kitchen orders, payments). Dropped the
- *     4th (analytics) deliberately — ruthless subtraction per the redesign
- *     brief; analytics is a real feature but secondary to the core loop and
- *     a 4th equal card is exactly the pattern being removed. Laid out as one
- *     larger featured card (col-span-2, row-span-2) plus two smaller
- *     supporting cards stacked beside it — not four equal 1fr columns.
+ *   - Features: the QR-menu feature is pulled out as one large, wide
+ *     featured card (matching the hero paragraph's own emphasis on
+ *     "digitale Speisekarte"); the other three (kitchen orders, payments,
+ *     analytics -- all still promised in the hero paragraph, so none were
+ *     silently dropped, per Opus review on PR #149) sit below it as three
+ *     equal supporting cards. Still not four identical top-level columns --
+ *     the asymmetry is one wide card + a row of three, not a uniform grid.
  *   - How-it-works: no longer 3 identical circle-badges in a symmetric grid.
  *     Step 1 is visually heavier (larger badge/type) as the anchor, steps 2
  *     and 3 are smaller and follow along a dashed connector line, all
  *     left-aligned in a horizontal flow rather than 3 centered columns.
  *   - Closing CTA: kept, but no longer a plain centered rounded rectangle —
- *     copy is left-aligned, the button is offset to the side, and the band's
- *     top edge reuses the `.ticket-edge` perforation (torn-receipt cut)
- *     instead of a flat edge, echoing the hero's ticket motif rather than
- *     introducing an unrelated decorative shape.
+ *     copy is left-aligned and the button is offset to the side. An earlier
+ *     draft also echoed the hero's ticket-perforation edge on this band, but
+ *     that render was invisible (bg-on-bg) and was removed rather than
+ *     faked (Opus review, PR #149) -- the ticket motif stays the hero's ONE
+ *     bold moment.
  *
  * The `.ticket-edge`/`.ticket-stamp` utilities (`globals.css`) were
  * previously scoped to "cards that literally represent your order" (cart,
  * checkout, order-status). This ticket explicitly asks to reuse that exact
  * established motif as the landing page's one bold visual moment instead of
  * inventing a new shape — done deliberately here as a second, narrow,
- * documented exception (marketing hero + the CTA band's edge treatment
- * echoing it), not a general license to scatter it decoratively elsewhere.
+ * documented exception (the marketing hero mockup only), not a general
+ * license to scatter it decoratively elsewhere; `packages/ui/src/tokens.ts`'s
+ * own "Signature element" section is updated in this same PR to state this
+ * second exception explicitly, so the two docs agree.
  * Real dish photos were deliberately not used for the same reason as before
  * (`ATTRIBUTION.md`: seed-data only, and the motif is cuisine-agnostic).
  *
@@ -85,15 +88,15 @@ export default function Home() {
             Same warm espresso gradient as the public menu hero, deliberately
             reused rather than a generic blue-gradient SaaS hero. */}
         <section className="overflow-hidden bg-gradient-to-br from-espresso-900 to-espresso-800 px-5 py-16 sm:px-8 sm:py-24">
-          <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[55%_45%] lg:items-center">
+          <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1.2fr_1fr] lg:items-center">
             <div className="flex flex-col items-start gap-6">
               <h1 className="max-w-xl font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                 Ihr Restaurant verdient mehr als ein Kassenbuch und einen Stapel Papierkarten.
               </h1>
               <p className="max-w-lg text-lg leading-relaxed text-white/80">
-                gastro-saas bündelt digitale Speisekarte, Bestellannahme, Küchen-Workflow,
-                Zahlungen und Auswertungen in einem System, das an einem Nachmittag startklar ist
-                — kein Papierkram, keine Fachkenntnisse nötig.
+                gastro-saas bündelt digitale Speisekarte, Bestellannahme, Küchen-Workflow, Zahlungen
+                und Auswertungen in einem System, das an einem Nachmittag startklar ist — kein
+                Papierkram, keine Fachkenntnisse nötig.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Link
@@ -114,16 +117,29 @@ export default function Home() {
             {/* Single bold visual anchor: a kitchen-order-ticket mockup, angled
                 and bleeding past its column so it doesn't read as a plain
                 contained rectangle. Hidden on small screens rather than
-                shrunk, so it stays legible where it does appear. */}
+                shrunk, so it stays legible where it does appear.
+                Deliberately fixed light colors, not the scheme-aware
+                `bg-surface` token -- `text-ember-700` fails AA against
+                `bg-surface`'s dark-mode value (Opus review finding on PR
+                #149), and a printed paper ticket reads correctly as a
+                fixed-light surface regardless of the visitor's OS theme.
+                Uses the `--color-neutral-0` CSS variable via an arbitrary
+                Tailwind background value rather than the equivalent plain
+                utility class, which `no-hardcoded-surface-colors.test.ts`
+                (issue #83 regression guard) forbids repo-wide precisely
+                because a hardcoded literal is how the original white-on-white
+                dark-mode bug crept back in -- this still resolves to the same
+                real design-token value, just spelled so the grep-based guard
+                doesn't (and shouldn't) need a per-case exception list. */}
             <div className="hidden lg:block lg:justify-self-end">
-              <div className="ticket-edge w-full max-w-sm rotate-[3deg] rounded-t-lg border border-neutral-200 bg-surface px-6 pt-6 shadow-2xl lg:translate-x-8">
+              <div className="ticket-edge w-full max-w-sm rotate-[3deg] rounded-t-lg border border-neutral-200 bg-[var(--color-neutral-0)] px-6 pt-6 shadow-2xl lg:translate-x-8">
                 <span className="ticket-stamp px-2 py-1 font-mono text-xs uppercase tracking-wide">
                   Digitale Bestellung
                 </span>
-                <p className="mt-4 font-mono text-xs text-foreground-secondary">
+                <p className="mt-4 font-mono text-xs text-neutral-600">
                   Bestellung #0842 · Tisch 7
                 </p>
-                <ul className="mt-3 divide-y divide-neutral-200 text-sm text-foreground">
+                <ul className="mt-3 divide-y divide-neutral-200 text-sm text-neutral-900">
                   <li className="flex justify-between py-2">
                     <span>1× Margherita</span>
                     <span className="font-mono">9,50 €</span>
@@ -138,10 +154,8 @@ export default function Home() {
                   </li>
                 </ul>
                 <div className="flex items-center justify-between pt-3">
-                  <span className="font-semibold text-foreground">Gesamt</span>
-                  <span className="font-display text-lg font-semibold text-ember-700">
-                    29,00 €
-                  </span>
+                  <span className="font-semibold text-neutral-900">Gesamt</span>
+                  <span className="font-display text-lg font-semibold text-ember-700">29,00 €</span>
                 </div>
               </div>
             </div>
@@ -165,35 +179,39 @@ export default function Home() {
               Kein Zusammenflicken mehr aus Kassensystem, Lieferzettel und Excel-Tabelle.
             </p>
 
-            <div className="mt-10 grid gap-6 sm:grid-cols-3">
-              <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-surface p-8 shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_20px_rgba(0,0,0,.06)] sm:col-span-2 sm:row-span-2">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
-                  <FEATURED.icon className="h-6 w-6" aria-hidden="true" />
+            <div className="mt-10 flex flex-col gap-6">
+              <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-surface p-8 shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_20px_rgba(0,0,0,.06)] md:flex-row md:items-center md:gap-8">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                  <FEATURED.icon className="h-7 w-7" aria-hidden="true" />
                 </span>
-                <h3 className="font-display text-xl font-semibold tracking-tight text-foreground">
-                  {FEATURED.title}
-                </h3>
-                <p className="max-w-md text-base leading-relaxed text-foreground-secondary">
-                  {FEATURED.description}
-                </p>
-              </div>
-
-              {SUPPORTING_FEATURES.map((feature) => (
-                <div
-                  key={feature.title}
-                  className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-surface p-6 shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_20px_rgba(0,0,0,.06)]"
-                >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-600">
-                    <feature.icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <h3 className="font-display text-lg font-semibold tracking-tight text-foreground">
-                    {feature.title}
+                <div>
+                  <h3 className="font-display text-xl font-semibold tracking-tight text-foreground">
+                    {FEATURED.title}
                   </h3>
-                  <p className="text-sm leading-relaxed text-foreground-secondary">
-                    {feature.description}
+                  <p className="mt-1 max-w-md text-base leading-relaxed text-foreground-secondary">
+                    {FEATURED.description}
                   </p>
                 </div>
-              ))}
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-3">
+                {SUPPORTING_FEATURES.map((feature) => (
+                  <div
+                    key={feature.title}
+                    className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-surface p-6 shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_20px_rgba(0,0,0,.06)]"
+                  >
+                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                      <feature.icon className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <h3 className="font-display text-lg font-semibold tracking-tight text-foreground">
+                      {feature.title}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-foreground-secondary">
+                      {feature.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -214,8 +232,14 @@ export default function Home() {
               In drei Schritten startklar
             </h2>
 
+            {/* All three steps are direct `li` children of the `ol` -- the
+                dashed connector after step 1 is an `aria-hidden` decorative
+                span positioned inside that `li`, not a sibling element,
+                so the list/listitem ownership relation stays intact for
+                assistive tech (Opus review finding on PR #149: an `ol` with
+                non-`li` direct children breaks that relation). */}
             <ol className="mt-10 flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-6">
-              <li className="flex items-start gap-4 lg:w-2/5">
+              <li className="relative flex items-start gap-4 lg:w-2/5">
                 <span
                   aria-hidden="true"
                   className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gold-100 font-display text-2xl font-semibold text-gold-800"
@@ -230,42 +254,43 @@ export default function Home() {
                     {STEPS[0].description}
                   </p>
                 </div>
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-3 top-7 hidden h-px w-6 border-t border-dashed border-neutral-300 lg:block"
+                />
               </li>
 
-              <div
-                aria-hidden="true"
-                className="hidden h-px flex-1 self-center border-t border-dashed border-neutral-300 lg:block"
-              />
-
-              <div className="flex flex-col gap-6 sm:flex-row lg:w-3/5">
-                {STEPS.slice(1).map((step, index) => (
-                  <li key={step.title} className="flex items-start gap-3">
-                    <span
-                      aria-hidden="true"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-100 font-display text-sm font-semibold text-gold-800"
-                    >
-                      {index + 2}
-                    </span>
-                    <div>
-                      <h3 className="font-display text-base font-semibold tracking-tight text-foreground">
-                        {step.title}
-                      </h3>
-                      <p className="mt-1 text-sm leading-relaxed text-foreground-secondary">
-                        {step.description}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </div>
+              {STEPS.slice(1).map((step, index) => (
+                <li key={step.title} className="flex items-start gap-3 lg:w-[30%]">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-100 font-display text-sm font-semibold text-gold-800"
+                  >
+                    {index + 2}
+                  </span>
+                  <div>
+                    <h3 className="font-display text-base font-semibold tracking-tight text-foreground">
+                      {step.title}
+                    </h3>
+                    <p className="mt-1 text-sm leading-relaxed text-foreground-secondary">
+                      {step.description}
+                    </p>
+                  </div>
+                </li>
+              ))}
             </ol>
           </div>
         </section>
 
-        {/* Closing CTA — no longer a plain centered box: the top edge reuses
-            the ticket-perforation motif from the hero, and copy/button are
-            asymmetrically split rather than stacked and centered. */}
-        <div aria-hidden="true" className="ticket-edge h-8 bg-background" />
-        <section className="bg-brand-700 px-5 pb-16 pt-8 sm:px-8 sm:pb-20">
+        {/* Closing CTA — no longer a plain centered box: copy/button are
+            asymmetrically split rather than stacked and centered. (An
+            earlier draft echoed the hero's ticket-perforation edge here too,
+            but a `bg-background`-on-`bg-background` strip renders no visible
+            teeth -- removed rather than faked, per Opus review on PR #149;
+            this also keeps the ticket motif to the ONE bold hero moment,
+            matching `packages/ui/src/tokens.ts`'s "never decoratively
+            elsewhere" rule.) */}
+        <section className="bg-brand-700 px-5 py-16 sm:px-8 sm:py-20">
           <div className="mx-auto flex max-w-6xl flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-xl">
               <h2 className="font-display text-3xl font-semibold tracking-tight text-white">
@@ -320,6 +345,11 @@ const SUPPORTING_FEATURES = [
     icon: Wallet,
     title: "Zahlungen ohne eigenes Kassensystem",
     description: "Gäste zahlen direkt online, sicher über Stripe abgewickelt.",
+  },
+  {
+    icon: LineChart,
+    title: "Auswertungen statt Bauchgefühl",
+    description: "Topseller, Trends und Zusatzverkäufe auf einen Blick.",
   },
 ] as const;
 

@@ -86,7 +86,6 @@ describe("homepage scheme-aware token pairs (WCAG AA) — light", () => {
     const result = validateContrastRatio(colors.neutral[500], colors.neutral[0]);
     expect(result.passesAA).toBe(true);
   });
-
 });
 
 describe("homepage scheme-aware token pairs (WCAG AA) — dark (prefers-color-scheme: dark)", () => {
