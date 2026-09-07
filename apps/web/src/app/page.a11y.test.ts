@@ -9,14 +9,15 @@ import { describe, expect, it } from "vitest";
  * Since issue #83 re-enabled automatic OS-driven dark mode, `page.tsx` uses
  * the scheme-aware `--surface`/`--surface-secondary`/`--background`/
  * `--foreground`/`--foreground-secondary`/`--link-foreground` tokens
- * (`bg-surface`, `bg-surface-secondary`, `text-foreground`,
+ * (`bg-surface`, `bg-surface-secondary`, `bg-background`, `text-foreground`,
  * `text-foreground-secondary`, `text-link-foreground`) for its header,
- * footer, features section and feature cards — those pairs are checked
- * below for BOTH schemes, mirroring `dark-mode-tokens.a11y.test.ts`'s
- * pattern. `brand`/`gold`/`espresso` are NOT scheme-aware (no dark-mode
- * override in `globals.css`), so the hero, closing CTA band and
- * "how it works" step badges — all fixed brand/gold/espresso colors — only
- * need a single check, same as `public-menu-design.a11y.test.ts`.
+ * footer, features section, feature cards and the "how it works" section —
+ * those pairs are checked below for BOTH schemes, mirroring
+ * `dark-mode-tokens.a11y.test.ts`'s pattern. `brand`/`gold`/`ember`/
+ * `espresso` are NOT scheme-aware (no dark-mode override in `globals.css`),
+ * so the hero (including its ticket-mockup visual anchor), closing CTA band
+ * and step badges — all fixed brand/gold/ember/espresso colors — only need a
+ * single check, same as `public-menu-design.a11y.test.ts`.
  *
  * Keep this list in sync with `page.tsx`: every text element there should
  * have a corresponding entry below, keyed by the Tailwind class it uses.
@@ -76,12 +77,12 @@ describe("homepage scheme-aware token pairs (WCAG AA) — light", () => {
     expect(result.passesAA).toBe(true);
   });
 
-  it("'how it works' section (default page background): text-foreground on bg-background", () => {
+  it("'how it works' section: text-foreground on bg-background", () => {
     const result = validateContrastRatio(colors.neutral[900], colors.neutral[0]);
     expect(result.passesAA).toBe(true);
   });
 
-  it("'how it works' section (default page background): text-foreground-secondary on bg-background", () => {
+  it("'how it works' section: text-foreground-secondary on bg-background", () => {
     const result = validateContrastRatio(colors.neutral[500], colors.neutral[0]);
     expect(result.passesAA).toBe(true);
   });
@@ -164,8 +165,23 @@ describe("homepage fixed-color pairs (WCAG AA) — brand/gold/espresso are not s
     expect(result.passesAA).toBe(true);
   });
 
-  it("'how it works' step number badge (gold-800) on its solid gold-100 background passes AA", () => {
+  it("'how it works' step number badges (gold-800) on their solid gold-100 background pass AA", () => {
     const result = validateContrastRatio(colors.gold[800], colors.gold[100]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("hero ticket mockup: order line text (neutral-900/500) on its solid surface (neutral-0) passes AA", () => {
+    expect(validateContrastRatio(colors.neutral[900], colors.neutral[0]).passesAA).toBe(true);
+    expect(validateContrastRatio(colors.neutral[500], colors.neutral[0]).passesAA).toBe(true);
+  });
+
+  it("hero ticket mockup: total price (ember-700) on its solid surface (neutral-0) passes AA", () => {
+    const result = validateContrastRatio(colors.ember[700], colors.neutral[0]);
+    expect(result.passesAA).toBe(true);
+  });
+
+  it("hero ticket mockup: '.ticket-stamp' tag text (gold-800) on its solid gold-50 background passes AA", () => {
+    const result = validateContrastRatio(colors.gold[800], colors.gold[50]);
     expect(result.passesAA).toBe(true);
   });
 

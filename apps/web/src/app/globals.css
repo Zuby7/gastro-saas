@@ -86,10 +86,16 @@ body {
  * Signature element for the design pass v2 redesign (see
  * packages/ui/src/tokens.ts's header comment for the full rationale): a
  * kitchen-order-ticket / paper-receipt torn bottom edge, built with a static
- * `clip-path` polygon -- no image asset, no motion. Applied ONLY to cards
- * that literally represent "your order" (cart summary, checkout's pre-submit
- * order summary, order-status page's live-status card), never decoratively
- * elsewhere, and never in the admin UI.
+ * `clip-path` polygon -- no image asset, no motion. Applied to cards that
+ * literally represent "your order" (cart summary, checkout's pre-submit
+ * order summary, order-status page's live-status card), never in the admin
+ * UI. One narrow, deliberate exception (added for the marketing landing
+ * page redesign, `app/page.tsx`): the hero's order-ticket mockup (a
+ * representative, non-live sample order used as the page's single bold
+ * visual anchor, per explicit design-brief instruction to reuse this exact
+ * established motif rather than invent a new shape) and the closing CTA
+ * band's top edge, which echoes that same hero motif. Still not a general
+ * license to use it decoratively elsewhere.
  *
  * `--ticket-notch` controls the tooth depth; the extra bottom padding makes
  * room so real content isn't clipped by the zigzag. Purely presentational --

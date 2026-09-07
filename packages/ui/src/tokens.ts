@@ -131,11 +131,21 @@
  * ### Signature element
  * A kitchen-order-ticket / paper-receipt card: a subtly torn/perforated
  * bottom edge (CSS `clip-path`, no image asset -- see `.ticket-edge` in
- * `apps/web/src/app/globals.css`), used ONLY where the content genuinely IS
- * the customer's order (cart summary, checkout's pre-submit order summary,
- * and the order-status page's live-status card) -- never decoratively
- * elsewhere. Order identifiers render in Space Mono inside a small
- * gold-bordered "stamp" badge, reinforcing the same ticket metaphor.
+ * `apps/web/src/app/globals.css`), used where the content genuinely IS the
+ * customer's order (cart summary, checkout's pre-submit order summary, and
+ * the order-status page's live-status card). Order identifiers render in
+ * Space Mono inside a small gold-bordered "stamp" badge, reinforcing the
+ * same ticket metaphor.
+ *
+ * One narrow, explicitly documented second exception (2026-09-07, landing
+ * page redesign, `apps/web/src/app/page.tsx`): the marketing hero's single
+ * bold visual anchor reuses the same `.ticket-edge`/`.ticket-stamp` motif for
+ * a mock order (illustrative, not a real customer order) -- deliberately
+ * reusing the product's own established visual language for its one "hero
+ * moment" instead of inventing an unrelated shape. Still never used
+ * decoratively elsewhere on that page (feature cards, CTA band, etc. stay
+ * plain) -- an earlier draft also put a ticket-edge strip on the CTA band and
+ * it was removed for exactly this reason (Opus review, PR #149).
  *
  * ## Pass 2 -- Critique
  *  - Cliché #1 (warm cream + serif + terracotta): explicitly not this --
