@@ -15,12 +15,35 @@ interface DishDetailProps {
 
 const initialCartActionState: CartActionState = {};
 
-function useCartFeedback(dish: PublicMenuDish, tenantSlug: string, state: CartActionState) {
+/**
+ * `floating`: when true, the visible error/success message is positioned
+ * `absolute inset-0` over the `relative` price/button row the caller
+ * provides, replacing that row's content instead of growing it. `Simple
+ * AddButton` needs this -- its form sits in a tight `justify-between`
+ * price/button row inside a card whose height is set by its CSS Grid track,
+ * and an in-flow message growing that form's height pushed the row (and the
+ * whole card) taller than its grid track, overlapping the neighboring card
+ * (reported live bug, 2026-09-08). Overlaying within the row's own box also
+ * keeps the message inside the card's `overflow-hidden` bounds, so it can't
+ * spill past the card edge either. `DishOptionChooser`'s panel is a
+ * full-width disclosure with room to grow, so it keeps the in-flow
+ * (non-floating) placement, which is more discoverable there.
+ */
+function useCartFeedback(
+  dish: PublicMenuDish,
+  tenantSlug: string,
+  state: CartActionState,
+  floating: boolean,
+) {
   const announcement = state.error
     ? state.error
     : state.cart
       ? `${dish.name} wurde zum Warenkorb hinzugefügt.`
       : "";
+
+  const messageClassName = floating
+    ? "absolute inset-0 z-10 flex items-center justify-end overflow-hidden"
+    : "mt-2";
 
   return (
     <>
@@ -31,14 +54,16 @@ function useCartFeedback(dish: PublicMenuDish, tenantSlug: string, state: CartAc
       {state.error ? (
         <p
           role="alert"
-          className="mt-2 rounded-md border border-danger-500 bg-danger-500/10 px-3 py-2 text-sm text-danger-foreground"
+          className={`${messageClassName} rounded-md border border-danger-500 bg-danger-500/10 px-3 py-2 text-sm text-danger-foreground shadow-sm`}
         >
           {state.error}
         </p>
       ) : null}
 
       {state.cart ? (
-        <p className="mt-2 rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-foreground">
+        <p
+          className={`${messageClassName} rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-foreground shadow-sm`}
+        >
           Im Warenkorb: {state.cart.itemCount} Artikel ·{" "}
           <Link href={`/r/${tenantSlug}/cart`} className="font-medium text-ember-700 underline">
             Warenkorb ansehen
@@ -62,10 +87,13 @@ export function SimpleAddButton({ dish, tenantSlug }: DishDetailProps) {
     boundAddToCartAction,
     initialCartActionState,
   );
-  const feedback = useCartFeedback(dish, tenantSlug, state);
+  const feedback = useCartFeedback(dish, tenantSlug, state, true);
   const variantId = dish.variants[0]?.id ?? "";
 
   return (
+    // No `relative` here -- the ancestor price/button row (dish-card.tsx)
+    // provides the positioning context so the floating confirmation covers
+    // that whole row, not just this form's own (shrink-to-fit) box.
     <form action={formAction} className="flex flex-col items-end">
       <input type="hidden" name="dishId" value={dish.id} />
       <input type="hidden" name="dishVariantId" value={variantId} />
@@ -103,7 +131,7 @@ export function DishOptionChooser({ dish, tenantSlug }: DishDetailProps) {
     boundAddToCartAction,
     initialCartActionState,
   );
-  const feedback = useCartFeedback(dish, tenantSlug, state);
+  const feedback = useCartFeedback(dish, tenantSlug, state, false);
 
   const selectedVariant = dish.variants.find((variant) => variant.id === selectedVariantId);
   const basePrice = selectedVariant?.priceCents ?? dish.priceCents ?? 0;
