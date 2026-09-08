@@ -134,7 +134,13 @@ export function DishCard({ dish, tenantSlug }: DishCardProps) {
             </span>
           </div>
         ) : isSimpleDish(dish) ? (
-          <div className="mt-auto flex items-center justify-between pt-2">
+          // `relative`: SimpleAddButton's post-submit confirmation overlays
+          // this row (`absolute inset-0`) instead of growing it -- an
+          // in-flow message here previously made this row taller than its
+          // CSS Grid track, overlapping the neighboring card (live bug,
+          // 2026-09-08). Staying within this row's own box also keeps it
+          // inside the card's `overflow-hidden` bounds.
+          <div className="relative mt-auto flex items-center justify-between pt-2">
             <span className="font-display font-bold text-ember-700">
               {formatPrice(dish.priceCents, dish.currency)}
             </span>
