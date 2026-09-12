@@ -29,6 +29,16 @@ export function createStripeClient(): Stripe {
 
   return new Stripe(secretKey, {
     apiVersion: "2026-07-29.dahlia",
+    // The Stripe SDK's default HTTP client uses Node's `https` module, which
+    // is not supported in the Cloudflare Workers runtime (workerd) -- every
+    // real API call failed there with a generic "An error occurred with our
+    // connection to Stripe" after silently retrying twice (live bug,
+    // 2026-09-13, found onboarding the demo tenant's real Stripe Connect
+    // account). `createFetchHttpClient()` uses the standard Fetch API, which
+    // workerd does support natively -- same fix class as this repo's other
+    // Workers-runtime-compatibility issues (the `next@16.2.12` middleware
+    // patch, `@cf-wasm/photon` instead of `sharp`).
+    httpClient: Stripe.createFetchHttpClient(),
   });
 }
 

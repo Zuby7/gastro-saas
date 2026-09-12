@@ -55,7 +55,7 @@ describe("CheckoutForm accessibility", () => {
     expect(
       alerts.some((alert) => alert.textContent?.includes("nicht mehr verfügbare Artikel")),
     ).toBe(true);
-    expect(screen.getByRole("button", { name: "Bestellung abschicken" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Weiter zur Zahlung" })).toBeDisabled();
   });
 
   // Ticket #41: privacy notice with a link to the full Datenschutzerklärung,

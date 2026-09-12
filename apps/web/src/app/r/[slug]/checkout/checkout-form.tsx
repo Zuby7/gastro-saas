@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
+import { CreditCard, Lock, Wallet } from "lucide-react";
 import { checkoutAction, type CheckoutFormState } from "./actions";
 
 interface CheckoutFormProps {
@@ -181,12 +182,38 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
         </label>
       </div>
 
+      {/*
+        Ticket: make the upcoming payment step obvious and overviewable
+        before the customer clicks through -- previously the button just
+        said "Bestellung abschicken" with no indication that the next step
+        is a real payment (redirect to Stripe Checkout), or which payment
+        methods are actually accepted. Icons are generic lucide-react
+        glyphs, not brand logos, to sidestep trademark/brand-guideline
+        concerns for Visa/Mastercard/PayPal/Klarna marks.
+      */}
+      <div className="flex items-center gap-2 text-sm text-foreground-secondary">
+        <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>Sichere Zahlung über Stripe</span>
+        <span aria-hidden="true">·</span>
+        <span className="flex items-center gap-1.5">
+          <CreditCard className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Kreditkarte
+        </span>
+        <span aria-hidden="true">·</span>
+        <span className="flex items-center gap-1.5">
+          <Wallet className="h-4 w-4 shrink-0" aria-hidden="true" />
+          PayPal
+        </span>
+        <span aria-hidden="true">·</span>
+        <span>Klarna</span>
+      </div>
+
       <button
         type="submit"
         disabled={isPending || !checkoutReady}
         className="rounded-md bg-brand-600 px-4 py-3 font-medium text-neutral-0 transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isPending ? "Bestellung wird aufgegeben…" : "Bestellung abschicken"}
+        {isPending ? "Weiterleitung zur Zahlung…" : "Weiter zur Zahlung"}
       </button>
     </form>
   );
