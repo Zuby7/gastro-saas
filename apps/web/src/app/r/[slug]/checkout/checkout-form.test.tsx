@@ -16,9 +16,30 @@ describe("CheckoutForm accessibility", () => {
   it("groups the fulfillment-type choice under a labeled fieldset/legend", () => {
     render(<CheckoutForm tenantSlug="demo" checkoutReady />);
 
-    expect(screen.getByRole("group", { name: "Wie möchten Sie bestellen?" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Abholung" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Tischbestellung" })).not.toBeChecked();
+    expect(screen.getByRole("group", { name: "Sie sitzen im Restaurant?" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Online bestellen & abholen" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Am Tisch bestellen" })).not.toBeChecked();
+  });
+
+  // Ticket #152: online-first flow -- the table-ordering choice is no longer
+  // the first question.
+  it("renders name, phone and note before the fulfillment fieldset, and the table number after it", () => {
+    const { container } = render(<CheckoutForm tenantSlug="demo" checkoutReady />);
+
+    const name = container.querySelector("#customerName")!;
+    const phone = container.querySelector("#customerPhone")!;
+    const note = container.querySelector("#customerNote")!;
+    const fieldset = container.querySelector("fieldset")!;
+    const follows = Node.DOCUMENT_POSITION_FOLLOWING;
+
+    expect(name.compareDocumentPosition(fieldset) & follows).toBeTruthy();
+    expect(phone.compareDocumentPosition(fieldset) & follows).toBeTruthy();
+    expect(note.compareDocumentPosition(fieldset) & follows).toBeTruthy();
+    expect(container.querySelector("form")!.firstElementChild).not.toBe(fieldset);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Am Tisch bestellen" }));
+    const table = container.querySelector("#tableIdentifier")!;
+    expect(fieldset.compareDocumentPosition(table) & follows).toBeTruthy();
   });
 
   it("shows the phone field (optional) for the pickup variant by default, with a labeled input", () => {
@@ -33,7 +54,7 @@ describe("CheckoutForm accessibility", () => {
   it("switches to a required, labeled table-number field for the table variant", () => {
     render(<CheckoutForm tenantSlug="demo" checkoutReady />);
 
-    fireEvent.click(screen.getByRole("radio", { name: "Tischbestellung" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Am Tisch bestellen" }));
 
     const tableInput = screen.getByLabelText("Tischnummer");
     expect(tableInput).toBeRequired();

@@ -14,7 +14,7 @@ The MVP is done when this full journey works end-to-end in Stripe **test mode**:
 ## In scope for MVP
 
 - Single-location tenants (data model is location-ready, UI is not multi-location yet).
-- Pickup and table ordering. Delivery is a feature-flagged placeholder, not implemented.
+- Pickup and table ordering. Delivery is a feature-flagged placeholder, not implemented. Checkout is online-first (ticket #152): the form flows name -> optional phone -> optional note -> "Sie sitzen im Restaurant?" choice ("Online bestellen & abholen" default / "Am Tisch bestellen", which swaps the phone field for the required table number) -> privacy notice, AGB consent, payment methods, "Weiter zur Zahlung". The server contract (`fulfillmentType` `pickup`/`table`, `tableIdentifier`, `customerPhone`) is unchanged.
 - Guest checkout only (no customer accounts yet).
 - Stripe Connect in test mode; production activation requires explicit human approval later.
 - Deterministic, rule-based menu quality/compliance checks. No AI dependency anywhere in the MVP.

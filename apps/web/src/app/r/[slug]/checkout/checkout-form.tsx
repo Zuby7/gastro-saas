@@ -23,34 +23,6 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
 
   return (
     <form action={formAction} className="flex flex-col gap-6" noValidate>
-      <fieldset className="flex flex-col gap-3">
-        <legend className="text-sm font-semibold text-foreground">
-          Wie möchten Sie bestellen?
-        </legend>
-        <label className="flex items-center gap-2 text-foreground">
-          <input
-            type="radio"
-            name="fulfillmentType"
-            value="pickup"
-            checked={fulfillmentType === "pickup"}
-            onChange={() => setFulfillmentType("pickup")}
-            className="h-4 w-4 accent-brand-600"
-          />
-          Abholung
-        </label>
-        <label className="flex items-center gap-2 text-foreground">
-          <input
-            type="radio"
-            name="fulfillmentType"
-            value="table"
-            checked={fulfillmentType === "table"}
-            onChange={() => setFulfillmentType("table")}
-            className="h-4 w-4 accent-brand-600"
-          />
-          Tischbestellung
-        </label>
-      </fieldset>
-
       <div className="flex flex-col gap-1">
         <label htmlFor="customerName" className="text-sm font-medium text-foreground">
           Name
@@ -80,21 +52,7 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
           />
         </div>
-      ) : (
-        <div className="flex flex-col gap-1">
-          <label htmlFor="tableIdentifier" className="text-sm font-medium text-foreground">
-            Tischnummer
-          </label>
-          <input
-            id="tableIdentifier"
-            name="tableIdentifier"
-            type="text"
-            required
-            maxLength={40}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
-          />
-        </div>
-      )}
+      ) : null}
 
       <div className="flex flex-col gap-1">
         <label htmlFor="customerNote" className="text-sm font-medium text-foreground">
@@ -108,6 +66,54 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
           className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
         />
       </div>
+
+      {/*
+        Ticket #152: online-first. Pickup is the default; the table-ordering
+        choice comes after the core fields and swaps the optional phone field
+        for the required Tischnummer. Server contract (fulfillmentType,
+        tableIdentifier, customerPhone) is unchanged.
+      */}
+      <fieldset className="flex flex-col gap-3">
+        <legend className="text-sm font-semibold text-foreground">Sie sitzen im Restaurant?</legend>
+        <label className="flex items-center gap-2 text-foreground">
+          <input
+            type="radio"
+            name="fulfillmentType"
+            value="pickup"
+            checked={fulfillmentType === "pickup"}
+            onChange={() => setFulfillmentType("pickup")}
+            className="h-4 w-4 accent-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
+          />
+          Online bestellen &amp; abholen
+        </label>
+        <label className="flex items-center gap-2 text-foreground">
+          <input
+            type="radio"
+            name="fulfillmentType"
+            value="table"
+            checked={fulfillmentType === "table"}
+            onChange={() => setFulfillmentType("table")}
+            className="h-4 w-4 accent-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
+          />
+          Am Tisch bestellen
+        </label>
+      </fieldset>
+
+      {fulfillmentType === "table" ? (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="tableIdentifier" className="text-sm font-medium text-foreground">
+            Tischnummer
+          </label>
+          <input
+            id="tableIdentifier"
+            name="tableIdentifier"
+            type="text"
+            required
+            maxLength={40}
+            className="rounded-md border border-neutral-300 px-3 py-2 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
+          />
+        </div>
+      ) : null}
 
       {state.error ? (
         <p

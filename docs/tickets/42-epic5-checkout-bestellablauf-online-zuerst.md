@@ -23,10 +23,10 @@ Abhängig von "Bestell-Zustandsmaschine und Checkout-Flow" (#21) und "Checkout-Z
 
 ## Akzeptanzkriterien
 
-- [ ] Standardpfad (Abholung) zeigt keine Tisch-Eingabe und keine Frage nach der Bestellart als ersten Schritt.
-- [ ] "Tischbestellung" ist weiterhin wählbar, erscheint nach den Kontaktdaten und verlangt eine Tischnummer.
-- [ ] Beide Pfade senden dieselben Formularfelder wie bisher (kein Server-Vertragsbruch); bestehende Checkout-Action-Tests bleiben grün.
-- [ ] Tastaturbedienung, sichtbarer Fokus, gruppierte Radios mit Legend/Label (a11y-Test angepasst und grün).
+- [x] Standardpfad (Abholung) zeigt keine Tisch-Eingabe und keine Frage nach der Bestellart als ersten Schritt.
+- [x] "Tischbestellung" ist weiterhin wählbar, erscheint nach den Kontaktdaten und verlangt eine Tischnummer.
+- [x] Beide Pfade senden dieselben Formularfelder wie bisher (kein Server-Vertragsbruch); bestehende Checkout-Action-Tests bleiben grün.
+- [x] Tastaturbedienung, sichtbarer Fokus, gruppierte Radios mit Legend/Label (a11y-Test angepasst und grün).
 
 ## UI-Zustände
 
@@ -62,8 +62,8 @@ Nicht zutreffend (reine UI-Änderung, per Revert zurückrollbar).
 
 ## Definition of Done
 
-- [ ] Akzeptanzkriterien erfüllt
-- [ ] Tests grün (lint, typecheck, unit, ggf. e2e)
-- [ ] Tenant-Isolation weiterhin gewährleistet
-- [ ] Dokumentation aktualisiert
+- [x] Akzeptanzkriterien erfüllt
+- [x] Tests grün (lint, typecheck, unit, ggf. e2e)
+- [x] Tenant-Isolation weiterhin gewährleistet
+- [x] Dokumentation aktualisiert
 - [ ] Opus-Validator: `APPROVED`
