@@ -151,6 +151,43 @@ describe("OrderStatusPage", () => {
     expect(screen.getByRole("button", { name: "Bewertung abschicken" })).toBeInTheDocument();
   });
 
+  it.each(["received", "accepted", "preparing", "ready", "completed"] as const)(
+    "links to the digital receipt for a paid (%s) order",
+    async (status) => {
+      getOrderStatusByTokenMock.mockResolvedValue(buildOrder({ status }));
+      const { default: OrderStatusPage } = await import("./page");
+
+      render(
+        await OrderStatusPage({
+          params: Promise.resolve({ slug: "demo", token: "valid-token" }),
+        }),
+      );
+
+      expect(screen.getByRole("link", { name: "Digitalen Beleg öffnen" })).toHaveAttribute(
+        "href",
+        "/r/demo/orders/valid-token/beleg",
+      );
+    },
+  );
+
+  it.each(["awaiting_payment", "cancelled"] as const)(
+    "does not link to the digital receipt for a %s order",
+    async (status) => {
+      getOrderStatusByTokenMock.mockResolvedValue(buildOrder({ status }));
+      const { default: OrderStatusPage } = await import("./page");
+
+      render(
+        await OrderStatusPage({
+          params: Promise.resolve({ slug: "demo", token: "valid-token" }),
+        }),
+      );
+
+      expect(
+        screen.queryByRole("link", { name: "Digitalen Beleg öffnen" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
   it("renders the already-submitted rating summary instead of the form for a completed, already-rated order", async () => {
     getOrderStatusByTokenMock.mockResolvedValue(
       buildOrder({

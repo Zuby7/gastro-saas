@@ -24,12 +24,12 @@ Abhängig von #22 (Bestellstatus), #24/#25 (Zahlung/Webhook) — umgesetzt.
 
 ## Akzeptanzkriterien
 
-- [ ] Beleg ist für bezahlte Bestellungen per Token abrufbar und zeigt ausschließlich serverseitig berechnete Beträge.
-- [ ] Falsches/unbekanntes Token oder Token eines anderen Tenants liefert dieselbe generische "nicht gefunden"-Seite wie die Statusseite (kein Orakel).
-- [ ] Unbezahlte/abgebrochene Bestellung zeigt keinen Beleg.
-- [ ] Druckansicht blendet Navigation/Buttons aus und ist auf Papier/PDF lesbar.
-- [ ] Rechtlicher Hinweis ("kein steuerlich qualifizierter Kassenbeleg") ist sichtbar.
-- [ ] Cross-Tenant-Test: Token von Tenant A ist unter Slug von Tenant B nicht abrufbar.
+- [x] Beleg ist für bezahlte Bestellungen per Token abrufbar und zeigt ausschließlich serverseitig berechnete Beträge.
+- [x] Falsches/unbekanntes Token oder Token eines anderen Tenants liefert dieselbe generische "nicht gefunden"-Seite wie die Statusseite (kein Orakel).
+- [x] Unbezahlte/abgebrochene Bestellung zeigt keinen Beleg.
+- [x] Druckansicht blendet Navigation/Buttons aus und ist auf Papier/PDF lesbar.
+- [x] Rechtlicher Hinweis ("kein steuerlich qualifizierter Kassenbeleg") ist sichtbar.
+- [x] Cross-Tenant-Test: Token von Tenant A ist unter Slug von Tenant B nicht abrufbar.
 
 ## UI-Zustände
 
@@ -65,10 +65,10 @@ Nur falls RPC erweitert wird: additive Migration, per Revert rückrollbar.
 
 ## Definition of Done
 
-- [ ] Akzeptanzkriterien erfüllt
-- [ ] Tests grün (lint, typecheck, unit, ggf. e2e)
-- [ ] Migration validiert (falls zutreffend)
-- [ ] Tenant-Isolation weiterhin gewährleistet
+- [x] Akzeptanzkriterien erfüllt
+- [x] Tests grün (lint, typecheck, unit, ggf. e2e)
+- [x] Migration validiert (nicht zutreffend: keine Migration, bestehende RPC wiederverwendet)
+- [x] Tenant-Isolation weiterhin gewährleistet
 - [ ] Sicherheitsprüfung bestanden
-- [ ] Dokumentation aktualisiert
+- [x] Dokumentation aktualisiert
 - [ ] Opus-Validator: `APPROVED`

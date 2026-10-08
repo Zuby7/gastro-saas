@@ -5,6 +5,7 @@ import { formatOrderTimestamp } from "@/lib/orders/format";
 import { getOrderStatusByToken } from "@/lib/orders/service";
 import { orderStatusLabel } from "@/lib/orders/status-labels";
 import { hashOrderAccessToken } from "@/lib/orders/token";
+import { isOrderPaidStatus } from "@/lib/orders/receipt";
 import { OrderStatusLive } from "./order-status-live";
 import { RatingForm } from "./rating-form";
 
@@ -167,6 +168,15 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
           ) : (
             <RatingForm tenantSlug={slug} token={token} />
           )
+        ) : null}
+
+        {isOrderPaidStatus(order.status) ? (
+          <Link
+            href={`/r/${slug}/orders/${token}/beleg`}
+            className="self-start text-sm font-medium text-ember-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
+          >
+            Digitalen Beleg öffnen
+          </Link>
         ) : null}
 
         <Link
