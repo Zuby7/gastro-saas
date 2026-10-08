@@ -5,6 +5,10 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2024-09-23",
   "compatibility_flags": ["nodejs_compat"],
+  // Public base URL (not a secret): used for Stripe success/cancel/return URLs, invite links and QR codes.
+  "vars": {
+    "NEXT_PUBLIC_APP_URL": "https://gastro-saas-web.gastro-saas-web.workers.dev",
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS",
