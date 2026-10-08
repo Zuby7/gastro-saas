@@ -127,7 +127,7 @@ export function DishCard({ dish, tenantSlug }: DishCardProps) {
           // Opus review finding 2 on PR #80 (price display was previously
           // lost entirely for sold-out dishes).
           <div className="mt-auto flex items-center pt-2">
-            <span className="font-display font-bold text-ember-700">
+            <span className="font-display font-bold text-accent-foreground">
               {isSimpleDish(dish)
                 ? formatPrice(dish.priceCents, dish.currency)
                 : startingPriceLabel(dish)}
@@ -141,7 +141,7 @@ export function DishCard({ dish, tenantSlug }: DishCardProps) {
           // 2026-09-08). Staying within this row's own box also keeps it
           // inside the card's `overflow-hidden` bounds.
           <div className="relative mt-auto flex items-center justify-between pt-2">
-            <span className="font-display font-bold text-ember-700">
+            <span className="font-display font-bold text-accent-foreground">
               {formatPrice(dish.priceCents, dish.currency)}
             </span>
             <SimpleAddButton dish={dish} tenantSlug={tenantSlug} />
@@ -152,7 +152,7 @@ export function DishCard({ dish, tenantSlug }: DishCardProps) {
               aria-label={`${dish.name}, ${startingPriceLabel(dish)}: Auswahl öffnen`}
               className={`flex cursor-pointer list-none items-center justify-between rounded-lg [&::-webkit-details-marker]:hidden ${ADD_BUTTON_INTERACTIVE_CLASSNAME}`}
             >
-              <span className="font-display font-bold text-ember-700">
+              <span className="font-display font-bold text-accent-foreground">
                 {formatPrice(startingPriceCents(dish), dish.currency)}
               </span>
               <span className={ADD_BUTTON_VISUAL_CLASSNAME} aria-hidden="true">

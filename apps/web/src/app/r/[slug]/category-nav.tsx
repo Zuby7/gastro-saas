@@ -80,7 +80,7 @@ export function CategoryNav({ categories }: CategoryNavProps) {
               aria-current={isActive ? "true" : undefined}
               className={`shrink-0 border-b-2 py-4 text-sm font-medium motion-safe:transition-colors motion-safe:duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600 ${
                 isActive
-                  ? "border-ember-600 text-ember-600"
+                  ? "border-accent-foreground text-accent-foreground"
                   : "border-transparent text-foreground-secondary hover:text-foreground"
               }`}
             >

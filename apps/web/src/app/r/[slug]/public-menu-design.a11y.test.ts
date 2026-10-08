@@ -71,6 +71,11 @@ describe("public menu category nav / dish card color contrast (WCAG AA)", () => 
     expect(result.passesAA).toBe(true);
   });
 
+  it("dark scheme: accent text (ember-300) on card (neutral-800) and page (neutral-900) passes AA (issue #159)", () => {
+    expect(validateContrastRatio(colors.ember[300], colors.neutral[800]).passesAA).toBe(true);
+    expect(validateContrastRatio(colors.ember[300], colors.neutral[900]).passesAA).toBe(true);
+  });
+
   it("'+' add-to-cart button icon (white) on its solid ember-600 background passes AA (non-text UI component, 3:1 minimum)", () => {
     const result = validateContrastRatio("#ffffff", colors.ember[600], "large");
     expect(result.passesAA).toBe(true);

@@ -45,7 +45,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
         {!cart || cart.items.length === 0 ? (
           <p className="rounded-md border border-neutral-300 bg-surface p-4 text-foreground">
             Ihr Warenkorb ist leer.{" "}
-            <Link href={`/r/${slug}`} className="font-medium text-ember-700 underline">
+            <Link href={`/r/${slug}`} className="font-medium text-accent-foreground underline">
               Zurück zur Speisekarte
             </Link>
           </p>
@@ -61,7 +61,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
             <div className="ticket-edge rounded-t-lg border border-b-0 border-neutral-300 bg-surface px-4 pt-3 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-foreground">Gesamtsumme</span>
-                <span className="font-display text-xl font-semibold text-ember-700">
+                <span className="font-display text-xl font-semibold text-accent-foreground">
                   {formatPrice(cart.totalCents, cart.currency)}
                 </span>
               </div>

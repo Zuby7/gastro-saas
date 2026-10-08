@@ -55,7 +55,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
           Für diesen Link konnte keine Bestellung gefunden werden. Bitte prüfen Sie den Link aus
           Ihrer Bestellbestätigung.
         </p>
-        <Link href={`/r/${slug}`} className="font-medium text-ember-700 underline">
+        <Link href={`/r/${slug}`} className="font-medium text-accent-foreground underline">
           Zurück zur Speisekarte
         </Link>
       </main>
@@ -132,7 +132,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
           </ul>
           <div className="mt-4 flex items-center justify-between border-t border-neutral-200 pt-3">
             <span className="font-medium text-foreground">Gesamtsumme</span>
-            <span className="font-display text-lg font-semibold text-ember-700">
+            <span className="font-display text-lg font-semibold text-accent-foreground">
               {formatPrice(order.totalCents, order.currency)}
             </span>
           </div>
@@ -173,7 +173,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
         {isOrderPaidStatus(order.status) ? (
           <Link
             href={`/r/${slug}/orders/${token}/beleg`}
-            className="self-start text-sm font-medium text-ember-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
+            className="self-start text-sm font-medium text-accent-foreground underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
           >
             Digitalen Beleg öffnen
           </Link>
@@ -181,7 +181,7 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
 
         <Link
           href={`/r/${slug}`}
-          className="self-start text-sm font-medium text-ember-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
+          className="self-start text-sm font-medium text-accent-foreground underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
         >
           Zurück zur Speisekarte
         </Link>

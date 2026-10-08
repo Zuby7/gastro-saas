@@ -65,7 +65,10 @@ function useCartFeedback(
           className={`${messageClassName} rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-foreground shadow-sm`}
         >
           Im Warenkorb: {state.cart.itemCount} Artikel ·{" "}
-          <Link href={`/r/${tenantSlug}/cart`} className="font-medium text-ember-700 underline">
+          <Link
+            href={`/r/${tenantSlug}/cart`}
+            className="font-medium text-accent-foreground underline"
+          >
             Warenkorb ansehen
           </Link>
         </p>

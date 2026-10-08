@@ -38,7 +38,7 @@ export default async function ReceiptPage({ params }: ReceiptPageProps) {
           Für diesen Link konnte keine Bestellung gefunden werden. Bitte prüfen Sie den Link aus
           Ihrer Bestellbestätigung.
         </p>
-        <Link href={`/r/${slug}`} className="font-medium text-ember-700 underline">
+        <Link href={`/r/${slug}`} className="font-medium text-accent-foreground underline">
           Zurück zur Speisekarte
         </Link>
       </main>
@@ -55,7 +55,10 @@ export default async function ReceiptPage({ params }: ReceiptPageProps) {
           Für diese Bestellung liegt aktuell kein Beleg vor. Ein Beleg ist erst nach erfolgreicher
           Online-Zahlung verfügbar.
         </p>
-        <Link href={`/r/${slug}/orders/${token}`} className="font-medium text-ember-700 underline">
+        <Link
+          href={`/r/${slug}/orders/${token}`}
+          className="font-medium text-accent-foreground underline"
+        >
           Zurück zum Bestellstatus
         </Link>
       </main>
@@ -77,7 +80,7 @@ export default async function ReceiptPage({ params }: ReceiptPageProps) {
         <nav className="print:hidden" aria-label="Navigation">
           <Link
             href={`/r/${slug}/orders/${token}`}
-            className="text-sm font-medium text-ember-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
+            className="text-sm font-medium text-accent-foreground underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
           >
             Zurück zum Bestellstatus
           </Link>
