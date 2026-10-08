@@ -99,3 +99,7 @@ First real end-to-end attempt of the Stripe Connect onboarding + Checkout flow a
 6. **Seed data trap.** The demo tenant's seeded `payment_accounts` row used a fake `acct_demo_seed_test` with `charges_enabled: true`, which made checkout fail generically instead of honestly. Removed on the hosted DB; do not seed fake Stripe account ids into any environment that has a real Stripe key.
 
 Remaining manual step for the demo tenant: complete hosted Express onboarding in test mode (Stripe's "use test data" path), then verify `charges_enabled` via the `account.updated` Connect webhook before placing a test order with a Stripe test card.
+
+## `NEXT_PUBLIC_APP_URL` must be set on the Worker (2026-10-09, issue #157)
+
+The first end-to-end test payment on the live Worker succeeded at Stripe, but the redirect back pointed to `http://localhost:3000` (`ERR_CONNECTION_REFUSED`): `lib/payments/service.ts`, `app/account/payments/actions.ts` and `app/account/actions.ts` fall back to localhost when `NEXT_PUBLIC_APP_URL` is unset. The public base URL is now a plain (non-secret) `vars` entry in `apps/web/wrangler.jsonc`. When a custom domain replaces the `*.workers.dev` URL, update that value (and the Stripe Dashboard webhook endpoints) in the same change.
