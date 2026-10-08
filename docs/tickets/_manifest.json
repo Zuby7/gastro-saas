@@ -309,5 +309,34 @@
     "labels": ["type:feature", "area:frontend", "priority:high", "phase:mvp", "risk:privacy"],
     "milestone": 5,
     "issue": 41
+  },
+  {
+    "file": "docs/tickets/42-epic5-checkout-bestellablauf-online-zuerst.md",
+    "title": "[Epic 5] Checkout-Ablauf: Online-Bestellung zuerst, Tischbestellung später im Prozess",
+    "labels": [
+      "type:feature",
+      "area:frontend",
+      "area:ordering",
+      "priority:medium",
+      "phase:mvp",
+      "risk:accessibility"
+    ],
+    "milestone": 5,
+    "issue": 152
+  },
+  {
+    "file": "docs/tickets/43-epic6-digitaler-kassenbon-beleg.md",
+    "title": "[Epic 6] Digitaler Kassenbon: Beleg für bezahlte Bestellungen",
+    "labels": [
+      "type:feature",
+      "area:ordering",
+      "area:frontend",
+      "priority:medium",
+      "phase:mvp",
+      "risk:privacy",
+      "risk:payment"
+    ],
+    "milestone": 6,
+    "issue": 153
   }
 ]
