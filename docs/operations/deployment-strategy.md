@@ -111,3 +111,14 @@ Live end-to-end test on `https://gastro-saas-web.gastro-saas-web.workers.dev` (S
 Accessibility: axe-core (WCAG 2 A/AA + best-practice) over `/`, `/login`, `/register`, `/r/<slug>`, `/cart`, `/checkout`, `/agb`, `/datenschutz`, `/impressum` at 390 px width in light and dark scheme: 0 violations after #160 (dark-mode accent contrast).
 
 Open follow-ups: CD pipeline for the Worker, migration-drift check in `/release-check`, evaluate Accounts v2 before production, idempotency-key handling for failed Connect account creation, receipt order reference / `noindex` for token pages, issue #89 (Sentry), #83 (dark-mode tech debt).
+
+## Scheduled purge of hashed visitor IPs (issue #164) — manual step on the hosted project
+
+Migration `supabase/migrations/20260906170000_schedule_analytics_attempt_purge.sql` schedules `purge_stale_menu_view_attempts()` and `purge_stale_dish_engagement_attempts()` (35 days) daily at 03:15/03:25 UTC via Supabase pg_cron (free). It is a no-op where pg_cron is unavailable. The hosted project is not migrated automatically. **Order matters:** (a) `wrangler secret put IP_HASH_SECRET` (long random value, via stdin); (b) deploy this Worker build; (c) run the migration SQL in the Supabase SQL Editor and verify with `select jobname, schedule from cron.job;`. Consequence of a missing secret in production: **all** `record_menu_view` / `record_dish_view(s)` / `record_add_to_cart_event` calls are skipped (view and add-to-cart statistics are silently lost; only a `console.warn` is emitted), not just the IP hash.
+
+Runbook:
+
+- Verify scheduled: `select jobname, schedule from cron.job;` (expect `purge-menu-view-attempts`, `purge-dish-engagement-attempts`).
+- Verify runs: `select jobname, status, return_message, start_time from cron.job_run_details order by start_time desc limit 10;` — check after the first night and occasionally; a `failed` status means rows are not being purged.
+- Rotating `IP_HASH_SECRET` resets rate-limit buckets and can double-count views inside the 1-day dedup window; no data migration needed.
+- Until this is verified in production, privacy texts keep saying "vorgesehen" (see `docs/legal/cookie-inventory.md`).

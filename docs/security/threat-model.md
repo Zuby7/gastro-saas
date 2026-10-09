@@ -62,6 +62,20 @@ and an Owner-only (`tenant.data.delete`) deletion-request workflow
   (`apps/web/src/app/account/privacy/retention-settings-form.tsx`). Until a
   scheduled-job mechanism exists for this platform, rows older than the
   configured period simply remain until one of those two paths runs.
+- `menu_view_attempts`/`dish_engagement_attempts` (hashed visitor IPs, 35-day
+  window): migration `20260906170000_schedule_analytics_attempt_purge.sql`
+  (issue #164) schedules `purge_stale_*_attempts()` daily via Supabase
+  pg_cron (no-op where pg_cron is unavailable). It only takes effect on the
+  hosted project once the migration SQL has been run there — see
+  `docs/operations/deployment-strategy.md`. IP hashes are HMAC-SHA256 keyed
+  with the `IP_HASH_SECRET` Worker secret. Rollout order: set the secret,
+  deploy the Worker, then run the migration SQL and verify
+  `select jobname, schedule from cron.job;`. In production without the secret,
+  ALL menu-view/dish-view(s)/add-to-cart recording is skipped (fail-safe, but
+  statistics are silently lost; only a console.warn). Rotating the secret
+  resets rate-limit buckets and can double-count views inside the 1-day dedup
+  window. Rows written before the secret was set stay
+  unsalted until the purge removes them (max 35 days).
 - `audit_logs` is explicitly out of scope for both configurable retention and
   the deletion workflow: it is append-only/immutable for every app-facing
   role by design (ticket #6, `reject_audit_log_mutation()`), a deliberate

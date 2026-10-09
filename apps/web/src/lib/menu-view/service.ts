@@ -1,11 +1,33 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { getClientIp } from "@/lib/auth/client-ip";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { readMenuViewToken } from "./cookie";
 import { hashMenuViewToken } from "./token";
 
-/** SHA-256 hex digest -- the only form of the client IP that reaches Postgres for this feature. */
-function hashIp(ip: string): string {
+/**
+ * Keyed hash of the client IP (issue #164). With `IP_HASH_SECRET` set (a Worker
+ * secret in production) this is HMAC-SHA256, so the stored value cannot be
+ * brute-forced from the small IPv4 space. Without the secret:
+ *  - production: returns null and the caller skips recording (analytics is
+ *    best-effort; storing an unsalted IP hash is the worse failure) -- warns.
+ *  - non-production (dev/test/CI): plain SHA-256, so local setups need no secret.
+ */
+let warnedMissingSecret = false;
+
+export function hashIp(ip: string): string | null {
+  const secret = process.env.IP_HASH_SECRET;
+  if (secret) {
+    return createHmac("sha256", secret).update(ip, "utf8").digest("hex");
+  }
+  if (process.env.NODE_ENV === "production") {
+    if (!warnedMissingSecret) {
+      warnedMissingSecret = true;
+      console.warn(
+        "[menu-view] IP_HASH_SECRET is not set; skipping ALL menu/dish view and add-to-cart analytics recording",
+      );
+    }
+    return null;
+  }
   return createHash("sha256").update(ip, "utf8").digest("hex");
 }
 
@@ -19,7 +41,7 @@ function hashIp(ip: string): string {
  * PR #136 repair cycle). Falls back to the session token's own hash so each
  * anonymous browser still gets its own independent bucket.
  */
-function resolveRateLimitBucketHash(ip: string, sessionTokenHash: string): string {
+function resolveRateLimitBucketHash(ip: string, sessionTokenHash: string): string | null {
   return ip === "unknown" ? hashIp(`session-fallback:${sessionTokenHash}`) : hashIp(ip);
 }
 
@@ -52,6 +74,9 @@ export async function recordMenuViewOnce(tenantSlug: string, tenantId: string): 
     const sessionTokenHash = hashMenuViewToken(token);
     const ip = await getClientIp();
     const ipHash = resolveRateLimitBucketHash(ip, sessionTokenHash);
+    if (ipHash === null) {
+      return;
+    }
 
     const admin = createSupabaseAdminClient();
     const { error } = await admin.rpc("record_menu_view", {
@@ -94,12 +119,16 @@ export async function recordDishViewOnce(
 
     const ip = await getClientIp();
     const sessionTokenHash = hashMenuViewToken(token);
+    const ipHash = resolveRateLimitBucketHash(ip, sessionTokenHash);
+    if (ipHash === null) {
+      return;
+    }
     const admin = createSupabaseAdminClient();
     const { error } = await admin.rpc("record_dish_view", {
       p_tenant_id: tenantId,
       p_dish_id: dishId,
       p_session_token_hash: sessionTokenHash,
-      p_ip_hash: resolveRateLimitBucketHash(ip, sessionTokenHash),
+      p_ip_hash: ipHash,
     });
 
     if (error) {
@@ -147,12 +176,16 @@ export async function recordDishViewsOnce(
 
     const ip = await getClientIp();
     const sessionTokenHash = hashMenuViewToken(token);
+    const ipHash = resolveRateLimitBucketHash(ip, sessionTokenHash);
+    if (ipHash === null) {
+      return;
+    }
     const admin = createSupabaseAdminClient();
     const { error } = await admin.rpc("record_dish_views", {
       p_tenant_id: tenantId,
       p_dish_ids: dishIds,
       p_session_token_hash: sessionTokenHash,
-      p_ip_hash: resolveRateLimitBucketHash(ip, sessionTokenHash),
+      p_ip_hash: ipHash,
     });
 
     if (error) {
@@ -186,12 +219,16 @@ export async function recordAddToCartEventOnce(
 
     const ip = await getClientIp();
     const sessionTokenHash = hashMenuViewToken(token);
+    const ipHash = resolveRateLimitBucketHash(ip, sessionTokenHash);
+    if (ipHash === null) {
+      return;
+    }
     const admin = createSupabaseAdminClient();
     const { error } = await admin.rpc("record_add_to_cart_event", {
       p_tenant_id: tenantId,
       p_dish_id: dishId,
       p_session_token_hash: sessionTokenHash,
-      p_ip_hash: resolveRateLimitBucketHash(ip, sessionTokenHash),
+      p_ip_hash: ipHash,
     });
 
     if (error) {
