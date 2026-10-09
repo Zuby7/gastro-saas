@@ -2,11 +2,18 @@
 
 import { startTransition, useActionState, useEffect, useRef, type FormEvent } from "react";
 
+export type PreservedFormProps = {
+  action: (formData: FormData) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+};
+
 export type PreservedFormOptions<S> = {
   /** Defines "success" from the state shape. Default: the state has no truthy `error` and no non-empty `fieldErrors`. */
   isSuccess?: (state: S) => boolean;
   /** Reset the form fields after a successful result (default: true). */
   resetOnSuccess?: boolean;
+  /** Field names (e.g. passwords) that are cleared when the result is NOT a success. */
+  clearOnError?: string[];
 };
 
 function defaultIsSuccess(state: unknown): boolean {
@@ -28,16 +35,18 @@ function defaultIsSuccess(state: unknown): boolean {
  * calls the action inside a transition with the form's FormData (so React's
  * automatic reset never runs) and calls `form.reset()` only on success.
  *
- * Usage: `<form onSubmit={onSubmit}>`.
+ * Usage: `const [state, formProps] = usePreservedFormAction(...)` then `<form {...formProps}>`
+ * (spread both props; never use `onSubmit` alone).
  */
 export function usePreservedFormAction<S>(
   action: (previous: S, formData: FormData) => Promise<S> | S,
   initialState: S,
   options: PreservedFormOptions<S> = {},
-): [state: S, onSubmit: (event: FormEvent<HTMLFormElement>) => void, isPending: boolean] {
-  const { isSuccess = defaultIsSuccess, resetOnSuccess = true } = options;
+): [state: S, formProps: PreservedFormProps, isPending: boolean] {
+  const { isSuccess = defaultIsSuccess, resetOnSuccess = true, clearOnError } = options;
   const formRef = useRef<HTMLFormElement | null>(null);
   const resetPending = useRef(false);
+  const clearPending = useRef(false);
   const isSuccessRef = useRef(isSuccess);
   useEffect(() => {
     isSuccessRef.current = isSuccess;
@@ -46,7 +55,9 @@ export function usePreservedFormAction<S>(
   const [state, formAction, isPending] = useActionState<unknown, FormData>(
     async (previous, formData) => {
       const next = await action(previous as S, formData);
-      resetPending.current = resetOnSuccess && isSuccessRef.current(next);
+      const ok = isSuccessRef.current(next);
+      resetPending.current = resetOnSuccess && ok;
+      clearPending.current = !ok && !!clearOnError?.length;
       return next;
     },
     initialState,
@@ -56,6 +67,13 @@ export function usePreservedFormAction<S>(
     if (resetPending.current) {
       resetPending.current = false;
       formRef.current?.reset();
+    }
+    if (clearPending.current) {
+      clearPending.current = false;
+      for (const name of clearOnError ?? []) {
+        const field = formRef.current?.elements.namedItem(name);
+        if (field instanceof HTMLInputElement) field.value = "";
+      }
     }
   }, [state]);
 
@@ -76,5 +94,9 @@ export function usePreservedFormAction<S>(
     });
   };
 
-  return [state as S, onSubmit, isPending];
+  // `action` stays next to `onSubmit`: with JS it is skipped (onSubmit calls
+  // preventDefault, so React never auto-resets), but before hydration / without
+  // JS the browser POSTs to the server action instead of a GET that would leak
+  // typed values into the URL.
+  return [state as S, { action: formAction, onSubmit }, isPending];
 }

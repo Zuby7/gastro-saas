@@ -176,7 +176,7 @@ export function DishOptionChooser({ dish, tenantSlug }: DishDetailProps) {
 
   return (
     <form
-      onSubmit={formAction}
+      {...formAction}
       className="flex flex-col gap-4 rounded-md border border-neutral-200 bg-surface-secondary p-3"
     >
       <input type="hidden" name="dishId" value={dish.id} />

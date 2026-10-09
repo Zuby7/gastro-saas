@@ -53,7 +53,7 @@ export function RefundForm({
 
   return (
     <form
-      onSubmit={formAction}
+      {...formAction}
       className="flex flex-col gap-3"
       noValidate
       aria-labelledby="refund-form-heading"

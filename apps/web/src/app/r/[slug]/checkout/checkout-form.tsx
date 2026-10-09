@@ -23,7 +23,7 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "table">("pickup");
 
   return (
-    <form onSubmit={formAction} className="flex flex-col gap-6" noValidate>
+    <form {...formAction} className="flex flex-col gap-6" noValidate>
       <div className="flex flex-col gap-1">
         <label htmlFor="customerName" className="text-sm font-medium text-foreground">
           Name

@@ -42,7 +42,7 @@ export function DeletionRequestForm() {
         </p>
       ) : null}
 
-      <form onSubmit={formAction} className="flex flex-col gap-4" noValidate>
+      <form {...formAction} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1">
           <label htmlFor="reason" className="text-sm font-medium text-foreground">
             Begründung (optional)

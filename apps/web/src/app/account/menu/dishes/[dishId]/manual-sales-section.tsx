@@ -65,7 +65,7 @@ export function ManualSalesSection({ dishId, entries }: ManualSalesSectionProps)
         </p>
       ) : null}
 
-      <form onSubmit={formAction} className="flex flex-wrap items-end gap-3" noValidate>
+      <form {...formAction} className="flex flex-wrap items-end gap-3" noValidate>
         <input type="hidden" name="dishId" value={dishId} />
         <div className="flex flex-col gap-1">
           <label htmlFor="manual-sale-quantity" className="text-sm font-medium text-foreground">

@@ -9,7 +9,9 @@ import { registerAction, type RegisterFormState } from "./actions";
 const initialState: RegisterFormState = {};
 
 export default function RegisterPage() {
-  const [state, formAction, isPending] = usePreservedFormAction(registerAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(registerAction, initialState, {
+    clearOnError: ["password"],
+  });
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
@@ -40,7 +42,7 @@ export default function RegisterPage() {
         </p>
       ) : null}
 
-      <form onSubmit={formAction} className="flex flex-col gap-4" noValidate>
+      <form {...formAction} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1">
           <label htmlFor="tenantName" className="text-sm font-medium text-foreground">
             Restaurantname

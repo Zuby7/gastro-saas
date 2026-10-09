@@ -47,7 +47,7 @@ export function RatingForm({ tenantSlug, token }: RatingFormProps) {
   return (
     <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-foreground">Wie war Ihre Bestellung?</h2>
-      <form onSubmit={formAction} className="mt-3 flex flex-col gap-4" noValidate>
+      <form {...formAction} className="mt-3 flex flex-col gap-4" noValidate>
         <fieldset className="flex flex-col gap-2">
           <legend className="text-sm font-medium text-foreground">Bewertung</legend>
           <div className="flex flex-wrap gap-3">

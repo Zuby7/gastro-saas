@@ -67,4 +67,11 @@ describe("CheckoutForm payment-methods hint", () => {
     expect(screen.getByText("Klarna")).toBeInTheDocument();
     expect(screen.getByText("weitere Zahlarten")).toBeInTheDocument();
   });
+
+  it("renders a form with a function action (never a bare GET form)", () => {
+    const { container } = render(<CheckoutForm tenantSlug="demo" checkoutReady />);
+    const form = container.querySelector("form")!;
+    expect(form.getAttribute("action")).toMatch(/^javascript:/);
+    expect(form.getAttribute("method")?.toLowerCase() ?? "post").not.toBe("get");
+  });
 });

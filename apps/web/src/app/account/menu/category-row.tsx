@@ -22,7 +22,7 @@ export function CategoryRow({ id, name }: { id: string; name: string }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-surface-secondary p-2">
-      <form onSubmit={renameFormAction} className="flex items-center gap-2">
+      <form {...renameFormAction} className="flex items-center gap-2">
         <input type="hidden" name="categoryId" value={id} />
         <label htmlFor={`category-name-${id}`} className="sr-only">
           Kategoriename

@@ -70,7 +70,7 @@ export function AvailabilityToggleForm({
 
   return (
     <form
-      onSubmit={formAction}
+      {...formAction}
       className="flex flex-wrap items-end gap-2 rounded-md bg-surface-secondary p-2"
     >
       {Object.entries(hiddenFields).map(([name, value]) => (

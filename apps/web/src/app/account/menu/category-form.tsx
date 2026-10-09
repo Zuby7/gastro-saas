@@ -10,7 +10,7 @@ export function CategoryForm() {
   const [state, formAction, isPending] = usePreservedFormAction(createCategoryAction, initialState);
 
   return (
-    <form onSubmit={formAction} className="flex flex-wrap items-end gap-2" noValidate>
+    <form {...formAction} className="flex flex-wrap items-end gap-2" noValidate>
       <div className="flex flex-col gap-1">
         <label htmlFor="new-category-name" className="text-sm font-medium text-foreground">
           Neue Kategorie

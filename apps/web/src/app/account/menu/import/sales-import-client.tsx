@@ -64,7 +64,7 @@ export function SalesImportClient() {
           </p>
         ) : null}
 
-        <form onSubmit={analyzeFormAction} className="flex flex-wrap items-end gap-3" noValidate>
+        <form {...analyzeFormAction} className="flex flex-wrap items-end gap-3" noValidate>
           <div className="flex flex-col gap-1">
             <label htmlFor="import-file" className="text-sm font-medium text-foreground">
               Datei
@@ -143,7 +143,7 @@ export function SalesImportClient() {
             </table>
           </div>
 
-          <form onSubmit={confirmFormAction} className="flex flex-col gap-4">
+          <form {...confirmFormAction} className="flex flex-col gap-4">
             <input type="hidden" name="batchId" value={analyzed.batchId} />
             <div className="grid gap-3 sm:grid-cols-2">
               {FIELD_OPTIONS.map((field) => (

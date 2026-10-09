@@ -138,7 +138,7 @@ export function OptionGroupsSection({
       </div>
 
       {canEditMenu && unassignedGroups.length > 0 ? (
-        <form onSubmit={assignFormAction} className="flex flex-wrap items-end gap-2">
+        <form {...assignFormAction} className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
             <label htmlFor="assign-option-group" className="text-sm font-medium text-foreground">
@@ -166,11 +166,7 @@ export function OptionGroupsSection({
       ) : null}
 
       {canEditMenu ? (
-        <form
-          onSubmit={createGroupFormAction}
-          className="flex flex-wrap items-end gap-2"
-          noValidate
-        >
+        <form {...createGroupFormAction} className="flex flex-wrap items-end gap-2" noValidate>
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
             <label htmlFor="new-group-name" className="text-sm font-medium text-foreground">
@@ -225,11 +221,7 @@ export function OptionGroupsSection({
       ) : null}
 
       {canEditMenu && allOptionGroups.length > 0 ? (
-        <form
-          onSubmit={createOptionFormAction}
-          className="flex flex-wrap items-end gap-2"
-          noValidate
-        >
+        <form {...createOptionFormAction} className="flex flex-wrap items-end gap-2" noValidate>
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
             <label htmlFor="new-option-group" className="text-sm font-medium text-foreground">

@@ -79,7 +79,7 @@ export function AssignableLookupSection({
         </p>
       ) : null}
 
-      <form onSubmit={createFormAction} className="flex flex-wrap items-end gap-2" noValidate>
+      <form {...createFormAction} className="flex flex-wrap items-end gap-2" noValidate>
         <input type="hidden" name="dishId" value={dishId} />
         <input type="hidden" name="entity" value={entity} />
         <div className="flex flex-col gap-1">

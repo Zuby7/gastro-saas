@@ -11,13 +11,13 @@ function Harness({
   action: (prev: State, fd: FormData) => Promise<State>;
   resetOnSuccess?: boolean;
 }) {
-  const [state, onSubmit, isPending] = usePreservedFormAction(
+  const [state, formProps, isPending] = usePreservedFormAction(
     action,
     {} as State,
     resetOnSuccess === undefined ? {} : { resetOnSuccess },
   );
   return (
-    <form onSubmit={onSubmit} aria-label="demo">
+    <form {...formProps} aria-label="demo">
       <label>
         Name
         <input name="name" type="text" />
@@ -53,6 +53,45 @@ function fill() {
 }
 
 describe("usePreservedFormAction", () => {
+  it("renders a form with a function action (never a bare GET form) and keeps values", async () => {
+    const action = vi.fn(async () => ({ error: "x" }));
+    render(<Harness action={action} />);
+    const form = screen.getByRole("form", { name: "demo" });
+    expect(form.getAttribute("action")).toMatch(/^javascript:/);
+    expect(form.getAttribute("method")?.toLowerCase() ?? "post").not.toBe("get");
+    fill();
+    fireEvent.click(screen.getByRole("button", { name: "Go" }));
+    await screen.findByRole("alert");
+    // action present + onSubmit preventDefault: React must not auto-reset.
+    expect(screen.getByLabelText("Name")).toHaveValue("Ada");
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears only the clearOnError fields after an error", async () => {
+    function Pw() {
+      const [, formProps] = usePreservedFormAction(
+        async () => ({ error: "bad" }) as State,
+        {} as State,
+        {
+          clearOnError: ["pw"],
+        },
+      );
+      return (
+        <form {...formProps} aria-label="pw-form">
+          <input aria-label="mail" name="mail" />
+          <input aria-label="pw" name="pw" type="password" />
+          <button type="submit">Go</button>
+        </form>
+      );
+    }
+    render(<Pw />);
+    fireEvent.change(screen.getByLabelText("mail"), { target: { value: "a@b.de" } });
+    fireEvent.change(screen.getByLabelText("pw"), { target: { value: "secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "Go" }));
+    await waitFor(() => expect(screen.getByLabelText("pw")).toHaveValue(""));
+    expect(screen.getByLabelText("mail")).toHaveValue("a@b.de");
+  });
+
   it("keeps all field values (text, checkbox, select, textarea) after an error result", async () => {
     const action = vi.fn(async () => ({ error: "Bitte prüfen" }));
     render(<Harness action={action} />);

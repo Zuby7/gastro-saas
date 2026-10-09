@@ -83,7 +83,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
       </div>
 
       <div className="flex items-center gap-4">
-        <form onSubmit={updateAction} className="flex items-center gap-2">
+        <form {...updateAction} className="flex items-center gap-2">
           <input type="hidden" name="cartItemId" value={line.cartItemId} />
           <label className="sr-only" htmlFor={`quantity-${line.cartItemId}`}>
             Menge für {line.dishName}

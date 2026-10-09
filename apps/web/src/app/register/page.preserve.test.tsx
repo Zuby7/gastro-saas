@@ -26,4 +26,11 @@ describe("RegisterPage keeps entered values after a validation error", () => {
     expect(screen.getByLabelText("E-Mail-Adresse")).toHaveValue("wirt@example.com");
     expect(screen.getByRole("checkbox")).toBeChecked();
   });
+
+  it("renders a form with a function action (never a bare GET form)", () => {
+    const { container } = render(<RegisterPage />);
+    const form = container.querySelector("form")!;
+    expect(form.getAttribute("action")).toMatch(/^javascript:/);
+    expect(form.getAttribute("method")?.toLowerCase() ?? "post").not.toBe("get");
+  });
 });

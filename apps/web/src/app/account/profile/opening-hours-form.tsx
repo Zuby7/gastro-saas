@@ -53,7 +53,7 @@ export function OpeningHoursForm({ initial }: { initial: OpeningHourInitialValue
         </p>
       ) : null}
 
-      <form onSubmit={formAction} className="flex flex-col gap-3" noValidate>
+      <form {...formAction} className="flex flex-col gap-3" noValidate>
         {initial.map((row) => (
           <fieldset
             key={row.weekday}
