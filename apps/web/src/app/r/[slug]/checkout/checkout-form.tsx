@@ -197,9 +197,9 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
         glyphs, not brand logos, to sidestep trademark/brand-guideline
         concerns for Visa/Mastercard/PayPal/Klarna marks.
       */}
-      <div className="flex items-center gap-2 text-sm text-foreground-secondary">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-foreground-secondary">
         <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span>Sichere Zahlung über Stripe</span>
+        <span className="whitespace-nowrap">Sichere Zahlung über Stripe</span>
         <span aria-hidden="true">·</span>
         <span className="flex items-center gap-1.5">
           <CreditCard className="h-4 w-4 shrink-0" aria-hidden="true" />
