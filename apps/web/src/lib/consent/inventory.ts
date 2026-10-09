@@ -61,8 +61,8 @@ export const STATISTICS_COOKIES = COOKIE_INVENTORY.filter((c) => c.category === 
 /**
  * Plain-language description of what the statistics category does; shown in
  * the settings dialog. Must stay true to `lib/menu-view/service.ts`: it counts
- * menu views, dish views and add-to-cart events, and processes a SHA-256 hash
- * of the IP address (not anonymous) for rate limiting and deduplication. The
+ * menu views, dish views and add-to-cart events, and processes a keyed
+ * HMAC-SHA256 hash (server secret) of the IP address (not anonymous) for rate limiting and deduplication. The
  * hash rows are meant to be purged after 35 days (see
  * `docs/legal/cookie-inventory.md` for the open scheduling point).
  */

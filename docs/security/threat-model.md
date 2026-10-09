@@ -68,8 +68,13 @@ and an Owner-only (`tenant.data.delete`) deletion-request workflow
   pg_cron (no-op where pg_cron is unavailable). It only takes effect on the
   hosted project once the migration SQL has been run there — see
   `docs/operations/deployment-strategy.md`. IP hashes are HMAC-SHA256 keyed
-  with the `IP_HASH_SECRET` Worker secret; in production without it, recording
-  is skipped (fail-safe). Rows written before the secret was set stay
+  with the `IP_HASH_SECRET` Worker secret. Rollout order: set the secret,
+  deploy the Worker, then run the migration SQL and verify
+  `select jobname, schedule from cron.job;`. In production without the secret,
+  ALL menu-view/dish-view(s)/add-to-cart recording is skipped (fail-safe, but
+  statistics are silently lost; only a console.warn). Rotating the secret
+  resets rate-limit buckets and can double-count views inside the 1-day dedup
+  window. Rows written before the secret was set stay
   unsalted until the purge removes them (max 35 days).
 - `audit_logs` is explicitly out of scope for both configurable retention and
   the deletion workflow: it is append-only/immutable for every app-facing

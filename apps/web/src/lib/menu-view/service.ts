@@ -12,13 +12,20 @@ import { hashMenuViewToken } from "./token";
  *    best-effort; storing an unsalted IP hash is the worse failure) -- warns.
  *  - non-production (dev/test/CI): plain SHA-256, so local setups need no secret.
  */
+let warnedMissingSecret = false;
+
 export function hashIp(ip: string): string | null {
   const secret = process.env.IP_HASH_SECRET;
   if (secret) {
     return createHmac("sha256", secret).update(ip, "utf8").digest("hex");
   }
   if (process.env.NODE_ENV === "production") {
-    console.warn("[menu-view] IP_HASH_SECRET is not set; skipping IP-hash analytics recording");
+    if (!warnedMissingSecret) {
+      warnedMissingSecret = true;
+      console.warn(
+        "[menu-view] IP_HASH_SECRET is not set; skipping ALL menu/dish view and add-to-cart analytics recording",
+      );
+    }
     return null;
   }
   return createHash("sha256").update(ip, "utf8").digest("hex");

@@ -50,11 +50,32 @@ describe("IP hash salting (#164)", () => {
     readMenuViewTokenMock.mockResolvedValue("some-session-token");
     rpcMock.mockClear();
 
-    const { recordMenuViewOnce, recordDishViewsOnce } = await import("./service");
-    await recordMenuViewOnce("some-tenant", TENANT);
-    await recordDishViewsOnce("some-tenant", TENANT, [DISH]);
+    vi.resetModules();
+    const svc = await import("./service");
+    await svc.recordMenuViewOnce("some-tenant", TENANT);
+    await svc.recordDishViewOnce("some-tenant", TENANT, DISH);
+    await svc.recordDishViewsOnce("some-tenant", TENANT, [DISH]);
+    await svc.recordAddToCartEventOnce("some-tenant", TENANT, DISH);
 
     expect(rpcMock).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalled();
+    // Warns only once per isolate, not on every request.
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to plain SHA-256 outside production when the secret is unset", async () => {
+    vi.stubEnv("IP_HASH_SECRET", "");
+    vi.stubEnv("NODE_ENV", "test");
+    getClientIpMock.mockResolvedValue("203.0.113.42");
+    readMenuViewTokenMock.mockResolvedValue("some-session-token");
+    rpcMock.mockClear();
+
+    vi.resetModules();
+    const { recordAddToCartEventOnce } = await import("./service");
+    await recordAddToCartEventOnce("some-tenant", TENANT, DISH);
+
+    const [, params] = rpcMock.mock.calls[0]!;
+    expect((params as { p_ip_hash: string }).p_ip_hash).toBe(
+      createHash("sha256").update("203.0.113.42").digest("hex"),
+    );
   });
 });
