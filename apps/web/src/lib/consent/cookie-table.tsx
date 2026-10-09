@@ -9,7 +9,12 @@ export function CookieTable({
   caption: string;
 }) {
   return (
-    <div className="overflow-x-auto">
+    <div
+      className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link-foreground"
+      role="region"
+      aria-label={caption}
+      tabIndex={0}
+    >
       <table className="w-full border-collapse text-left text-sm text-foreground">
         <caption className="sr-only">{caption}</caption>
         <thead>
