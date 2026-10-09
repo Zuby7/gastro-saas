@@ -87,7 +87,7 @@ Chose fix (a) from issue #91: `claim_payment_webhook_event()` now takes an expli
 - **Real dish photos**: 12 freely-licensed (CC0/CC BY/CC BY-SA) photos from Wikimedia Commons, checked into `supabase/seed-assets/dishes/*.jpg` (attribution in that directory's `ATTRIBUTION.md`). `media_assets` requires a real Supabase Storage object, not a URL column, and Storage's actual file bytes live outside Postgres (survive independently of `db reset`, which only resets the database) — so `seed.sql` only creates the `media_assets` rows; a companion script, `supabase/seed-assets/upload-dish-media.mjs`, uploads the real bytes via the Storage REST API. Verified end-to-end: after running the script, a signed URL for the uploaded object returns HTTP 200 with the exact original byte count.
 - **Payments**: one `payment_accounts` row, obviously-fake test id `acct_demo_seed_test`, `status = 'enabled'`. 5 orders spanning every real status (`awaiting_payment`, `preparing`, `ready`, `completed`, `cancelled`), each built via a real, validated `order_status_events` transition chain (not a shortcut past `is_valid_order_status_transition()`); 3 have a matching `payments` row (`status = 'paid'`, fake `cs_test_.../pi_test_...` ids); the completed order has one partial `succeeded` refund (fake `re_test_...` id).
 - **Invitations**: one pending invitation (`neue.aushilfe@trattoria-demo.test`, Marketing role).
-- **Not seeded**: analytics/reviews data (Epic 9/10 not built), Epic 8 (#27-#29) columns/UI (still on separate, unmerged branches at the time of this seed).
+- **Not seeded** (written at seed time, 2026-08; the features themselves are implemented since): analytics-specific, reviews and Epic 8 availability data. The demo `payment_accounts` row (`acct_demo_seed_test`) is for local UI browsing only and must not be used with a real Stripe key; see `docs/operations/troubleshooting.md`.
 
 ## Cloudflare 500 bug fix (2026-09-06) — middleware-manifest crash resolved, app live
 
@@ -118,8 +118,8 @@ Full detail: `docs/operations/deployment-strategy.md`'s "Real Supabase project w
 
 ## Explicitly not decided yet (needs the user or a later ticket)
 
-- Real Stripe/Supabase/Resend/Sentry/PostHog/Better Stack account creation — these need the user's own email/identity and, for Stripe, banking details for payouts.
+- (Status 2026-10-09: a hosted Supabase project, a Cloudflare Worker and a Stripe test-mode platform exist; Resend is integrated in code but a real Worker key is not documented here; Sentry (#89), PostHog and Better Stack are not integrated.) Further real Stripe/Supabase/Resend/Sentry/PostHog/Better Stack account creation — these need the user's own email/identity and, for Stripe, banking details for payouts.
 - Production domain purchase.
-- Whether to use a full `packages/*` monorepo layout or a single-app structure — deferred to the first scaffolding ticket (Epic 1) per `docs/architecture/domain-boundaries.md`.
-- Whether Prisma or the raw Supabase client is the typed data-access layer — deferred to the first database ticket.
+- ~~Monorepo layout versus single app~~ — decided: pnpm workspace with `apps/web` and `packages/*` (see `docs/architecture/domain-boundaries.md`, including the drift note about logic living in `apps/web/src/lib`).
+- ~~Prisma versus raw Supabase client~~ — decided in practice: raw `@supabase/supabase-js` / `@supabase/ssr` plus Postgres RPCs; no Prisma.
 - Production Stripe activation — requires explicit human approval per the source brief, not assumed here or ever without asking.

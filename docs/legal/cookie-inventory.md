@@ -39,7 +39,7 @@ Schriften werden self-hosted (`next/font`), kein Google-Fonts-Request. Keine Mar
 
 ## Technische Folgeaufgaben
 
-- Follow-up: IP-Hash mit serverseitigem Geheimnis salzen (HMAC) statt reinem SHA-256. Nicht in #162 umgesetzt, da dafür ein neues Secret/Konfiguration nötig ist und bestehende Tests (`service.test.ts`) sowie ggf. Datenbestände betroffen sind.
+- Erledigt in #164: IP-Hash mit serverseitigem Geheimnis (`IP_HASH_SECRET`, HMAC-SHA256) statt reinem SHA-256; Details siehe Abschnitt „Offene Punkte“. Offen bleibt nur, den Purge-Job im gehosteten Projekt auszuführen und zu bestätigen.
 - Erledigt in #163: Plattformseiten außerhalb von `/r/[slug]` (`/`, `/login`, `/register`, `/account`, `/datenschutz`) setzen nur notwendige Cookies (`sb-*`, ggf. `gastro_cookie_consent`; Konstante `PLATFORM_COOKIES`). Die Plattform-Datenschutzerklärung (`/datenschutz#cookies`) enthält dazu den Abschnitt „Cookies und ähnliche Technologien“ (gleiche `CookieTable`); der Footer-Link „Cookie-Hinweise“ (`PlatformCookieLink`; bewusst nicht „Cookie-Einstellungen“, da er einen Informationsabschnitt öffnet) führt dorthin, da es auf diesen Seiten keine Einwilligungskategorie zu verwalten gibt (kein Banner). Neue Cookies auf Plattformseiten müssen in `PLATFORM_COOKIE_NAMES` (`inventory.ts`) ergänzt werden.
 - Erledigt in #163: Der feste Cookie-Banner unter `/r/[slug]` reserviert per Abstandshalter (gemessene Banner-Höhe, `ResizeObserver`) Platz im Seitenfluss, solange keine Entscheidung vorliegt, damit er auf Mobilgeräten keine Inhalte verdeckt.
 - Versionshistorie: `CONSENT_VERSION` 3 (Textkorrektur Statistik: Gericht-/Warenkorb-Ereignisse und IP-Hash).

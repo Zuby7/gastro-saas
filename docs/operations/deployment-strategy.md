@@ -11,7 +11,7 @@
 
 ## Hosting
 
-Cloudflare Pages/Workers via `@opennextjs/cloudflare` (see ADR-0001, `docs/platform/service-register.md`). Free `*.pages.dev`/`*.workers.dev` subdomain until a real domain is purchased (a deliberate later step, not part of this foundation pass).
+Cloudflare Workers via `@opennextjs/cloudflare` (see ADR-0001, `docs/platform/service-register.md`). The dated sections below are a chronological record: the "First deployment attempt" blocker and the "no migrations / no secrets yet" statements are superseded by the later sections (middleware patch, Stripe test-mode go-live). Current operational docs: `docs/operations/runbook-stripe-test-mode.md`, `docs/operations/troubleshooting.md`. Free `*.pages.dev`/`*.workers.dev` subdomain until a real domain is purchased (a deliberate later step, not part of this foundation pass).
 
 ### Middleware-manifest 500 bug — fixed (2026-09-06)
 
@@ -57,9 +57,10 @@ The blocker described in the "First deployment attempt" section below (`Dynamic 
 - `supabase start` runs the full local stack (Postgres, Auth, Storage, Studio, etc.) via Docker and applies every migration under `supabase/migrations/` in filename order. `supabase stop` frees the Docker resources afterwards.
 - Migration file naming convention: `supabase/migrations/<YYYYMMDDHHMMSS>_<snake_case_name>.sql` (Supabase CLI default ordering).
 - `supabase/migrations/20260801040000_tenant_membership_brand_location_model.sql` (ticket #4) is the real tenant/membership/brand/location schema and the pattern to copy for further tenant-scoped tables: explicit `tenant_id` + RLS policy in the same migration. The earlier `20260801030000_example_tenant_isolation_pattern.sql` was a disposable reference-only migration (no real domain table) and has been superseded -- don't copy it for new work, but its comments on what it does _not_ cover (Layer 0 / guest paths) still apply and are covered in `docs/security/tenant-isolation.md`.
-- `supabase/seed.sql` is the seed-script skeleton run by `supabase db reset`; currently a no-op until real domain tables exist.
-- CI validates migrations via `.github/workflows/migration-check.yml`, which runs `supabase start` (applies all migrations against a fresh local Postgres) followed by `supabase db lint` on every PR touching `supabase/**`.
-- Local env vars live in `.env.example` at the repo root; copy to `.env.local` and the values already match Supabase's well-known local-dev defaults -- no manual key lookup needed for local work.
+- `supabase/seed.sql` seeds the local demo tenant "Trattoria Da Mario" and refuses to run unless the session flag `gastro_saas.allow_demo_seed = 'on'` is set; use `db:reset` / `db:seed`, which set it (see `docs/development/getting-started.md`). Never run it against a hosted project.
+- CI validates migrations via `.github/workflows/migration-check.yml`, which runs `supabase start` (applies all migrations against a fresh local Postgres), `supabase db lint`, and the DB/RLS integration tests on every PR and push to `main` (no path filter, because it is a required check).
+- Local env vars: `.env.example` at the repo root documents every variable; copy it to `apps/web/.env.local` (where Next.js reads it). The Supabase values already match the well-known local-dev defaults -- no manual key lookup needed for local work. Full table: `docs/development/getting-started.md`.
+- Migrations are not applied to the hosted project by merging; see "Stripe test-mode go-live" below (migration drift) and `docs/operations/troubleshooting.md`.
 
 ## Background processing
 
