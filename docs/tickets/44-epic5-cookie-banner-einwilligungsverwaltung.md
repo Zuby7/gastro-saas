@@ -4,14 +4,14 @@ Der bestehende Banner (#146) hat nur "Ablehnen"/"Akzeptieren" für ein einziges 
 
 ## Cookie-Inventar (Stand Code)
 
-| Cookie | Zweck | Kategorie | Einwilligung |
-|---|---|---|---|
-| Supabase-Auth (`sb-*`) | Login/Sitzung (Personal) | notwendig, § 25 Abs. 2 Nr. 2 | nein |
-| Warenkorb-Cookie (`cart-<slug>`) | Warenkorb des Gasts | notwendig | nein |
-| Bestell-Cookie (`order-<slug>`) | Zugriff auf eigene Bestellung | notwendig | nein |
-| `gastro_cookie_consent` | speichert die Entscheidung | notwendig | nein |
-| `menu_view` | anonyme Seitenaufrufe zählen (#67) | Statistik | **ja (Opt-in)** |
-| Stripe (auf checkout.stripe.com) | Zahlung | Drittanbieter, eigene Verantwortung | Hinweis in Datenschutzerklärung |
+| Cookie                           | Zweck                              | Kategorie                           | Einwilligung                    |
+| -------------------------------- | ---------------------------------- | ----------------------------------- | ------------------------------- |
+| Supabase-Auth (`sb-*`)           | Login/Sitzung (Personal)           | notwendig, § 25 Abs. 2 Nr. 2        | nein                            |
+| Warenkorb-Cookie (`cart-<slug>`) | Warenkorb des Gasts                | notwendig                           | nein                            |
+| Bestell-Cookie (`order-<slug>`)  | Zugriff auf eigene Bestellung      | notwendig                           | nein                            |
+| `gastro_cookie_consent`          | speichert die Entscheidung         | notwendig                           | nein                            |
+| `menu_view`                      | anonyme Seitenaufrufe zählen (#67) | Statistik                           | **ja (Opt-in)**                 |
+| Stripe (auf checkout.stripe.com) | Zahlung                            | Drittanbieter, eigene Verantwortung | Hinweis in Datenschutzerklärung |
 
 Schriften werden self-hosted (`next/font`), kein Google-Fonts-Request. Keine Marketing-/Tracking-Skripte.
 
@@ -58,4 +58,3 @@ Komponenten-, Middleware-, a11y-Kontrast- und Tastatur-Tests; Cookie-Inventar-Te
 - [x] Tests grün (lint, typecheck, unit, build)
 - [x] Dokumentation aktualisiert
 - [ ] Opus-Validator: `APPROVED`
-
