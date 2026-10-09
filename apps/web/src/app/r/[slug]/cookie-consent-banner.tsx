@@ -11,7 +11,11 @@ import {
   type ConsentState,
 } from "@/lib/consent/cookie";
 import { CookieTable } from "@/lib/consent/cookie-table";
-import { NECESSARY_COOKIES, STATISTICS_COOKIES } from "@/lib/consent/inventory";
+import {
+  NECESSARY_COOKIES,
+  STATISTICS_COOKIES,
+  STATISTICS_DESCRIPTION,
+} from "@/lib/consent/inventory";
 
 /**
  * Tickets #146/#162: cookie-consent UI for the public restaurant pages.
@@ -34,7 +38,7 @@ import { NECESSARY_COOKIES, STATISTICS_COOKIES } from "@/lib/consent/inventory";
 
 /** One class string for all three first-level buttons: equal size, weight and contrast. */
 export const CONSENT_BUTTON_CLASS =
-  "rounded-md border-2 border-foreground bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
+  "rounded-md border-2 border-foreground bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link-foreground";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -55,6 +59,7 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statistics, setStatistics] = useState(false);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const settingsLinkRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const titleId = useId();
   const statisticsId = useId();
@@ -84,8 +89,13 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
     returnFocusRef.current = null;
     // Wait for the dialog to unmount, then restore focus to the trigger.
     window.setTimeout(() => {
+      // Trigger may be gone (banner closes after a decision): fall back to the
+      // persistent settings link so focus is never lost to <body>.
+      const fallback = settingsLinkRef.current;
       if (target && target.isConnected) {
         target.focus();
+      } else if (fallback) {
+        fallback.focus();
       }
     }, 0);
   }
@@ -139,17 +149,18 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
 
   return (
     <>
-      <div className="border-t border-neutral-200 px-5 py-4 sm:px-8">
+      <footer className="border-t border-neutral-200 px-5 py-4 sm:px-8">
         <div className="mx-auto max-w-5xl text-sm">
           <button
+            ref={settingsLinkRef}
             type="button"
             onClick={(event) => openDialog(event.currentTarget)}
-            className="font-medium text-link-foreground underline hover:text-brand-700"
+            className="font-medium text-link-foreground underline hover:text-foreground"
           >
             Cookie-Einstellungen
           </button>
         </div>
-      </div>
+      </footer>
 
       {bannerVisible ? (
         <div
@@ -160,11 +171,13 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
           <div className="mx-auto flex max-w-5xl flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <p className="text-sm text-foreground">
               Wir setzen notwendige Cookies ein. Mit Ihrer Einwilligung setzen wir zusätzlich ein
-              Statistik-Cookie, das anonyme Seitenaufrufe zählt. Sie können alles ablehnen, Ihre
-              Auswahl in den Einstellungen anpassen oder alles akzeptieren. Details in unserer{" "}
+              Statistik-Cookie, das Speisekarten-Aufrufe, Gericht-Ansichten und „In den
+              Warenkorb“-Aktionen zählt (dabei wird zur Missbrauchsabwehr und Mehrfachzählung ein
+              Hash Ihrer IP-Adresse verarbeitet). Sie können alles ablehnen, Ihre Auswahl in den
+              Einstellungen anpassen oder alles akzeptieren. Details in unserer{" "}
               <Link
                 href={`/r/${tenantSlug}/datenschutz`}
-                className="font-medium text-link-foreground underline hover:text-brand-700"
+                className="font-medium text-link-foreground underline hover:text-foreground"
               >
                 Datenschutzerklärung
               </Link>
@@ -207,7 +220,7 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
               <button
                 type="button"
                 onClick={closeDialog}
-                className="text-sm font-medium text-link-foreground underline hover:text-brand-700"
+                className="text-sm font-medium text-link-foreground underline hover:text-foreground"
               >
                 Schließen
               </button>
@@ -218,7 +231,7 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
               der{" "}
               <Link
                 href={`/r/${tenantSlug}/datenschutz`}
-                className="font-medium text-link-foreground underline hover:text-brand-700"
+                className="font-medium text-link-foreground underline hover:text-foreground"
               >
                 Datenschutzerklärung
               </Link>
@@ -259,8 +272,7 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
                 </label>
               </div>
               <p className="text-sm">
-                Hilft dem Restaurant zu verstehen, wie oft die Speisekarte aufgerufen wird. Nur mit
-                Ihrer Einwilligung, standardmäßig aus.
+                {STATISTICS_DESCRIPTION} Nur mit Ihrer Einwilligung, standardmäßig aus.
               </p>
               <CookieTable cookies={STATISTICS_COOKIES} caption="Statistik-Cookies" />
             </section>

@@ -230,6 +230,35 @@ describe("CookieConsentBanner settings dialog", () => {
   });
 });
 
+describe("focus after deciding from the banner dialog", () => {
+  it("moves focus to the persistent Cookie-Einstellungen link when the banner trigger is gone", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<CookieConsentBanner tenantSlug="demo" />);
+      const trigger = screen.getByRole("button", { name: "Einstellungen" });
+      trigger.focus();
+      fireEvent.click(trigger);
+      fireEvent.click(screen.getByRole("button", { name: "Auswahl speichern" }));
+      await act(async () => {
+        vi.runAllTimers();
+      });
+
+      expect(banner()).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cookie-Einstellungen" })).toHaveFocus();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("renders the persistent link inside a footer landmark", () => {
+    render(<CookieConsentBanner tenantSlug="demo" />);
+    const footer = screen.getByRole("contentinfo");
+    expect(
+      within(footer).getByRole("button", { name: "Cookie-Einstellungen" }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("persistent Cookie-Einstellungen link and withdrawal", () => {
   it("is present even after a decision and reopens the dialog with the stored choice", async () => {
     vi.useFakeTimers();

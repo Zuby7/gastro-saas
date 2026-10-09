@@ -17,10 +17,11 @@
 export const CONSENT_COOKIE_NAME = "gastro_cookie_consent";
 
 /** Bump whenever the cookie inventory or banner wording changes materially; forces a re-prompt. */
-export const CONSENT_VERSION = 2;
+export const CONSENT_VERSION = 3;
 
 /** A decision expires after 6 months and the visitor is asked again. */
 export const CONSENT_VALIDITY_SECONDS = 60 * 60 * 24 * 183;
+export const CONSENT_CLOCK_SKEW_MS = 5 * 60 * 1000;
 export const CONSENT_COOKIE_MAX_AGE_SECONDS = CONSENT_VALIDITY_SECONDS;
 
 export interface ConsentRecord {
@@ -72,8 +73,10 @@ export function parseConsent(
     return { status: "outdated" };
   }
   const ageMs = now.getTime() - decidedAt;
-  // Future timestamps (clock tampering) are never trusted.
-  if (ageMs < 0 || ageMs > CONSENT_VALIDITY_SECONDS * 1000) {
+  // Timestamps far in the future (clock tampering) are never trusted; small
+  // client/server clock skew (up to 5 minutes) is tolerated, because the
+  // timestamp is written by the browser's clock and read by the server's.
+  if (ageMs < -CONSENT_CLOCK_SKEW_MS || ageMs > CONSENT_VALIDITY_SECONDS * 1000) {
     return { status: "outdated" };
   }
   return { status: "valid", record: { version, timestamp, statistics } };

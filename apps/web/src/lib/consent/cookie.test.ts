@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONSENT_CLOCK_SKEW_MS,
   CONSENT_VALIDITY_SECONDS,
   CONSENT_VERSION,
   hasStatisticsConsent,
@@ -57,6 +58,13 @@ describe("versioned consent storage", () => {
     expect(parseConsent(encodeURIComponent('{"version":2}'), now)).toEqual({ status: "outdated" });
     const future = new Date(now.getTime() + 86_400_000);
     expect(parseConsent(serializeConsent(true, future), now)).toEqual({ status: "outdated" });
+  });
+
+  it("tolerates up to 5 minutes of client/server clock skew but not more", () => {
+    const raw = serializeConsent(true, new Date(now.getTime() + CONSENT_CLOCK_SKEW_MS - 1000));
+    expect(parseConsent(raw, now).status).toBe("valid");
+    const tooFar = serializeConsent(true, new Date(now.getTime() + CONSENT_CLOCK_SKEW_MS + 60_000));
+    expect(parseConsent(tooFar, now)).toEqual({ status: "outdated" });
   });
 
   it("statistics consent requires an explicit opt-in", () => {

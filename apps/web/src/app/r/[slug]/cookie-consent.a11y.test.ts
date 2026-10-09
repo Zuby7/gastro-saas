@@ -71,4 +71,25 @@ describe.each(schemes)("consent UI contrast ($name scheme)", ({ source }) => {
       ).passesAA,
     ).toBe(true);
   });
+
+  it("focus outline (link-foreground) reaches 3:1 against surface and surface-secondary", () => {
+    const outline = tokenTarget(source, "link-foreground");
+    for (const bg of ["surface", "surface-secondary"]) {
+      expect(validateContrastRatio(outline, tokenTarget(source, bg), "large").passesAA).toBe(true);
+    }
+  });
+
+  it("link hover colour (foreground) passes AA on surface, surface-muted and surface-secondary", () => {
+    const hover = tokenTarget(source, "foreground");
+    for (const bg of ["surface", "surface-muted", "surface-secondary"]) {
+      expect(validateContrastRatio(hover, tokenTarget(source, bg)).passesAA).toBe(true);
+    }
+  });
+});
+
+describe("consent UI classes use scheme-aware tokens only", () => {
+  it("does not use fixed brand-700 for outline or hover", () => {
+    const src = readFileSync(join(__dirname, "cookie-consent-banner.tsx"), "utf8");
+    expect(src).not.toMatch(/outline-brand-700|hover:text-brand-700/);
+  });
 });

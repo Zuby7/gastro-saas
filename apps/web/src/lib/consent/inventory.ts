@@ -48,7 +48,7 @@ export const COOKIE_INVENTORY: readonly CookieInventoryEntry[] = [
   {
     name: "gastro_view_<slug>",
     purpose:
-      "Zählt anonyme Speisekarten-Aufrufe (ohne Personenbezug, nur ein Hash wird gespeichert).",
+      "Enthält eine zufällige Kennung, um Speisekarten-Aufrufe, Gericht-Ansichten und „In den Warenkorb“-Aktionen je Besuch nur einmal zu zählen. Dabei wird ein Hash Ihrer IP-Adresse zur Missbrauchsabwehr (Ratenbegrenzung) und Mehrfachzählung verarbeitet.",
     duration: "24 Stunden",
     provider: "Diese Website (Erstanbieter)",
     category: "statistics",
@@ -57,6 +57,17 @@ export const COOKIE_INVENTORY: readonly CookieInventoryEntry[] = [
 
 export const NECESSARY_COOKIES = COOKIE_INVENTORY.filter((c) => c.category === "necessary");
 export const STATISTICS_COOKIES = COOKIE_INVENTORY.filter((c) => c.category === "statistics");
+
+/**
+ * Plain-language description of what the statistics category does; shown in
+ * the settings dialog. Must stay true to `lib/menu-view/service.ts`: it counts
+ * menu views, dish views and add-to-cart events, and processes a SHA-256 hash
+ * of the IP address (not anonymous) for rate limiting and deduplication. The
+ * hash rows are meant to be purged after 35 days (see
+ * `docs/legal/cookie-inventory.md` for the open scheduling point).
+ */
+export const STATISTICS_DESCRIPTION =
+  "Hilft dem Restaurant zu verstehen, wie oft die Speisekarte aufgerufen, einzelne Gerichte angesehen und Gerichte in den Warenkorb gelegt werden. Zur Missbrauchsabwehr und Mehrfachzählung wird ein Hash Ihrer IP-Adresse verarbeitet; er ist für eine Speicherung von höchstens 35 Tagen vorgesehen.";
 
 /** Third-party service reached only on explicit user action; not a cookie of this site. */
 export const STRIPE_NOTICE =

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { menuViewCookieName } from "@/lib/menu-view/cookie-name";
 import { CONSENT_COOKIE_NAME } from "./cookie";
-import { COOKIE_INVENTORY } from "./inventory";
+import { COOKIE_INVENTORY, STATISTICS_COOKIES, STATISTICS_DESCRIPTION } from "./inventory";
 
 const SRC_ROOT = join(__dirname, "..", "..");
 
@@ -74,5 +74,15 @@ describe("cookie inventory matches the code", () => {
     expect(COOKIE_INVENTORY.filter((e) => e.category === "statistics").map((e) => e.name)).toEqual([
       "gastro_view_<slug>",
     ]);
+  });
+
+  it("statistics wording is truthful: dish and cart events plus the IP hash, never 'anonym'", () => {
+    const texts = [...STATISTICS_COOKIES.map((c) => c.purpose), STATISTICS_DESCRIPTION];
+    for (const text of texts) {
+      expect(text).toMatch(/Gericht/);
+      expect(text).toMatch(/Warenkorb/);
+      expect(text).toMatch(/Hash Ihrer IP-Adresse/);
+      expect(text).not.toMatch(/anonym|ohne Personenbezug/i);
+    }
   });
 });

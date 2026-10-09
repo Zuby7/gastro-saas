@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CookieTable } from "@/lib/consent/cookie-table";
-import { NECESSARY_COOKIES, STATISTICS_COOKIES, STRIPE_NOTICE } from "@/lib/consent/inventory";
+import {
+  NECESSARY_COOKIES,
+  STATISTICS_COOKIES,
+  STATISTICS_DESCRIPTION,
+  STRIPE_NOTICE,
+} from "@/lib/consent/inventory";
 import { getPublicLegalPage } from "@/lib/public-menu/fetch";
 
 interface DatenschutzPageProps {
@@ -31,7 +36,7 @@ export default async function DatenschutzPage({ params }: DatenschutzPageProps) 
           </h1>
           <Link
             href={`/r/${slug}`}
-            className="shrink-0 text-sm font-medium text-link-foreground underline hover:text-brand-700"
+            className="shrink-0 text-sm font-medium text-link-foreground underline hover:text-foreground"
           >
             Zurück zur Speisekarte
           </Link>
@@ -69,6 +74,7 @@ export default async function DatenschutzPage({ params }: DatenschutzPageProps) 
           <CookieTable cookies={NECESSARY_COOKIES} caption="Notwendige Cookies" />
 
           <h3 className="font-semibold">Statistik (nur mit Einwilligung)</h3>
+          <p className="leading-relaxed">{STATISTICS_DESCRIPTION}</p>
           <CookieTable cookies={STATISTICS_COOKIES} caption="Statistik-Cookies" />
 
           <h3 className="font-semibold">Widerruf und Änderung Ihrer Auswahl</h3>
