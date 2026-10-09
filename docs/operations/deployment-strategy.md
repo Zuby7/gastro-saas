@@ -103,3 +103,11 @@ Remaining manual step for the demo tenant: complete hosted Express onboarding in
 ## `NEXT_PUBLIC_APP_URL` must be set on the Worker (2026-10-09, issue #157)
 
 The first end-to-end test payment on the live Worker succeeded at Stripe, but the redirect back pointed to `http://localhost:3000` (`ERR_CONNECTION_REFUSED`): `lib/payments/service.ts`, `app/account/payments/actions.ts` and `app/account/actions.ts` fall back to localhost when `NEXT_PUBLIC_APP_URL` is unset. The public base URL is now a plain (non-secret) `vars` entry in `apps/web/wrangler.jsonc`. When a custom domain replaces the `*.workers.dev` URL, update that value (and the Stripe Dashboard webhook endpoints) in the same change.
+
+## Verification of the deployed Worker (2026-10-09, version `41fdbbc1`)
+
+Live end-to-end test on `https://gastro-saas-web.gastro-saas-web.workers.dev` (Stripe **test mode** only, test card `4242 4242 4242 4242`, no real money): menu → add dish → checkout → Stripe Checkout → return to `/r/trattoria-da-mario/orders/<token>` → status "Bestellung eingegangen" (webhook confirmed the payment) → receipt link present (`/beleg`, ticket #153). The demo tenant's `payment_accounts` row points to a fully enabled Stripe **custom** test account (Express accounts cannot be pre-filled via API; production tenants use the Express onboarding of ADR-0002).
+
+Accessibility: axe-core (WCAG 2 A/AA + best-practice) over `/`, `/login`, `/register`, `/r/<slug>`, `/cart`, `/checkout`, `/agb`, `/datenschutz`, `/impressum` at 390 px width in light and dark scheme: 0 violations after #160 (dark-mode accent contrast).
+
+Open follow-ups: CD pipeline for the Worker, migration-drift check in `/release-check`, evaluate Accounts v2 before production, idempotency-key handling for failed Connect account creation, receipt order reference / `noindex` for token pages, issue #89 (Sentry), #83 (dark-mode tech debt).
