@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "build:cf": "opennextjs-cloudflare build",
     "preview:cf": "opennextjs-cloudflare preview",
-    "deploy:cf": "opennextjs-cloudflare deploy"
+    "deploy:cf": "opennextjs-cloudflare deploy",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@cf-wasm/photon": "^0.4.0",
@@ -41,6 +42,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.5",
+    "@vitest/coverage-v8": "4.1.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "exifr": "^7.1.3",

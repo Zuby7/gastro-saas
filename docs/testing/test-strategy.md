@@ -51,3 +51,7 @@ As of 2026-08-01 (backfilled per-ticket Opus review of ticket #3), `main`'s bran
 - `Migration Validation` (runs `supabase start`, `supabase db lint`, and the tenant-isolation integration test — added because a broken migration or a failing cross-tenant RLS test must block merge, not just warn)
 
 Any new required CI job must be added to branch protection via the GitHub API (`gh api -X PUT repos/<owner>/<repo>/branches/main/protection`) in the same PR that introduces it — a job that isn't required doesn't actually gate anything.
+
+## Coverage baseline (2026-10-09)
+
+Measured with `pnpm --filter @gastro-saas/web test:coverage` (`@vitest/coverage-v8`, free): **789 unit/component tests; apps/web statements 57.4 %, branches 42.6 %, functions 58.8 %, lines 57.8 %.** This excludes the database/RLS/RPC integration tests in `packages/database` (run against a real local Supabase in CI) and the Playwright e2e specs. The gap is mostly Server Components/pages and Supabase-backed services that are covered by integration tests instead of unit tests. No coverage gate is enforced yet; raising the baseline on payment, auth and tenant-isolation code is the priority. Re-measure before each release (`/release-check`) and record the numbers here.
