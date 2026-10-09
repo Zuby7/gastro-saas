@@ -64,7 +64,7 @@ Any future expiry, any CVC, any postcode:
 | `4000 0000 0000 0002` | Declined                          |
 | `4000 0025 0000 3155` | Requires 3D Secure authentication |
 
-> **PayPal is not available** for Connect destination charges in this setup (Stripe API: `Unknown capability: paypal_payments`; checked 2026-10-09). The checkout therefore advertises only card, Klarna and "weitere Zahlarten"; do not re-add a PayPal claim unless Stripe enables it.
+> **PayPal is not available** for Connect payments in this setup (checked 2026-10-09 against the Stripe test account). Stripe answers a Checkout Session with PayPal + Connect with `Your Stripe account currently does not support Connect payments with PayPal` (platform eligibility, https://docs.stripe.com/payments/paypal#connect), and PayPal + `on_behalf_of` with `on_behalf_of cannot be used with the paypal payment method`. PayPal works only on the platform account itself. Enabling it would need a Stripe eligibility approval and dropping `on_behalf_of` (changes the merchant of record), see issue #193. The checkout therefore advertises only card, Klarna and other methods Stripe offers dynamically (Apple Pay, Link, Amazon Pay, bank methods).
 
 ## 7. Verify the payment path (manual end-to-end check)
 
