@@ -5,7 +5,7 @@ import { PlatformCookieLink } from "./platform-cookie-link";
 describe("PlatformCookieLink", () => {
   it("links to the cookie section of the platform Datenschutzerklärung", () => {
     render(<PlatformCookieLink />);
-    expect(screen.getByRole("link", { name: "Cookie-Einstellungen" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Cookie-Hinweise" })).toHaveAttribute(
       "href",
       "/datenschutz#cookies",
     );

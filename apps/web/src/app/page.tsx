@@ -314,7 +314,7 @@ export default function Home() {
       <footer className="border-t border-neutral-200 bg-surface px-5 py-8 sm:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm text-foreground-secondary sm:flex-row sm:items-center sm:justify-between">
           <span>gastro-saas</span>
-          <nav className="flex gap-4" aria-label="Footer">
+          <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Footer">
             <Link href="/login" className="font-medium text-link-foreground underline">
               Anmelden
             </Link>
