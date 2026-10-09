@@ -1,5 +1,6 @@
 "use client";
 
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { useActionState } from "react";
 import { formatPrice } from "@/lib/public-menu/format";
 import type { CartLineView } from "@/lib/cart/types";
@@ -20,9 +21,10 @@ const initialState: CartActionState = {};
 export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
   // `tenantSlug` is bound server-side, not read from a client-editable form
   // field -- see the doc comment on `addToCartAction` in `./actions.ts`.
-  const [updateState, updateAction, isUpdating] = useActionState(
+  const [updateState, updateAction, isUpdating] = usePreservedFormAction(
     updateCartItemQuantityAction.bind(null, tenantSlug),
     initialState,
+    { resetOnSuccess: false },
   );
   const [removeState, removeAction, isRemoving] = useActionState(
     removeCartItemAction.bind(null, tenantSlug),
@@ -81,7 +83,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
       </div>
 
       <div className="flex items-center gap-4">
-        <form action={updateAction} className="flex items-center gap-2">
+        <form onSubmit={updateAction} className="flex items-center gap-2">
           <input type="hidden" name="cartItemId" value={line.cartItemId} />
           <label className="sr-only" htmlFor={`quantity-${line.cartItemId}`}>
             Menge für {line.dishName}

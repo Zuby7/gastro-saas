@@ -1,8 +1,9 @@
 "use client";
 
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import Link from "next/link";
-import { useActionState, useState } from "react";
-import { CreditCard, Lock, Wallet } from "lucide-react";
+import { useState } from "react";
+import { CreditCard, Lock } from "lucide-react";
 import { checkoutAction, type CheckoutFormState } from "./actions";
 
 interface CheckoutFormProps {
@@ -15,14 +16,14 @@ const initialState: CheckoutFormState = {};
 export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
   // `tenantSlug` is bound server-side, not read from a client-editable form
   // field -- see the doc comment on `checkoutAction` in `./actions.ts`.
-  const [state, formAction, isPending] = useActionState(
+  const [state, formAction, isPending] = usePreservedFormAction(
     checkoutAction.bind(null, tenantSlug),
     initialState,
   );
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "table">("pickup");
 
   return (
-    <form action={formAction} className="flex flex-col gap-6" noValidate>
+    <form onSubmit={formAction} className="flex flex-col gap-6" noValidate>
       <div className="flex flex-col gap-1">
         <label htmlFor="customerName" className="text-sm font-medium text-foreground">
           Name
@@ -195,7 +196,7 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
         is a real payment (redirect to Stripe Checkout), or which payment
         methods are actually accepted. Icons are generic lucide-react
         glyphs, not brand logos, to sidestep trademark/brand-guideline
-        concerns for Visa/Mastercard/PayPal/Klarna marks.
+        concerns for Visa/Mastercard/Klarna marks.
       */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-foreground-secondary">
         <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -206,12 +207,9 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
           Kreditkarte
         </span>
         <span aria-hidden="true">·</span>
-        <span className="flex items-center gap-1.5">
-          <Wallet className="h-4 w-4 shrink-0" aria-hidden="true" />
-          PayPal
-        </span>
-        <span aria-hidden="true">·</span>
         <span>Klarna</span>
+        <span aria-hidden="true">·</span>
+        <span>weitere Zahlarten</span>
       </div>
 
       <button

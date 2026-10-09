@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+
 import { saveProfileAction, type ProfileFormState } from "./actions";
 
 export interface ProfileFormInitialValues {
@@ -18,7 +19,9 @@ export interface ProfileFormInitialValues {
 const initialState: ProfileFormState = {};
 
 export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) {
-  const [state, formAction, isPending] = useActionState(saveProfileAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(saveProfileAction, initialState, {
+    resetOnSuccess: false,
+  });
 
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
@@ -43,7 +46,7 @@ export function ProfileForm({ initial }: { initial: ProfileFormInitialValues }) 
         </p>
       ) : null}
 
-      <form action={formAction} className="flex flex-col gap-4" noValidate>
+      <form onSubmit={formAction} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1">
           <label htmlFor="displayName" className="text-sm font-medium text-foreground">
             Name

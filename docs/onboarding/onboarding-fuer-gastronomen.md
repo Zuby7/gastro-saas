@@ -76,7 +76,7 @@ _Abbildung 4: Der Warenkorb._
 
 ![Kasse auf dem Handy mit den Feldern Name, Telefonnummer, Hinweis, Auswahl Abholung oder Tisch, Häkchen für AGB und Datenschutz und dem Knopf "Weiter zur Zahlung"](img/23-gast-kasse.png)
 
-_Abbildung 5: Die Kasse. Auf dem Bild steht "Sichere Zahlung über Stripe" mit Kreditkarte, PayPal und Klarna. Welche Zahlarten wirklich angeboten werden, hängt von den Einstellungen bei Stripe ab._
+_Abbildung 5: Die Kasse. Auf dem Bild steht "Sichere Zahlung über Stripe" mit Kreditkarte und Klarna (der Screenshot zeigt noch einen älteren Stand mit PayPal; PayPal wird derzeit nicht angeboten). Welche weiteren Zahlarten wirklich angeboten werden, hängt von den Einstellungen bei Stripe ab._
 
 ### Schritt 5: Bezahlen
 

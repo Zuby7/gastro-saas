@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+
 import { submitRatingAction, type RatingFormState } from "./rating-actions";
 
 interface RatingFormProps {
@@ -24,7 +25,7 @@ const STAR_OPTIONS = [1, 2, 3, 4, 5] as const;
  * form fields), mirroring `CheckoutForm`'s binding pattern.
  */
 export function RatingForm({ tenantSlug, token }: RatingFormProps) {
-  const [state, formAction, isPending] = useActionState(
+  const [state, formAction, isPending] = usePreservedFormAction(
     submitRatingAction.bind(null, tenantSlug, token),
     initialState,
   );
@@ -46,7 +47,7 @@ export function RatingForm({ tenantSlug, token }: RatingFormProps) {
   return (
     <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-foreground">Wie war Ihre Bestellung?</h2>
-      <form action={formAction} className="mt-3 flex flex-col gap-4" noValidate>
+      <form onSubmit={formAction} className="mt-3 flex flex-col gap-4" noValidate>
         <fieldset className="flex flex-col gap-2">
           <legend className="text-sm font-medium text-foreground">Bewertung</legend>
           <div className="flex flex-wrap gap-3">

@@ -1,5 +1,6 @@
 "use client";
 
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { useActionState } from "react";
 import {
   archiveCategoryAction,
@@ -11,16 +12,17 @@ import {
 const initialState: MenuActionState = {};
 
 export function CategoryRow({ id, name }: { id: string; name: string }) {
-  const [renameState, renameFormAction, renamePending] = useActionState(
+  const [renameState, renameFormAction, renamePending] = usePreservedFormAction(
     renameCategoryAction,
     initialState,
+    { resetOnSuccess: false },
   );
   const [moveState, moveFormAction] = useActionState(moveCategoryAction, initialState);
   const [archiveState, archiveFormAction] = useActionState(archiveCategoryAction, initialState);
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-surface-secondary p-2">
-      <form action={renameFormAction} className="flex items-center gap-2">
+      <form onSubmit={renameFormAction} className="flex items-center gap-2">
         <input type="hidden" name="categoryId" value={id} />
         <label htmlFor={`category-name-${id}`} className="sr-only">
           Kategoriename

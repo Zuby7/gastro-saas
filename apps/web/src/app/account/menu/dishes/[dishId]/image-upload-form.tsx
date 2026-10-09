@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+
 import { uploadDishImageAction, type DishActionState } from "./actions";
 
 const initialState: DishActionState = {};
@@ -14,7 +15,10 @@ export function ImageUploadForm({
   currentImageUrl: string | null;
   currentAltText: string | null;
 }) {
-  const [state, formAction, isPending] = useActionState(uploadDishImageAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(
+    uploadDishImageAction,
+    initialState,
+  );
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm">
@@ -49,7 +53,7 @@ export function ImageUploadForm({
         </p>
       ) : null}
 
-      <form action={formAction} className="flex flex-col gap-3" noValidate>
+      <form onSubmit={formAction} className="flex flex-col gap-3" noValidate>
         <input type="hidden" name="dishId" value={dishId} />
         <div className="flex flex-col gap-1">
           <label htmlFor="dish-image-file" className="text-sm font-medium text-foreground">

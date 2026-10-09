@@ -64,6 +64,8 @@ Any future expiry, any CVC, any postcode:
 | `4000 0000 0000 0002` | Declined                          |
 | `4000 0025 0000 3155` | Requires 3D Secure authentication |
 
+> **PayPal is not available** for Connect destination charges in this setup (Stripe API: `Unknown capability: paypal_payments`; checked 2026-10-09). The checkout therefore advertises only card, Klarna and "weitere Zahlarten"; do not re-add a PayPal claim unless Stripe enables it.
+
 ## 7. Verify the payment path (manual end-to-end check)
 
 There is no automated Stripe e2e test (Playwright covers only register/login). Verify manually, locally with `stripe listen` running or on the Worker:

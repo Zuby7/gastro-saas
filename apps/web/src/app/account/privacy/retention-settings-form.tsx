@@ -1,5 +1,6 @@
 "use client";
 
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { useActionState } from "react";
 import {
   saveRetentionSettingsAction,
@@ -12,7 +13,11 @@ const initialState: RetentionSettingsFormState = {};
 const initialPurgeState: PurgeAnalyticsEventsFormState = {};
 
 export function RetentionSettingsForm({ initialRetentionDays }: { initialRetentionDays: number }) {
-  const [state, formAction, isPending] = useActionState(saveRetentionSettingsAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(
+    saveRetentionSettingsAction,
+    initialState,
+    { resetOnSuccess: false },
+  );
   const [purgeState, purgeFormAction, isPurgePending] = useActionState(
     purgeExpiredAnalyticsEventsAction,
     initialPurgeState,
@@ -47,7 +52,7 @@ export function RetentionSettingsForm({ initialRetentionDays }: { initialRetenti
         </p>
       ) : null}
 
-      <form action={formAction} className="flex flex-col gap-4" noValidate>
+      <form onSubmit={formAction} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1">
           <label
             htmlFor="analyticsEventsRetentionDays"

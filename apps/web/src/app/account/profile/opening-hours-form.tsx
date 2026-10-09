@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+
 import { saveOpeningHoursAction, type OpeningHoursFormState } from "./actions";
 
 export interface OpeningHourInitialValue {
@@ -23,7 +24,11 @@ const WEEKDAY_LABELS = [
 const initialState: OpeningHoursFormState = {};
 
 export function OpeningHoursForm({ initial }: { initial: OpeningHourInitialValue[] }) {
-  const [state, formAction, isPending] = useActionState(saveOpeningHoursAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(
+    saveOpeningHoursAction,
+    initialState,
+    { resetOnSuccess: false },
+  );
 
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
@@ -48,7 +53,7 @@ export function OpeningHoursForm({ initial }: { initial: OpeningHourInitialValue
         </p>
       ) : null}
 
-      <form action={formAction} className="flex flex-col gap-3" noValidate>
+      <form onSubmit={formAction} className="flex flex-col gap-3" noValidate>
         {initial.map((row) => (
           <fieldset
             key={row.weekday}

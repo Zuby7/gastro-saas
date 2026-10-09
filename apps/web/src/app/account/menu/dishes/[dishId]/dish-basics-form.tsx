@@ -1,5 +1,6 @@
 "use client";
 
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { useActionState } from "react";
 import {
   setAllergenReviewedAction,
@@ -34,7 +35,11 @@ export function DishBasicsForm({
   canEditMenu,
   canManageAvailability,
 }: DishBasicsFormProps) {
-  const [state, formAction, isPending] = useActionState(updateDishBasicsAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(
+    updateDishBasicsAction,
+    initialState,
+    { resetOnSuccess: false },
+  );
   const [reviewState, reviewFormAction, isReviewPending] = useActionState(
     setAllergenReviewedAction,
     initialState,
@@ -71,7 +76,7 @@ export function DishBasicsForm({
             </p>
           ) : null}
 
-          <form action={formAction} className="flex flex-col gap-3" noValidate>
+          <form onSubmit={formAction} className="flex flex-col gap-3" noValidate>
             <input type="hidden" name="dishId" value={dishId} />
             <div className="flex flex-col gap-1">
               <label htmlFor="dish-name" className="text-sm font-medium text-foreground">

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+import { useEffect, useState } from "react";
 import { issueRefundAction, type RefundActionState } from "./actions";
 
 const initialState: RefundActionState = {};
@@ -12,7 +13,7 @@ export function RefundForm({
   orderId: string;
   remainingRefundableCents: number;
 }) {
-  const [state, formAction, isPending] = useActionState(issueRefundAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(issueRefundAction, initialState);
   // Request idempotency token (issue #97, risk:payment): minted ONCE per form
   // instance, and only rotated after a *successful* submission -- never
   // inside `onSubmit`. Minting it inside `onSubmit` was the original bug: a
@@ -52,7 +53,7 @@ export function RefundForm({
 
   return (
     <form
-      action={formAction}
+      onSubmit={formAction}
       className="flex flex-col gap-3"
       noValidate
       aria-labelledby="refund-form-heading"

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+
 import { analyzeImportFileAction, confirmImportAction, type ImportActionState } from "./actions";
 
 const initialState: ImportActionState = {};
@@ -22,11 +23,11 @@ const FIELD_OPTIONS = [
  * never trusting anything about validity from step 1's preview alone.
  */
 export function SalesImportClient() {
-  const [analyzeState, analyzeFormAction, isAnalyzing] = useActionState(
+  const [analyzeState, analyzeFormAction, isAnalyzing] = usePreservedFormAction(
     analyzeImportFileAction,
     initialState,
   );
-  const [confirmState, confirmFormAction, isConfirming] = useActionState(
+  const [confirmState, confirmFormAction, isConfirming] = usePreservedFormAction(
     confirmImportAction,
     initialState,
   );
@@ -63,7 +64,7 @@ export function SalesImportClient() {
           </p>
         ) : null}
 
-        <form action={analyzeFormAction} className="flex flex-wrap items-end gap-3" noValidate>
+        <form onSubmit={analyzeFormAction} className="flex flex-wrap items-end gap-3" noValidate>
           <div className="flex flex-col gap-1">
             <label htmlFor="import-file" className="text-sm font-medium text-foreground">
               Datei
@@ -142,7 +143,7 @@ export function SalesImportClient() {
             </table>
           </div>
 
-          <form action={confirmFormAction} className="flex flex-col gap-4">
+          <form onSubmit={confirmFormAction} className="flex flex-col gap-4">
             <input type="hidden" name="batchId" value={analyzed.batchId} />
             <div className="grid gap-3 sm:grid-cols-2">
               {FIELD_OPTIONS.map((field) => (

@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { Plus } from "lucide-react";
 import { formatPrice } from "@/lib/public-menu/format";
 import type { PublicMenuDish } from "@/lib/public-menu/types";
@@ -130,7 +131,7 @@ export function DishOptionChooser({ dish, tenantSlug }: DishDetailProps) {
   // `tenantSlug` is bound server-side (not read from a client-editable form
   // field) -- see the doc comment on `addToCartAction` in `./cart/actions.ts`.
   const boundAddToCartAction = addToCartAction.bind(null, tenantSlug);
-  const [state, formAction, isPending] = useActionState(
+  const [state, formAction, isPending] = usePreservedFormAction(
     boundAddToCartAction,
     initialCartActionState,
   );
@@ -175,7 +176,7 @@ export function DishOptionChooser({ dish, tenantSlug }: DishDetailProps) {
 
   return (
     <form
-      action={formAction}
+      onSubmit={formAction}
       className="flex flex-col gap-4 rounded-md border border-neutral-200 bg-surface-secondary p-3"
     >
       <input type="hidden" name="dishId" value={dish.id} />

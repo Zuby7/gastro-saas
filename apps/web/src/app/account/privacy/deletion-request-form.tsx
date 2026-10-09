@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+import { useState } from "react";
 import { requestTenantDataDeletionAction, type DeletionRequestFormState } from "./actions";
 
 const initialState: DeletionRequestFormState = {};
 
 export function DeletionRequestForm() {
-  const [state, formAction, isPending] = useActionState(
+  const [state, formAction, isPending] = usePreservedFormAction(
     requestTenantDataDeletionAction,
     initialState,
   );
@@ -41,7 +42,7 @@ export function DeletionRequestForm() {
         </p>
       ) : null}
 
-      <form action={formAction} className="flex flex-col gap-4" noValidate>
+      <form onSubmit={formAction} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1">
           <label htmlFor="reason" className="text-sm font-medium text-foreground">
             Begründung (optional)
