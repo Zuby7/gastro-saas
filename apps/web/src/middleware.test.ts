@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CONSENT_VALIDITY_SECONDS, serializeConsent } from "@/lib/consent/cookie";
 
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
@@ -8,6 +9,10 @@ vi.mock("@supabase/ssr", () => ({
     },
   }),
 }));
+
+function consent(statistics: boolean, now: Date = new Date()): string {
+  return serializeConsent(statistics, now);
+}
 
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
@@ -33,7 +38,7 @@ describe("middleware menu-view cookie consent gate", () => {
   it("does not mint the menu-view cookie when consent was declined", async () => {
     const { middleware } = await import("./middleware");
     const request = new NextRequest("http://localhost/r/demo", {
-      headers: { cookie: "gastro_cookie_consent=declined" },
+      headers: { cookie: "gastro_cookie_consent=" + consent(false) + "" },
     });
 
     const response = await middleware(request);
@@ -45,7 +50,7 @@ describe("middleware menu-view cookie consent gate", () => {
   it("mints the menu-view cookie once consent has been accepted", async () => {
     const { middleware } = await import("./middleware");
     const request = new NextRequest("http://localhost/r/demo", {
-      headers: { cookie: "gastro_cookie_consent=accepted" },
+      headers: { cookie: "gastro_cookie_consent=" + consent(true) + "" },
     });
 
     const response = await middleware(request);
@@ -62,7 +67,9 @@ describe("middleware menu-view cookie consent gate", () => {
     async () => {
       const { middleware } = await import("./middleware");
       const request = new NextRequest("http://localhost/r/demo", {
-        headers: { cookie: "gastro_cookie_consent=declined; gastro_view_demo=old-token" },
+        headers: {
+          cookie: "gastro_cookie_consent=" + consent(false) + "; gastro_view_demo=old-token",
+        },
       });
 
       const response = await middleware(request);
@@ -87,4 +94,53 @@ describe("middleware menu-view cookie consent gate", () => {
       expect(deletedCookie?.value).toBe("");
     },
   );
+
+  it("treats legacy 'accepted'/'declined' values as no consent (no mint, existing cookie cleared)", async () => {
+    const { middleware } = await import("./middleware");
+    for (const legacy of ["accepted", "declined"]) {
+      const response = await middleware(
+        new NextRequest("http://localhost/r/demo", {
+          headers: { cookie: `gastro_cookie_consent=${legacy}; gastro_view_demo=old` },
+        }),
+      );
+      expect(response.cookies.get("gastro_view_demo")?.value).toBe("");
+    }
+    const mint = await middleware(
+      new NextRequest("http://localhost/r/demo", {
+        headers: { cookie: "gastro_cookie_consent=accepted" },
+      }),
+    );
+    expect(mint.cookies.getAll().some((c) => c.name.startsWith("gastro_view_"))).toBe(false);
+  });
+
+  it("does not mint after the decision expired (older than 6 months)", async () => {
+    const { middleware } = await import("./middleware");
+    const old = new Date(Date.now() - (CONSENT_VALIDITY_SECONDS + 60) * 1000);
+    const response = await middleware(
+      new NextRequest("http://localhost/r/demo", {
+        headers: { cookie: `gastro_cookie_consent=${consent(true, old)}` },
+      }),
+    );
+    expect(response.cookies.getAll().some((c) => c.name.startsWith("gastro_view_"))).toBe(false);
+  });
+
+  it("withdrawal (statistics=false) clears menu_view on non-menu routes such as the cart", async () => {
+    const { middleware } = await import("./middleware");
+    const response = await middleware(
+      new NextRequest("http://localhost/r/demo/cart", {
+        headers: { cookie: `gastro_cookie_consent=${consent(false)}; gastro_view_demo=old` },
+      }),
+    );
+    expect(response.cookies.get("gastro_view_demo")?.value).toBe("");
+  });
+
+  it("keeps an existing menu_view cookie while statistics consent is valid", async () => {
+    const { middleware } = await import("./middleware");
+    const response = await middleware(
+      new NextRequest("http://localhost/r/demo/cart", {
+        headers: { cookie: `gastro_cookie_consent=${consent(true)}; gastro_view_demo=keep` },
+      }),
+    );
+    expect(response.cookies.get("gastro_view_demo")).toBeUndefined();
+  });
 });

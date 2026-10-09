@@ -1,126 +1,288 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   CONSENT_COOKIE_MAX_AGE_SECONDS,
   CONSENT_COOKIE_NAME,
-  type ConsentValue,
+  parseConsent,
+  serializeConsent,
+  type ConsentState,
 } from "@/lib/consent/cookie";
+import { CookieTable } from "@/lib/consent/cookie-table";
+import { NECESSARY_COOKIES, STATISTICS_COOKIES } from "@/lib/consent/inventory";
 
 /**
- * Ticket #146: minimal, dismissible cookie-consent banner gating the
- * `menu_view` analytics cookie (ticket #67) -- the only non-essential
- * cookie this app currently sets (Supabase auth and cart/order cookies are
- * strictly necessary and are never gated). Deliberately simple: two
- * buttons, no cookie category matrix/CMP.
+ * Tickets #146/#162: cookie-consent UI for the public restaurant pages.
  *
- * The consent decision itself is stored in a first-party cookie
- * (`gastro_cookie_consent`) that is itself essential (it only remembers the
- * visitor's own preference) and therefore requires no consent to set.
+ * - First level: three visually identical buttons (reject all / settings /
+ *   accept all). Closing or scrolling never counts as consent -- the banner
+ *   simply stays until an explicit choice is made.
+ * - Settings dialog: category "Notwendig" (always on) and "Statistik"
+ *   (opt-in, default off), each with a Name/Zweck/Dauer/Anbieter table from
+ *   the shared inventory (`@/lib/consent/inventory`).
+ * - A persistent "Cookie-Einstellungen" link (rendered by the `[slug]`
+ *   layout on every public page) reopens the dialog; saving "statistics off"
+ *   is the withdrawal, and the refreshed request makes middleware delete the
+ *   (httpOnly) `gastro_view_*` cookie.
  *
- * Written client-side via `document.cookie` (not a server action) so the
- * decision takes effect immediately without a full page reload; `router.
- * refresh()` re-runs the Server Component tree (including middleware) on
- * the next request so the analytics cookie is minted (or stays absent) per
- * the fresh decision.
+ * The decision is written client-side via `document.cookie` (versioned JSON,
+ * see `@/lib/consent/cookie`) so it applies immediately; `router.refresh()`
+ * then re-runs middleware with the fresh decision.
  */
+
+/** One class string for all three first-level buttons: equal size, weight and contrast. */
+export const CONSENT_BUTTON_CLASS =
+  "rounded-md border-2 border-foreground bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function readConsentCookie(): string | null {
+  const entry = document.cookie
+    .split("; ")
+    .find((candidate) => candidate.startsWith(`${CONSENT_COOKIE_NAME}=`));
+  return entry ? entry.slice(CONSENT_COOKIE_NAME.length + 1) : null;
+}
+
 export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
   const router = useRouter();
-  // Starts hidden (identical on server and client) and is only revealed in a
-  // post-mount effect once `document.cookie` is actually readable -- a lazy
-  // `useState` initializer still runs during SSR, where no cookie can be
-  // read, so computing it there would risk a hydration mismatch for anyone
-  // who already made a decision on a previous visit. This is a genuine
-  // "synchronize with an external system" (the browser's cookie jar) effect,
-  // exempted from `react-hooks/set-state-in-effect` below -- same rationale
-  // as `../../account/orders/[orderId]/refund-form.tsx`'s token mint.
-  const [visible, setVisible] = useState(false);
+  // Starts as null (identical on server and client) and is filled in a
+  // post-mount effect once `document.cookie` is readable, avoiding a
+  // hydration mismatch. Genuine "synchronize with an external system" effect.
+  const [consent, setConsent] = useState<ConsentState | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [statistics, setStatistics] = useState(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const titleId = useId();
+  const statisticsId = useId();
 
   useEffect(() => {
-    const hasDecision = document.cookie
-      .split("; ")
-      .some((entry) => entry.startsWith(`${CONSENT_COOKIE_NAME}=`));
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above: client-only cookie read, not derivable during SSR/first render.
-    setVisible(!hasDecision);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only cookie read, not derivable during SSR/first render.
+    setConsent(parseConsent(readConsentCookie()));
   }, []);
 
-  function decide(value: ConsentValue) {
-    // `secure` is appended only over https -- a local/preview http origin
-    // (e.g. `wrangler dev`) must still be able to write the cookie, and
-    // `document.cookie` silently drops a `secure` cookie set from a
-    // non-secure context rather than erroring.
+  useEffect(() => {
+    if (dialogOpen) {
+      dialogRef.current?.focus();
+    }
+  }, [dialogOpen]);
+
+  function openDialog(trigger?: HTMLElement | null) {
+    returnFocusRef.current = trigger ?? (document.activeElement as HTMLElement | null);
+    const current = parseConsent(readConsentCookie());
+    // Default is always "off"; only a valid earlier opt-in pre-selects it.
+    setStatistics(current.status === "valid" && current.record.statistics);
+    setDialogOpen(true);
+  }
+
+  function closeDialog() {
+    setDialogOpen(false);
+    const target = returnFocusRef.current;
+    returnFocusRef.current = null;
+    // Wait for the dialog to unmount, then restore focus to the trigger.
+    window.setTimeout(() => {
+      if (target && target.isConnected) {
+        target.focus();
+      }
+    }, 0);
+  }
+
+  function decide(statisticsChoice: boolean) {
+    // `secure` only over https -- a local http origin must still be able to
+    // write the cookie (`document.cookie` silently drops secure cookies there).
     const secureAttr = window.location.protocol === "https:" ? "; secure" : "";
-    document.cookie = `${CONSENT_COOKIE_NAME}=${value}; path=/; max-age=${CONSENT_COOKIE_MAX_AGE_SECONDS}; samesite=lax${secureAttr}`;
-    setVisible(false);
+    document.cookie = `${CONSENT_COOKIE_NAME}=${serializeConsent(statisticsChoice)}; path=/; max-age=${CONSENT_COOKIE_MAX_AGE_SECONDS}; samesite=lax${secureAttr}`;
+    setConsent(parseConsent(readConsentCookie()));
+    if (dialogOpen) {
+      closeDialog();
+    }
     router.refresh();
   }
 
-  if (!visible) {
-    return null;
+  function onDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      closeDialog();
+      return;
+    }
+    if (event.key !== "Tab") {
+      return;
+    }
+    const dialog = dialogRef.current;
+    if (!dialog) {
+      return;
+    }
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+    if (focusable.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || active === dialog)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    } else if (!dialog.contains(active)) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
+  const bannerVisible = consent !== null && consent.status !== "valid";
+
   return (
-    <div
-      role="region"
-      aria-label="Cookie-Einstellungen"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-neutral-200 bg-surface p-4 shadow-[0_-4px_12px_rgba(0,0,0,.08)]"
-    >
-      <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-foreground">
-          Wir verwenden ein nicht-essenzielles Cookie, um anonyme Seitenaufrufe für dieses
-          Restaurant zu zählen. Details in unserer{" "}
-          <Link
-            href={`/r/${tenantSlug}/datenschutz`}
+    <>
+      <div className="border-t border-neutral-200 px-5 py-4 sm:px-8">
+        <div className="mx-auto max-w-5xl text-sm">
+          <button
+            type="button"
+            onClick={(event) => openDialog(event.currentTarget)}
             className="font-medium text-link-foreground underline hover:text-brand-700"
           >
-            Datenschutzerklärung
-          </Link>
-          .
-        </p>
-        <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            onClick={() => decide("declined")}
-            className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
-          >
-            Ablehnen
-          </button>
-          <button
-            type="button"
-            onClick={() => decide("accepted")}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
-          >
-            Akzeptieren
+            Cookie-Einstellungen
           </button>
         </div>
       </div>
-    </div>
-  );
-}
 
-/**
- * Ticket #146 Opus repair-cycle finding: withdrawing consent must be as easy
- * as giving it, not just a one-time banner. A plain footer link that clears
- * the decision cookie and reloads -- the reload re-runs middleware (which
- * then also clears the now-unconsented `menu_view` cookie, see
- * `middleware.ts`) and remounts `CookieConsentBanner`, whose own effect
- * re-detects the missing decision cookie and shows the banner again.
- */
-export function CookieSettingsLink() {
-  function resetConsent() {
-    document.cookie = `${CONSENT_COOKIE_NAME}=; path=/; max-age=0; samesite=lax`;
-    window.location.reload();
-  }
+      {bannerVisible ? (
+        <div
+          role="region"
+          aria-label="Cookie-Hinweis"
+          className="fixed inset-x-0 bottom-0 z-50 border-t border-neutral-200 bg-surface p-4 shadow-[0_-4px_12px_rgba(0,0,0,.08)]"
+        >
+          <div className="mx-auto flex max-w-5xl flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <p className="text-sm text-foreground">
+              Wir setzen notwendige Cookies ein. Mit Ihrer Einwilligung setzen wir zusätzlich ein
+              Statistik-Cookie, das anonyme Seitenaufrufe zählt. Sie können alles ablehnen, Ihre
+              Auswahl in den Einstellungen anpassen oder alles akzeptieren. Details in unserer{" "}
+              <Link
+                href={`/r/${tenantSlug}/datenschutz`}
+                className="font-medium text-link-foreground underline hover:text-brand-700"
+              >
+                Datenschutzerklärung
+              </Link>
+              .
+            </p>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button type="button" onClick={() => decide(false)} className={CONSENT_BUTTON_CLASS}>
+                Alle ablehnen
+              </button>
+              <button
+                type="button"
+                onClick={(event) => openDialog(event.currentTarget)}
+                className={CONSENT_BUTTON_CLASS}
+              >
+                Einstellungen
+              </button>
+              <button type="button" onClick={() => decide(true)} className={CONSENT_BUTTON_CLASS}>
+                Alle akzeptieren
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
-  return (
-    <button
-      type="button"
-      onClick={resetConsent}
-      className="text-sm font-medium text-link-foreground underline hover:text-brand-700"
-    >
-      Cookie-Einstellungen
-    </button>
+      {dialogOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
+            onKeyDown={onDialogKeyDown}
+            className="flex max-h-full w-full max-w-3xl flex-col gap-5 overflow-y-auto rounded-lg bg-surface p-6 text-foreground shadow-xl focus:outline-none"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <h2 id={titleId} className="font-display text-xl font-semibold">
+                Cookie-Einstellungen
+              </h2>
+              <button
+                type="button"
+                onClick={closeDialog}
+                className="text-sm font-medium text-link-foreground underline hover:text-brand-700"
+              >
+                Schließen
+              </button>
+            </div>
+            <p className="text-sm">
+              Hier legen Sie fest, welche Cookies wir setzen dürfen. Ihre Auswahl können Sie
+              jederzeit über „Cookie-Einstellungen“ am Seitenende ändern oder widerrufen. Mehr in
+              der{" "}
+              <Link
+                href={`/r/${tenantSlug}/datenschutz`}
+                className="font-medium text-link-foreground underline hover:text-brand-700"
+              >
+                Datenschutzerklärung
+              </Link>
+              .
+            </p>
+
+            <section aria-labelledby={`${titleId}-necessary`} className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-4">
+                <h3 id={`${titleId}-necessary`} className="font-semibold">
+                  Notwendig
+                </h3>
+                <span className="text-sm font-medium">Immer aktiv</span>
+              </div>
+              <p className="text-sm">
+                Diese Cookies sind für den Betrieb der Seite erforderlich (Warenkorb, Bestellung,
+                Anmeldung, Speicherung Ihrer Cookie-Auswahl) und können nicht abgewählt werden.
+              </p>
+              <CookieTable cookies={NECESSARY_COOKIES} caption="Notwendige Cookies" />
+            </section>
+
+            <section aria-labelledby={`${titleId}-statistics`} className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-4">
+                <h3 id={`${titleId}-statistics`} className="font-semibold">
+                  Statistik
+                </h3>
+                <label
+                  htmlFor={statisticsId}
+                  className="flex items-center gap-2 text-sm font-medium"
+                >
+                  <input
+                    id={statisticsId}
+                    type="checkbox"
+                    checked={statistics}
+                    onChange={(event) => setStatistics(event.target.checked)}
+                    className="h-5 w-5 accent-brand-600"
+                  />
+                  Statistik erlauben
+                </label>
+              </div>
+              <p className="text-sm">
+                Hilft dem Restaurant zu verstehen, wie oft die Speisekarte aufgerufen wird. Nur mit
+                Ihrer Einwilligung, standardmäßig aus.
+              </p>
+              <CookieTable cookies={STATISTICS_COOKIES} caption="Statistik-Cookies" />
+            </section>
+
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => decide(false)} className={CONSENT_BUTTON_CLASS}>
+                Alle ablehnen
+              </button>
+              <button
+                type="button"
+                onClick={() => decide(statistics)}
+                className={CONSENT_BUTTON_CLASS}
+              >
+                Auswahl speichern
+              </button>
+              <button type="button" onClick={() => decide(true)} className={CONSENT_BUTTON_CLASS}>
+                Alle akzeptieren
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

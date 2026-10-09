@@ -6,7 +6,6 @@ import { recordDishViewsOnce, recordMenuViewOnce } from "@/lib/menu-view/service
 import { getPublicMenu } from "@/lib/public-menu/fetch";
 import { loadCartViewForDisplay } from "./cart/actions";
 import { CategoryNav } from "./category-nav";
-import { CookieConsentBanner, CookieSettingsLink } from "./cookie-consent-banner";
 import { DishCard } from "./dish-card";
 
 interface PublicMenuPageProps {
@@ -110,7 +109,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
       </div>
 
       {/*
-        Ticket #41/#146: footer links to the tenant-maintained
+        Ticket #41/#146: footer links (cookie-settings link and banner come from ./layout.tsx, #162) to the tenant-maintained
         Impressum/Datenschutz/AGB pages.
       */}
       <footer className="border-t border-neutral-200 px-5 py-6 sm:px-8">
@@ -133,11 +132,8 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
           >
             AGB
           </Link>
-          <CookieSettingsLink />
         </div>
       </footer>
-
-      <CookieConsentBanner tenantSlug={slug} />
     </main>
   );
 }

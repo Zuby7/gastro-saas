@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { menuViewCookieName } from "@/lib/menu-view/cookie-name";
-import { CONSENT_COOKIE_NAME, isConsentAccepted } from "@/lib/consent/cookie";
+import { MENU_VIEW_COOKIE_PREFIX, menuViewCookieName } from "@/lib/menu-view/cookie-name";
+import { CONSENT_COOKIE_NAME, hasStatisticsConsent } from "@/lib/consent/cookie";
 
 // Matches only the base public menu route (`/r/<slug>`), not its
 // cart/checkout/order-status sub-routes -- ticket #67's menu-view analytics
@@ -67,14 +67,16 @@ export async function middleware(request: NextRequest) {
   // route slug.
   //
   // Ticket #146: this cookie is non-essential (analytics purpose only), so
-  // it is only minted once the visitor has explicitly accepted the cookie
-  // banner (`gastro_cookie_consent=accepted`, written client-side by
+  // it is only minted once the visitor has opted in to the "Statistik"
+  // category with a valid, current decision (versioned `gastro_cookie_consent`
+  // with `statistics: true`, see `@/lib/consent/cookie`; written client-side by
   // `CookieConsentBanner`) -- never set unconditionally/before consent.
+  const statisticsConsent = hasStatisticsConsent(request.cookies.get(CONSENT_COOKIE_NAME)?.value);
   const menuRouteMatch = PUBLIC_MENU_ROUTE_PATTERN.exec(request.nextUrl.pathname);
   if (menuRouteMatch) {
     const tenantSlug = menuRouteMatch[1]!;
     const cookieName = menuViewCookieName(tenantSlug);
-    if (isConsentAccepted(request.cookies.get(CONSENT_COOKIE_NAME)?.value)) {
+    if (statisticsConsent) {
       if (!request.cookies.get(cookieName)) {
         const token = randomBytes(32).toString("base64url");
         const cookieOptions = {
@@ -101,20 +103,26 @@ export async function middleware(request: NextRequest) {
         }
         response.cookies.set(cookieName, token, cookieOptions);
       }
-    } else if (request.cookies.get(cookieName)) {
-      // Ticket #146 Opus repair-cycle finding: consent that is missing/
-      // declined must also retroactively clear an existing menu_view cookie
-      // from a visit before this deploy (or before the visitor declined) --
-      // gating only the mint, not the cookie's continued presence, would let
-      // an already-set cookie keep being counted for up to its remaining
-      // 24h lifetime after a decline.
+    }
+  }
+
+  if (!statisticsConsent) {
+    // Ticket #146 Opus repair-cycle finding + #162: without a valid statistics
+    // opt-in (never decided, declined, withdrawn, legacy/expired decision) any
+    // existing menu_view cookie is cleared on EVERY route, so withdrawing
+    // consent from e.g. the cart page also removes it (the cookie is httpOnly
+    // and can only be deleted server-side).
+    for (const existing of request.cookies.getAll()) {
+      if (!existing.name.startsWith(MENU_VIEW_COOKIE_PREFIX)) {
+        continue;
+      }
       const previousSetCookies = response.cookies.getAll();
-      request.cookies.delete(cookieName);
+      request.cookies.delete(existing.name);
       response = NextResponse.next({ request });
       for (const cookie of previousSetCookies) {
         response.cookies.set(cookie);
       }
-      response.cookies.delete(cookieName);
+      response.cookies.delete(existing.name);
     }
   }
 
