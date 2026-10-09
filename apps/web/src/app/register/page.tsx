@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PlatformCookieLink } from "@/lib/consent/platform-cookie-link";
 import { useActionState } from "react";
 import { registerAction, type RegisterFormState } from "./actions";
 
@@ -176,6 +177,10 @@ export default function RegisterPage() {
         <Link href="/login" className="font-medium text-link-foreground underline">
           Anmelden
         </Link>
+      </p>
+
+      <p className="text-sm text-foreground-secondary">
+        <PlatformCookieLink />
       </p>
     </main>
   );

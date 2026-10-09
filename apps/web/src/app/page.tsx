@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PlatformCookieLink } from "@/lib/consent/platform-cookie-link";
 import { ClipboardList, LineChart, QrCode, Wallet } from "lucide-react";
 
 /**
@@ -313,13 +314,17 @@ export default function Home() {
       <footer className="border-t border-neutral-200 bg-surface px-5 py-8 sm:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm text-foreground-secondary sm:flex-row sm:items-center sm:justify-between">
           <span>gastro-saas</span>
-          <nav className="flex gap-4" aria-label="Footer">
+          <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Footer">
             <Link href="/login" className="font-medium text-link-foreground underline">
               Anmelden
             </Link>
             <Link href="/register" className="font-medium text-link-foreground underline">
               Restaurant registrieren
             </Link>
+            <Link href="/datenschutz" className="font-medium text-link-foreground underline">
+              Datenschutz
+            </Link>
+            <PlatformCookieLink />
           </nav>
         </div>
       </footer>

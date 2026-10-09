@@ -296,3 +296,22 @@ describe("persistent Cookie-Einstellungen link and withdrawal", () => {
     expect(refreshMock).toHaveBeenCalledOnce();
   });
 });
+
+describe("CookieConsentBanner layout spacer (#163)", () => {
+  const spacer = () => screen.queryByTestId("cookie-banner-spacer");
+
+  it("reserves space in the page flow while undecided and releases it after a decision", () => {
+    render(<CookieConsentBanner tenantSlug="demo" />);
+    expect(spacer()).toBeInTheDocument();
+    expect(spacer()).toHaveAttribute("aria-hidden", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Alle ablehnen" }));
+    expect(spacer()).not.toBeInTheDocument();
+  });
+
+  it("renders no spacer when a valid decision exists", () => {
+    setConsentCookie(serializeConsent(false));
+    render(<CookieConsentBanner tenantSlug="demo" />);
+    expect(spacer()).not.toBeInTheDocument();
+  });
+});
