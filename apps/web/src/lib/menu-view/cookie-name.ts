@@ -9,7 +9,9 @@
  * copies drifting apart and causing distinct slugs to collide on the same
  * cookie name (Opus finding, PR #129).
  */
+export const MENU_VIEW_COOKIE_PREFIX = "gastro_view_";
+
 export function menuViewCookieName(tenantSlug: string): string {
   const safeSlug = tenantSlug.replace(/[^a-z0-9-]/g, "");
-  return `gastro_view_${safeSlug}`;
+  return `${MENU_VIEW_COOKIE_PREFIX}${safeSlug}`;
 }
