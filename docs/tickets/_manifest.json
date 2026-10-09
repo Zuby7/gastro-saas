@@ -307,7 +307,7 @@
     "file": "docs/tickets/41-epic5-impressum-datenschutz-consent.md",
     "title": "[Epic 5] Impressum, Datenschutz & Consent",
     "labels": ["type:feature", "area:frontend", "priority:high", "phase:mvp", "risk:privacy"],
-    "milestone": 5,
+    "milestone": 13,
     "issue": 41
   },
   {
@@ -338,5 +338,19 @@
     ],
     "milestone": 6,
     "issue": 153
+  },
+  {
+    "file": "docs/tickets/44-epic5-cookie-banner-einwilligungsverwaltung.md",
+    "title": "[Epic 5] Rechtssicherer, barrierefreier Cookie-Banner mit Einwilligungsverwaltung (TDDDG/DSGVO)",
+    "labels": [
+      "type:feature",
+      "area:frontend",
+      "priority:high",
+      "phase:mvp",
+      "risk:privacy",
+      "risk:accessibility"
+    ],
+    "milestone": 13,
+    "issue": 162
   }
 ]
