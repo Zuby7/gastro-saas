@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CheckoutForm } from "./checkout-form";
 
@@ -61,6 +61,22 @@ describe("CheckoutForm accessibility", () => {
     expect(
       screen.queryByLabelText("Telefonnummer (optional, für Rückfragen zur Abholung)"),
     ).not.toBeInTheDocument();
+  });
+
+  it("advertises PayPal in the payment-methods hint only when paypalEnabled is true", () => {
+    const { unmount } = render(<CheckoutForm tenantSlug="demo" checkoutReady />);
+    expect(screen.queryByText("PayPal")).not.toBeInTheDocument();
+    expect(screen.getByText("Klarna")).toBeInTheDocument();
+    expect(screen.getByText("weitere Zahlarten")).toBeInTheDocument();
+    unmount();
+
+    render(<CheckoutForm tenantSlug="demo" checkoutReady paypalEnabled={false} />);
+    expect(screen.queryByText("PayPal")).not.toBeInTheDocument();
+    cleanup();
+
+    render(<CheckoutForm tenantSlug="demo" checkoutReady paypalEnabled />);
+    expect(screen.getByText("PayPal")).toBeInTheDocument();
+    expect(screen.getByText("weitere Zahlarten")).toBeInTheDocument();
   });
 
   it("labels the required customer-name field", () => {

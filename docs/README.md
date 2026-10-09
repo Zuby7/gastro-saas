@@ -13,13 +13,14 @@
 
 ## Architecture and data
 
-| Document                                                                                                       | What it covers                                                                  |
-| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [architecture/adr/0001-stack-and-modular-monolith.md](architecture/adr/0001-stack-and-modular-monolith.md)     | Stack choice (Next.js, Supabase, Stripe Connect, Cloudflare), modular monolith  |
-| [architecture/adr/0002-stripe-connect-account-model.md](architecture/adr/0002-stripe-connect-account-model.md) | Express accounts, destination charges with `on_behalf_of`, liability            |
-| [architecture/system-context.md](architecture/system-context.md)                                               | Actors and external systems                                                     |
-| [architecture/domain-boundaries.md](architecture/domain-boundaries.md)                                         | Module ownership and dependency rules, package layout                           |
-| [data/domain-model.md](data/domain-model.md)                                                                   | Tables and cross-cutting data rules (money in cents, immutability, soft delete) |
+| Document                                                                                                                             | What it covers                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| [architecture/adr/0001-stack-and-modular-monolith.md](architecture/adr/0001-stack-and-modular-monolith.md)                           | Stack choice (Next.js, Supabase, Stripe Connect, Cloudflare), modular monolith  |
+| [architecture/adr/0002-stripe-connect-account-model.md](architecture/adr/0002-stripe-connect-account-model.md)                       | Express accounts, destination charges with `on_behalf_of`, liability            |
+| [architecture/adr/0003-paypal-via-connect-without-on-behalf-of.md](architecture/adr/0003-paypal-via-connect-without-on-behalf-of.md) | PROPOSED: PayPal via Connect without `on_behalf_of`, behind a flag              |
+| [architecture/system-context.md](architecture/system-context.md)                                                                     | Actors and external systems                                                     |
+| [architecture/domain-boundaries.md](architecture/domain-boundaries.md)                                                               | Module ownership and dependency rules, package layout                           |
+| [data/domain-model.md](data/domain-model.md)                                                                                         | Tables and cross-cutting data rules (money in cents, immutability, soft delete) |
 
 ## Security, legal, testing
 

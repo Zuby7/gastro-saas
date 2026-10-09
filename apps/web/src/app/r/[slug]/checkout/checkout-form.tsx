@@ -9,11 +9,17 @@ import { checkoutAction, type CheckoutFormState } from "./actions";
 interface CheckoutFormProps {
   tenantSlug: string;
   checkoutReady: boolean;
+  /** Server-derived (STRIPE_CONNECT_PAYPAL_ENABLED); only then is PayPal advertised. */
+  paypalEnabled?: boolean;
 }
 
 const initialState: CheckoutFormState = {};
 
-export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
+export function CheckoutForm({
+  tenantSlug,
+  checkoutReady,
+  paypalEnabled = false,
+}: CheckoutFormProps) {
   // `tenantSlug` is bound server-side, not read from a client-editable form
   // field -- see the doc comment on `checkoutAction` in `./actions.ts`.
   const [state, formAction, isPending] = usePreservedFormAction(
@@ -209,6 +215,12 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
         <span aria-hidden="true">·</span>
         <span>Klarna</span>
         <span aria-hidden="true">·</span>
+        {paypalEnabled ? (
+          <>
+            <span>PayPal</span>
+            <span aria-hidden="true">·</span>
+          </>
+        ) : null}
         <span>weitere Zahlarten</span>
       </div>
 

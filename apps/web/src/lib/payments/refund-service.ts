@@ -46,6 +46,11 @@ import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-e
  * untouched, silently leaving the platform short -- this is the
  * Connect-specific detail this ticket calls out explicitly.
  *
+ * ADR-0003 (PROPOSED): with `STRIPE_CONNECT_PAYPAL_ENABLED=1` the charge is
+ * created without `on_behalf_of` (still `transfer_data.destination`). The
+ * refund call is unchanged -- `reverse_transfer` depends only on the
+ * transfer, not on `on_behalf_of` -- so nothing here is flag-dependent.
+ *
  * Reason mapping: Stripe's own `reason` enum (`duplicate` | `fraudulent` |
  * `requested_by_customer`) is far too restrictive to represent a manager's
  * free-text explanation, so it is not force-fit -- this module always sends

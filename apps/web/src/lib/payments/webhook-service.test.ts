@@ -271,6 +271,21 @@ describe("handleStripePaymentWebhookEvent -- checkout.session.completed (success
     );
   });
 
+  it("ADR-0003: behaves identically with STRIPE_CONNECT_PAYPAL_ENABLED=1 (no on_behalf_of; event.account stays unset on platform events)", async () => {
+    vi.stubEnv("STRIPE_CONNECT_PAYPAL_ENABLED", "1");
+    try {
+      const { handleStripePaymentWebhookEvent } = await import("./webhook-service");
+      const admin = makeAdmin();
+
+      await handleStripePaymentWebhookEvent(admin as never, checkoutSessionCompletedEvent());
+
+      expect(state.order?.status).toBe("received");
+      expect(state.payment?.status).toBe("paid");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("triggers the order confirmation email (ticket #40) with the customer's email off the completed session", async () => {
     const { handleStripePaymentWebhookEvent } = await import("./webhook-service");
     const admin = makeAdmin();

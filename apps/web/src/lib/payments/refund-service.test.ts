@@ -209,6 +209,35 @@ describe("issueRefundForOrder", () => {
     );
   });
 
+  it("ADR-0003: refund params are identical (reverse_transfer, platform-account call) when STRIPE_CONNECT_PAYPAL_ENABLED=1, i.e. for destination charges without on_behalf_of", async () => {
+    vi.stubEnv("STRIPE_CONNECT_PAYPAL_ENABLED", "1");
+    try {
+      const { issueRefundForOrder } = await import("./refund-service");
+      await issueRefundForOrder(fakeSupabase() as never, {
+        tenantId: "tenant-1",
+        orderId: "order-1",
+        actorUserId: "user-1",
+        amountCents: 2000,
+        reason: "Kunde unzufrieden",
+        requestToken: "11111111-1111-4111-8111-111111111111",
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    const [params, options] = stripeRefundsCreateMock.mock.calls[0] as [
+      Record<string, unknown>,
+      Record<string, unknown>,
+    ];
+    expect(params).toMatchObject({
+      payment_intent: "pi_test_abc",
+      amount: 2000,
+      reverse_transfer: true,
+    });
+    expect(params).not.toHaveProperty("on_behalf_of");
+    expect(options).not.toHaveProperty("stripeAccount");
+  });
+
   it("issues a partial refund for less than the full paid amount", async () => {
     const { issueRefundForOrder } = await import("./refund-service");
 

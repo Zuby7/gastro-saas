@@ -4,6 +4,7 @@ import { formatPrice } from "@/lib/public-menu/format";
 import { getPublicMenu } from "@/lib/public-menu/fetch";
 import { loadCartViewForDisplay } from "../cart/actions";
 import { CheckoutForm } from "./checkout-form";
+import { isPaypalConnectEnabled } from "@/lib/payments/paypal-flag";
 
 interface CheckoutPageProps {
   params: Promise<{ slug: string }>;
@@ -67,7 +68,11 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
               </div>
             </div>
 
-            <CheckoutForm tenantSlug={slug} checkoutReady={checkoutReady} />
+            <CheckoutForm
+              tenantSlug={slug}
+              checkoutReady={checkoutReady}
+              paypalEnabled={isPaypalConnectEnabled()}
+            />
           </>
         )}
       </div>

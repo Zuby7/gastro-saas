@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { isPaypalConnectEnabled } from "./paypal-flag";
 import { createStripeClient } from "@/lib/stripe/client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { recordOrderAuditEvent } from "@/lib/audit/record-order-audit-event";
@@ -145,7 +146,9 @@ export async function createCheckoutSessionForOrder(
       },
     ],
     payment_intent_data: {
-      on_behalf_of: stripeAccountId,
+      // ADR-0003 (PROPOSED): Stripe rejects PayPal together with
+      // `on_behalf_of`, so the flag drops it. Default (off) is unchanged.
+      ...(isPaypalConnectEnabled() ? {} : { on_behalf_of: stripeAccountId }),
       transfer_data: {
         destination: stripeAccountId,
       },

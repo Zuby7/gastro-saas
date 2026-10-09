@@ -302,6 +302,50 @@ describe("createCheckoutSessionForOrder", () => {
   });
 });
 
+describe("createCheckoutSessionForOrder -- STRIPE_CONNECT_PAYPAL_ENABLED flag (ADR-0003)", () => {
+  const input = {
+    tenantId: "tenant-1",
+    tenantSlug: "demo",
+    orderId: "order-1",
+    guestAccessToken: "raw-token",
+  };
+
+  async function paramsFor(envValue: string | undefined) {
+    if (envValue === undefined) vi.stubEnv("STRIPE_CONNECT_PAYPAL_ENABLED", "");
+    else vi.stubEnv("STRIPE_CONNECT_PAYPAL_ENABLED", envValue);
+    try {
+      const { createCheckoutSessionForOrder } = await import("./service");
+      await createCheckoutSessionForOrder(input);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    return createCheckoutSessionMock.mock.calls[0]![0] as {
+      payment_intent_data: Record<string, unknown>;
+      payment_method_types?: unknown;
+      metadata: Record<string, string>;
+      expires_at: number;
+    };
+  }
+
+  it.each([undefined, "", "0", "true", "yes"])(
+    "keeps on_behalf_of when the flag is %j (off)",
+    async (value) => {
+      const params = await paramsFor(value);
+      expect(params.payment_intent_data.on_behalf_of).toBe("acct_123");
+      expect(params.payment_intent_data.transfer_data).toEqual({ destination: "acct_123" });
+    },
+  );
+
+  it("omits on_behalf_of but keeps transfer_data.destination, dynamic payment methods and metadata when the flag is '1'", async () => {
+    const params = await paramsFor("1");
+    expect(params.payment_intent_data).not.toHaveProperty("on_behalf_of");
+    expect(params.payment_intent_data.transfer_data).toEqual({ destination: "acct_123" });
+    expect(params.payment_method_types).toBeUndefined();
+    expect(params.metadata).toMatchObject({ tenant_id: "tenant-1", order_id: "order-1" });
+    expect(typeof params.expires_at).toBe("number");
+  });
+});
+
 describe("createCheckoutSessionForOrder -- additional failure modes", () => {
   const input = {
     tenantId: "tenant-1",

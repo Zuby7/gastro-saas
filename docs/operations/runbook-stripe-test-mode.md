@@ -66,6 +66,17 @@ Any future expiry, any CVC, any postcode:
 
 > **PayPal is not available** for Connect payments in this setup (checked 2026-10-09 against the Stripe test account). Stripe answers a Checkout Session with PayPal + Connect with `Your Stripe account currently does not support Connect payments with PayPal` (platform eligibility, https://docs.stripe.com/payments/paypal#connect), and PayPal + `on_behalf_of` with `on_behalf_of cannot be used with the paypal payment method`. PayPal works only on the platform account itself. Enabling it would need a Stripe eligibility approval and dropping `on_behalf_of` (changes the merchant of record), see issue #193. The checkout therefore advertises only card, Klarna and other methods Stripe offers dynamically (Apple Pay, Link, Amazon Pay, bank methods).
 
+### PayPal rollout checklist (flag `STRIPE_CONNECT_PAYPAL_ENABLED`, ADR-0003 PROPOSED)
+
+The code is ready but the flag is OFF everywhere. Do not flip it until every step is done:
+
+1. ADR-0003 is accepted, including the external legal/tax review of the merchant-of-record change (see ADR).
+2. Request PayPal with Connect for the platform account from Stripe support / Dashboard (eligibility guidelines: https://docs.stripe.com/payments/paypal#connect). Record the answer.
+3. Verify eligibility: a `POST /v1/checkout/sessions` with `payment_method_types[]=paypal` and `transfer_data.destination` (no `on_behalf_of`) succeeds in the sandbox/test account (and, if Stripe requires, on the live account after approval).
+4. Set `STRIPE_CONNECT_PAYPAL_ENABLED=1` in the test environment only first (Worker variable, server side) and redeploy.
+5. Smoke test: checkout shows PayPal in Stripe Checkout and in the form hint; pay with PayPal sandbox; order becomes paid via webhook; refund the order (`reverse_transfer`) and check `refunds.status = 'succeeded'`.
+6. Only then, with explicit approval, enable in other environments. Rollback: unset the flag and redeploy (new sessions use `on_behalf_of` again; open sessions are unaffected).
+
 ## 7. Verify the payment path (manual end-to-end check)
 
 There is no automated Stripe e2e test (Playwright covers only register/login). Verify manually, locally with `stripe listen` running or on the Worker:
