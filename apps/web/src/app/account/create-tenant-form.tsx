@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+
 import { createTenantAction, type CreateTenantFormState } from "./actions";
 
 const initialState: CreateTenantFormState = {};
@@ -23,7 +24,7 @@ export function CreateTenantForm({
   defaultTenantName,
   defaultTenantSlug,
 }: CreateTenantFormProps = {}) {
-  const [state, formAction, isPending] = useActionState(createTenantAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(createTenantAction, initialState);
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
@@ -45,7 +46,7 @@ export function CreateTenantForm({
         </p>
       ) : null}
 
-      <form action={formAction} className="flex flex-col gap-4" noValidate>
+      <form {...formAction} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1">
           <label htmlFor="tenantName" className="text-sm font-medium text-foreground">
             Restaurantname

@@ -1,15 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+
 import { createDishAction, type MenuActionState } from "./actions";
 
 const initialState: MenuActionState = {};
 
 export function DishForm({ categoryId }: { categoryId: string }) {
-  const [state, formAction, isPending] = useActionState(createDishAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(createDishAction, initialState);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-2" noValidate>
+    <form {...formAction} className="flex flex-wrap items-end gap-2" noValidate>
       <input type="hidden" name="categoryId" value={categoryId} />
       <div className="flex flex-col gap-1">
         <label

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+import { useState } from "react";
 import type { DishActionState } from "./actions";
 
 const initialState: DishActionState = {};
@@ -46,7 +47,9 @@ export function AvailabilityToggleForm({
   idPrefix,
   itemLabel,
 }: AvailabilityToggleFormProps) {
-  const [state, formAction, isPending] = useActionState(action, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(action, initialState, {
+    resetOnSuccess: false,
+  });
   const dateTimeInputId = `${idPrefix}-available-again-at`;
 
   // `Date.now()` is impure and may not be called directly during render
@@ -67,7 +70,7 @@ export function AvailabilityToggleForm({
 
   return (
     <form
-      action={formAction}
+      {...formAction}
       className="flex flex-wrap items-end gap-2 rounded-md bg-surface-secondary p-2"
     >
       {Object.entries(hiddenFields).map(([name, value]) => (

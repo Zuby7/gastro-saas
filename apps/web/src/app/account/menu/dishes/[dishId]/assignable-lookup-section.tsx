@@ -1,5 +1,6 @@
 "use client";
 
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { useActionState } from "react";
 import { createLookupValueAction, toggleAssignmentAction, type DishActionState } from "./actions";
 import type { AssignmentEntity } from "./schemas";
@@ -34,7 +35,7 @@ export function AssignableLookupSection({
   items,
 }: AssignableLookupSectionProps) {
   const [toggleState, toggleFormAction] = useActionState(toggleAssignmentAction, initialState);
-  const [createState, createFormAction, isCreatePending] = useActionState(
+  const [createState, createFormAction, isCreatePending] = usePreservedFormAction(
     createLookupValueAction,
     initialState,
   );
@@ -78,7 +79,7 @@ export function AssignableLookupSection({
         </p>
       ) : null}
 
-      <form action={createFormAction} className="flex flex-wrap items-end gap-2" noValidate>
+      <form {...createFormAction} className="flex flex-wrap items-end gap-2" noValidate>
         <input type="hidden" name="dishId" value={dishId} />
         <input type="hidden" name="entity" value={entity} />
         <div className="flex flex-col gap-1">

@@ -1,15 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+
 import { createCategoryAction, type MenuActionState } from "./actions";
 
 const initialState: MenuActionState = {};
 
 export function CategoryForm() {
-  const [state, formAction, isPending] = useActionState(createCategoryAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(createCategoryAction, initialState);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-2" noValidate>
+    <form {...formAction} className="flex flex-wrap items-end gap-2" noValidate>
       <div className="flex flex-col gap-1">
         <label htmlFor="new-category-name" className="text-sm font-medium text-foreground">
           Neue Kategorie

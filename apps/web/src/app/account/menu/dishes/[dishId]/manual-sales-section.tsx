@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+
 import { recordManualSaleAction, type DishActionState } from "./actions";
 
 const initialState: DishActionState = {};
@@ -32,7 +33,10 @@ function formatDate(dateString: string): string {
  * dedicated `manual_sales_entries` table.
  */
 export function ManualSalesSection({ dishId, entries }: ManualSalesSectionProps) {
-  const [state, formAction, isPending] = useActionState(recordManualSaleAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(
+    recordManualSaleAction,
+    initialState,
+  );
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -61,7 +65,7 @@ export function ManualSalesSection({ dishId, entries }: ManualSalesSectionProps)
         </p>
       ) : null}
 
-      <form action={formAction} className="flex flex-wrap items-end gap-3" noValidate>
+      <form {...formAction} className="flex flex-wrap items-end gap-3" noValidate>
         <input type="hidden" name="dishId" value={dishId} />
         <div className="flex flex-col gap-1">
           <label htmlFor="manual-sale-quantity" className="text-sm font-medium text-foreground">

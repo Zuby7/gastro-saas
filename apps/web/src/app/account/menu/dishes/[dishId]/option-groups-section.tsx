@@ -1,5 +1,6 @@
 "use client";
 
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { useActionState } from "react";
 import {
   assignOptionGroupAction,
@@ -44,16 +45,19 @@ export function OptionGroupsSection({
   canEditMenu,
   canManageAvailability,
 }: OptionGroupsSectionProps) {
-  const [assignState, assignFormAction] = useActionState(assignOptionGroupAction, initialState);
+  const [assignState, assignFormAction] = usePreservedFormAction(
+    assignOptionGroupAction,
+    initialState,
+  );
   const [unassignState, unassignFormAction] = useActionState(
     unassignOptionGroupAction,
     initialState,
   );
-  const [createGroupState, createGroupFormAction, isCreateGroupPending] = useActionState(
+  const [createGroupState, createGroupFormAction, isCreateGroupPending] = usePreservedFormAction(
     createOptionGroupAction,
     initialState,
   );
-  const [createOptionState, createOptionFormAction, isCreateOptionPending] = useActionState(
+  const [createOptionState, createOptionFormAction, isCreateOptionPending] = usePreservedFormAction(
     createOptionAction,
     initialState,
   );
@@ -134,7 +138,7 @@ export function OptionGroupsSection({
       </div>
 
       {canEditMenu && unassignedGroups.length > 0 ? (
-        <form action={assignFormAction} className="flex flex-wrap items-end gap-2">
+        <form {...assignFormAction} className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
             <label htmlFor="assign-option-group" className="text-sm font-medium text-foreground">
@@ -162,7 +166,7 @@ export function OptionGroupsSection({
       ) : null}
 
       {canEditMenu ? (
-        <form action={createGroupFormAction} className="flex flex-wrap items-end gap-2" noValidate>
+        <form {...createGroupFormAction} className="flex flex-wrap items-end gap-2" noValidate>
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
             <label htmlFor="new-group-name" className="text-sm font-medium text-foreground">
@@ -217,7 +221,7 @@ export function OptionGroupsSection({
       ) : null}
 
       {canEditMenu && allOptionGroups.length > 0 ? (
-        <form action={createOptionFormAction} className="flex flex-wrap items-end gap-2" noValidate>
+        <form {...createOptionFormAction} className="flex flex-wrap items-end gap-2" noValidate>
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
             <label htmlFor="new-option-group" className="text-sm font-medium text-foreground">

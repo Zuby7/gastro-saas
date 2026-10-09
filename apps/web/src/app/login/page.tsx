@@ -1,14 +1,17 @@
 "use client";
 
+import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import Link from "next/link";
 import { PlatformCookieLink } from "@/lib/consent/platform-cookie-link";
-import { useActionState } from "react";
+
 import { loginAction, type LoginFormState } from "./actions";
 
 const initialState: LoginFormState = {};
 
 export default function LoginPage() {
-  const [state, formAction, isPending] = useActionState(loginAction, initialState);
+  const [state, formAction, isPending] = usePreservedFormAction(loginAction, initialState, {
+    clearOnError: ["password"],
+  });
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 p-8">
@@ -29,7 +32,7 @@ export default function LoginPage() {
         </p>
       ) : null}
 
-      <form action={formAction} className="flex flex-col gap-4" noValidate>
+      <form {...formAction} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1">
           <label htmlFor="email" className="text-sm font-medium text-foreground">
             E-Mail-Adresse
