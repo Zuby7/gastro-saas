@@ -27,7 +27,7 @@ Schriften werden self-hosted (`next/font`), kein Google-Fonts-Request. Keine Mar
 - Einstellungs-Dialog: Kategorie „Notwendig“ (immer aktiv) und „Statistik“ (Opt-in, standardmäßig aus), je mit Tabelle Name/Zweck/Dauer/Anbieter.
 - Speicherung: Cookie `gastro_cookie_consent` mit URL-codiertem JSON `{version, timestamp, statistics}`. Das ist der Nachweis (Art. 7 Abs. 1 DSGVO) ohne zusätzliche personenbezogene Daten; es gibt bewusst kein serverseitiges Consent-Log (Datensparsamkeit, keine IP-Adressen).
 - Re-Prompt: bei anderer `CONSENT_VERSION`, nach 6 Monaten, bei unlesbarem/zukünftigem Zeitstempel. Alte Werte `accepted`/`declined` (Ticket #146) gelten als veraltet; bis zur neuen Entscheidung ist Statistik aus.
-- Widerruf: Link „Cookie-Einstellungen“ auf allen öffentlichen Restaurantseiten (`apps/web/src/app/r/[slug]/layout.tsx`). Speichern mit abgewähltem „Statistik“ löscht `gastro_view_*` (Middleware auf jeder Route, da das Cookie httpOnly ist).
+- Widerruf: Link „Cookie-Einstellungen“ auf allen öffentlichen Restaurantseiten (auf Plattformseiten: Link zum Cookie-Abschnitt der Datenschutzerklärung, #163) (`apps/web/src/app/r/[slug]/layout.tsx`). Speichern mit abgewähltem „Statistik“ löscht `gastro_view_*` (Middleware auf jeder Route, da das Cookie httpOnly ist).
 - Middleware mintet `gastro_view_<slug>` nur bei gültiger, aktueller Entscheidung mit `statistics: true`.
 
 ## Offene Punkte für die externe Rechtsprüfung
@@ -40,5 +40,6 @@ Schriften werden self-hosted (`next/font`), kein Google-Fonts-Request. Keine Mar
 ## Technische Folgeaufgaben
 
 - Follow-up: IP-Hash mit serverseitigem Geheimnis salzen (HMAC) statt reinem SHA-256. Nicht in #162 umgesetzt, da dafür ein neues Secret/Konfiguration nötig ist und bestehende Tests (`service.test.ts`) sowie ggf. Datenbestände betroffen sind.
-- Follow-up: Cookie-Hinweis/-Link auf Plattformseiten außerhalb von `/r/[slug]` (`/`, `/login`, `/register`, `/account`, `/datenschutz`).
+- Erledigt in #163: Plattformseiten außerhalb von `/r/[slug]` (`/`, `/login`, `/register`, `/account`, `/datenschutz`) setzen nur notwendige Cookies (`sb-*`, ggf. `gastro_cookie_consent`; Konstante `PLATFORM_COOKIES`). Die Plattform-Datenschutzerklärung (`/datenschutz#cookies`) enthält dazu den Abschnitt „Cookies und ähnliche Technologien“ (gleiche `CookieTable`); der Footer-Link „Cookie-Einstellungen“ (`PlatformCookieLink`) führt dorthin, da es auf diesen Seiten keine Einwilligungskategorie zu verwalten gibt (kein Banner). Neue Cookies auf Plattformseiten müssen in `PLATFORM_COOKIE_NAMES` (`inventory.ts`) ergänzt werden.
+- Erledigt in #163: Der feste Cookie-Banner unter `/r/[slug]` reserviert per Abstandshalter (gemessene Banner-Höhe, `ResizeObserver`) Platz im Seitenfluss, solange keine Entscheidung vorliegt, damit er auf Mobilgeräten keine Inhalte verdeckt.
 - Versionshistorie: `CONSENT_VERSION` 3 (Textkorrektur Statistik: Gericht-/Warenkorb-Ereignisse und IP-Hash).

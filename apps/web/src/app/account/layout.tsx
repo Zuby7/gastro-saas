@@ -1,3 +1,4 @@
+import { PlatformCookieLink } from "@/lib/consent/platform-cookie-link";
 import { AccountNav } from "./account-nav";
 
 /**
@@ -16,6 +17,9 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
     <div className="flex min-h-screen flex-col">
       <AccountNav />
       <div className="flex-1">{children}</div>
+      <footer className="border-t border-neutral-200 px-5 py-4 text-sm sm:px-8">
+        <PlatformCookieLink />
+      </footer>
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { CookieTable } from "@/lib/consent/cookie-table";
+import { PLATFORM_COOKIES } from "@/lib/consent/inventory";
 
 /**
  * Ticket #146: static, platform-level Datenschutzerklärung for gastro-saas
@@ -33,6 +35,22 @@ export default function PlatformDatenschutzPage() {
           Rechtsanwältin/einem Rechtsanwalt geprüft und hier eingetragen. Dieser Text ist keine
           Rechtsberatung.
         </p>
+
+        <section id="cookies" aria-labelledby="cookies-heading" className="flex flex-col gap-3">
+          <h2 id="cookies-heading" className="font-display text-xl font-semibold text-foreground">
+            Cookies und ähnliche Technologien
+          </h2>
+          <p className="text-sm text-foreground">
+            Auf den Plattform-Seiten (Startseite, Anmeldung, Registrierung, Konto) setzen wir
+            ausschließlich technisch notwendige Cookies ein. Statistik- oder Marketing-Cookies
+            setzen wir hier nicht, daher ist keine Einwilligung erforderlich und es gibt hier nichts
+            abzuwählen. Die Cookies für Bestellungen und die optionale Statistik der
+            Restaurant-Speisekarten (Seiten unter „/r/…“) sind in der Datenschutzerklärung des
+            jeweiligen Restaurants beschrieben; dort können Sie Ihre Auswahl jederzeit über
+            „Cookie-Einstellungen“ ändern.
+          </p>
+          <CookieTable cookies={PLATFORM_COOKIES} caption="Cookies der Plattform-Seiten" />
+        </section>
       </div>
     </main>
   );

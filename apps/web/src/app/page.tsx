@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PlatformCookieLink } from "@/lib/consent/platform-cookie-link";
 import { ClipboardList, LineChart, QrCode, Wallet } from "lucide-react";
 
 /**
@@ -320,6 +321,10 @@ export default function Home() {
             <Link href="/register" className="font-medium text-link-foreground underline">
               Restaurant registrieren
             </Link>
+            <Link href="/datenschutz" className="font-medium text-link-foreground underline">
+              Datenschutz
+            </Link>
+            <PlatformCookieLink />
           </nav>
         </div>
       </footer>

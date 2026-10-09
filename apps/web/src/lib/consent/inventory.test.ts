@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { menuViewCookieName } from "@/lib/menu-view/cookie-name";
 import { CONSENT_COOKIE_NAME } from "./cookie";
-import { COOKIE_INVENTORY, STATISTICS_COOKIES, STATISTICS_DESCRIPTION } from "./inventory";
+import {
+  COOKIE_INVENTORY,
+  PLATFORM_COOKIES,
+  STATISTICS_COOKIES,
+  STATISTICS_DESCRIPTION,
+} from "./inventory";
 
 const SRC_ROOT = join(__dirname, "..", "..");
 
@@ -84,5 +89,12 @@ describe("cookie inventory matches the code", () => {
       expect(text).toMatch(/Hash Ihrer IP-Adresse/);
       expect(text).not.toMatch(/anonym|ohne Personenbezug/i);
     }
+  });
+});
+
+describe("platform cookie subset (#163)", () => {
+  it("contains only the auth session and the consent cookie, never statistics", () => {
+    expect(PLATFORM_COOKIES.map((c) => c.name)).toEqual(["gastro_cookie_consent", "sb-*"]);
+    expect(PLATFORM_COOKIES.every((c) => c.category === "necessary")).toBe(true);
   });
 });

@@ -63,4 +63,13 @@ describe("Home (Startseite / marketing landing page)", () => {
       }
     },
   );
+
+  it("has a footer link to the cookie settings", () => {
+    render(<Home />);
+
+    expect(screen.getByRole("link", { name: "Cookie-Einstellungen" })).toHaveAttribute(
+      "href",
+      "/datenschutz#cookies",
+    );
+  });
 });
