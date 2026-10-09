@@ -83,7 +83,7 @@ export default async function CartPage({ params }: CartPageProps) {
             <div className="ticket-edge rounded-t-lg border border-b-0 border-neutral-200 bg-surface px-4 pt-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-lg font-semibold text-foreground">Gesamtsumme</span>
-                <span className="font-display text-2xl font-semibold text-ember-700">
+                <span className="font-display text-2xl font-semibold text-accent-foreground">
                   {formatPrice(cart.totalCents, cart.currency)}
                 </span>
               </div>

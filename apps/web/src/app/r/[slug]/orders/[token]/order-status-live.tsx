@@ -101,7 +101,7 @@ export function OrderStatusLive({
           #{orderToken}
         </span>
       </div>
-      <p className="mt-1 font-display text-2xl font-semibold text-ember-700">
+      <p className="mt-1 font-display text-2xl font-semibold text-accent-foreground">
         {orderStatusLabel(status)}
       </p>
       <p className="mt-2 text-sm text-foreground-secondary">{orderStatusDescription(status)}</p>
