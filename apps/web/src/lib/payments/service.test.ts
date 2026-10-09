@@ -301,3 +301,35 @@ describe("createCheckoutSessionForOrder", () => {
     expect(params.line_items[0]!.price_data.unit_amount).toBe(999999);
   });
 });
+
+describe("createCheckoutSessionForOrder -- additional failure modes", () => {
+  const input = {
+    tenantId: "tenant-1",
+    tenantSlug: "demo",
+    orderId: "order-1",
+    guestAccessToken: "raw-token",
+  };
+
+  it("throws when the order cannot be found for the tenant, before calling Stripe", async () => {
+    state.order = null;
+
+    const { createCheckoutSessionForOrder } = await import("./service");
+
+    await expect(createCheckoutSessionForOrder(input)).rejects.toThrow(
+      "Order not found for payment creation.",
+    );
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+    expect(paymentsInsertCalls).toHaveLength(0);
+  });
+
+  it("throws and records no payment when Stripe returns no hosted checkout URL", async () => {
+    createCheckoutSessionMock.mockResolvedValue({ id: "cs_test_abc", url: null });
+
+    const { createCheckoutSessionForOrder } = await import("./service");
+
+    await expect(createCheckoutSessionForOrder(input)).rejects.toThrow(
+      "Stripe did not return a hosted checkout URL.",
+    );
+    expect(paymentsInsertCalls).toHaveLength(0);
+  });
+});
