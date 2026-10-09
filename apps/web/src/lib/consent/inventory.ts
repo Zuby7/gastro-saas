@@ -59,6 +59,17 @@ export const NECESSARY_COOKIES = COOKIE_INVENTORY.filter((c) => c.category === "
 export const STATISTICS_COOKIES = COOKIE_INVENTORY.filter((c) => c.category === "statistics");
 
 /**
+ * Cookies that can actually occur on the platform pages outside `/r/[slug]`
+ * (`/`, `/login`, `/register`, `/account`, `/datenschutz`): the Supabase auth
+ * session and the consent cookie (only present if the visitor decided on a
+ * restaurant page, it is scoped to `/`). No cart/order/statistics cookies.
+ */
+const PLATFORM_COOKIE_NAMES: readonly string[] = ["sb-*", "gastro_cookie_consent"];
+export const PLATFORM_COOKIES = COOKIE_INVENTORY.filter((c) =>
+  PLATFORM_COOKIE_NAMES.includes(c.name),
+);
+
+/**
  * Plain-language description of what the statistics category does; shown in
  * the settings dialog. Must stay true to `lib/menu-view/service.ts`: it counts
  * menu views, dish views and add-to-cart events, and processes a keyed

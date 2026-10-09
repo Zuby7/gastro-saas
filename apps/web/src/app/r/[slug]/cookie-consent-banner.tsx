@@ -61,6 +61,8 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const settingsLinkRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const bannerRef = useRef<HTMLDivElement | null>(null);
+  const [bannerHeight, setBannerHeight] = useState(0);
   const titleId = useId();
   const statisticsId = useId();
 
@@ -74,6 +76,28 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
       dialogRef.current?.focus();
     }
   }, [dialogOpen]);
+
+  const bannerVisible = consent !== null && consent.status !== "valid";
+
+  // The banner is fixed at the bottom; reserve exactly its height in the page
+  // flow while it is visible so it never covers content (notably on mobile,
+  // where it is tall), and release the space as soon as a decision is made.
+  useEffect(() => {
+    const element = bannerRef.current;
+    if (!bannerVisible || !element) {
+      setBannerHeight(0);
+      return;
+    }
+    const measure = () => setBannerHeight(element.offsetHeight);
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [bannerVisible]);
 
   function openDialog(trigger?: HTMLElement | null) {
     returnFocusRef.current = trigger ?? (document.activeElement as HTMLElement | null);
@@ -145,8 +169,6 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
     }
   }
 
-  const bannerVisible = consent !== null && consent.status !== "valid";
-
   return (
     <>
       <footer className="border-t border-neutral-200 px-5 py-4 sm:px-8">
@@ -164,6 +186,15 @@ export function CookieConsentBanner({ tenantSlug }: { tenantSlug: string }) {
 
       {bannerVisible ? (
         <div
+          data-testid="cookie-banner-spacer"
+          aria-hidden="true"
+          style={{ height: bannerHeight }}
+        />
+      ) : null}
+
+      {bannerVisible ? (
+        <div
+          ref={bannerRef}
           role="region"
           aria-label="Cookie-Hinweis"
           className="fixed inset-x-0 bottom-0 z-50 border-t border-neutral-200 bg-surface p-4 shadow-[0_-4px_12px_rgba(0,0,0,.08)]"
