@@ -1,0 +1,250 @@
+/*
+ * Landing page effects (issue #196). Colors come exclusively from the design
+ * token variables (`--color-*`, `--lp-*` in globals.css). Every animation is
+ * wrapped in `prefers-reduced-motion: no-preference`; the reduced-motion
+ * fallback is the static gradient, so nothing here moves or shimmers for
+ * users who opted out. No effect changes layout (only paint/transform).
+ */
+
+@property --lp-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* Soft blurred colour glows ("Farbuebergaenge") bleeding behind sections. */
+.lp-glow {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  filter: blur(60px);
+  z-index: 0;
+}
+.lp-glow--brand {
+  background: radial-gradient(closest-side, var(--lp-glow-brand), transparent);
+}
+.lp-glow--ember {
+  background: radial-gradient(closest-side, var(--lp-glow-ember), transparent);
+}
+.lp-glow--gold {
+  background: radial-gradient(closest-side, var(--lp-glow-gold), transparent);
+}
+
+/* Colored gradient header bar and closing band (light text only). */
+.lp-bar {
+  background-image: linear-gradient(
+    90deg,
+    var(--lp-bar-from),
+    var(--lp-bar-via) 55%,
+    var(--lp-bar-to)
+  );
+}
+.lp-band {
+  background-image: linear-gradient(
+    120deg,
+    var(--lp-band-from),
+    var(--lp-band-via) 55%,
+    var(--lp-band-to)
+  );
+}
+
+/* Gradient text for key words. */
+.lp-text-gradient {
+  background-image: linear-gradient(95deg, var(--lp-text-from), var(--lp-text-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glowing primary button. */
+.lp-btn-glow {
+  background-image: linear-gradient(135deg, var(--color-brand-700), var(--color-brand-600));
+  color: var(--color-neutral-0);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-brand-300) 40%, transparent),
+    0 8px 28px -4px color-mix(in srgb, var(--color-brand-400) 65%, transparent);
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+.lp-btn-glow:hover {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-brand-200) 60%, transparent),
+    0 10px 40px -2px color-mix(in srgb, var(--color-brand-300) 85%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lp-btn-glow:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* Glassy translucent surface. */
+.lp-glass {
+  background: var(--lp-glass);
+  border: 1px solid var(--lp-glass-border);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+/*
+ * Holographic card: iridescent conic-gradient border + faint diagonal sheen
+ * + pointer-follow glare (`--lp-mx`/`--lp-my`, set by the tiny HoloCard
+ * client component; defaults keep a static, centered sheen without JS).
+ */
+.lp-holo {
+  --lp-mx: 30%;
+  --lp-my: 0%;
+  position: relative;
+  isolation: isolate;
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(
+        from var(--lp-angle),
+        var(--lp-holo-1),
+        var(--lp-holo-2),
+        var(--lp-holo-3),
+        var(--lp-holo-4),
+        var(--lp-holo-2),
+        var(--lp-holo-1)
+      )
+      border-box;
+  box-shadow: 0 18px 50px -24px var(--lp-shadow);
+}
+.lp-holo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    color-mix(in srgb, var(--lp-holo-2) 16%, transparent) 45%,
+    color-mix(in srgb, var(--lp-holo-1) 16%, transparent) 55%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  background-position: 100% 0;
+}
+.lp-holo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    240px circle at var(--lp-mx) var(--lp-my),
+    var(--lp-glare),
+    color-mix(in srgb, var(--lp-holo-1) 10%, transparent) 45%,
+    transparent 70%
+  );
+  transition: opacity 200ms ease;
+}
+.lp-holo:hover::after {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lp-holo {
+    animation: lp-holo-spin 9s linear infinite;
+  }
+  .lp-holo::before {
+    transition: background-position 700ms ease;
+  }
+  .lp-holo:hover::before {
+    background-position: 0 0;
+  }
+}
+@keyframes lp-holo-spin {
+  to {
+    --lp-angle: 360deg;
+  }
+}
+
+/* Holographic ring for pills / frames (border only). */
+.lp-holo-ring {
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(
+        from var(--lp-angle),
+        var(--lp-holo-1),
+        var(--lp-holo-2),
+        var(--lp-holo-3),
+        var(--lp-holo-4),
+        var(--lp-holo-1)
+      )
+      border-box;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lp-holo-ring {
+    animation: lp-holo-spin 9s linear infinite;
+  }
+}
+
+/* Floating phone mockups. */
+.lp-phone {
+  border: 6px solid var(--color-espresso-900);
+  box-shadow:
+    0 30px 60px -20px var(--lp-shadow),
+    0 0 0 1px color-mix(in srgb, var(--color-neutral-0) 25%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lp-float {
+    animation: lp-float 7s ease-in-out infinite;
+  }
+  .lp-float--delay {
+    animation-delay: -3.5s;
+  }
+}
+@keyframes lp-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -12px;
+  }
+}
+
+/* FAQ: native details/summary with a CSS plus/minus indicator. */
+.lp-faq summary {
+  list-style: none;
+}
+.lp-faq summary::-webkit-details-marker {
+  display: none;
+}
+.lp-faq summary::after {
+  content: "+";
+  flex-shrink: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--link-foreground);
+}
+.lp-faq details[open] summary::after {
+  content: "\2212";
+}
+
+/* Skip link: visible on keyboard focus only. */
+.lp-skip {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 50;
+  transition: top 120ms ease;
+}
+.lp-skip:focus-visible {
+  top: 1rem;
+}
+
+.lp-focus:focus-visible {
+  outline: 3px solid var(--color-gold-300);
+  outline-offset: 3px;
+}
+.lp-focus-ink:focus-visible {
+  outline: 3px solid var(--link-foreground);
+  outline-offset: 3px;
+}

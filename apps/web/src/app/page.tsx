@@ -1,327 +1,489 @@
+/* eslint-disable @next/next/no-img-element -- plain <img> on purpose: Cloudflare Workers deployment, no next/image (see docs/design/landing-assets.md) */
 import Link from "next/link";
+import { Clock, EyeOff, FileText, ShieldCheck, Accessibility, Star, Building2 } from "lucide-react";
 import { PlatformCookieLink } from "@/lib/consent/platform-cookie-link";
-import { ClipboardList, LineChart, QrCode, Wallet } from "lucide-react";
+import { HoloCard } from "./_landing/holo-card";
+import {
+  BRAND_NAME,
+  CHALLENGES,
+  DEMO_HREF,
+  FAQS,
+  FEATURES,
+  LOGIN_HREF,
+  PAYMENT_METHODS,
+  REGISTER_HREF,
+  STEPS,
+  VALUES,
+} from "./_landing/content";
+import "./landing.css";
 
 /**
- * Marketing/landing page (visual redesign, per direct user request 2026-09-07
- * that the previous version "looks too AI-generated / boxy"). Replaces the
- * centered-hero + uniform-4-col-grid + repeated-box-per-section layout that
- * shipped in the prior pass.
+ * Marketing landing page, modern SaaS style (issue #196): colored gradient
+ * header bar, huge display headings, blurred colour glows behind sections,
+ * holographic conic-gradient card borders, glass surfaces, floating phone
+ * mockups and a large dashboard mockup overlapping a gradient band.
  *
- * Design notes (no `frontend-design` skill/plugin available in this
- * session - see `.claude/rules/frontend.md`'s note that it's optional if
- * not installed):
- *
- * Pass 1 (plan): reuse the existing token system (`packages/ui/src/tokens.ts`)
- * unchanged - no new colors/fonts. The three specific "AI slop" patterns
- * called out for this page (eyebrow-label-above-giant-centered-headline,
- * uniform icon-card grid, identical heading→box rhythm repeated every
- * section) are each broken structurally, not just re-skinned:
- *   - Hero: no floating eyebrow label at all. Instead an asymmetric ~55/45
- *     two-column layout - headline+copy left, a single bold visual anchor
- *     right (a `.ticket-edge` kitchen-order-ticket mockup, angled and
- *     bleeding past its column on large screens). The small "tag" that would
- *     otherwise have been a floating eyebrow is docked onto that ticket
- *     visual itself (`.ticket-stamp`), not floating alone above the H1.
- *     Headline size is reduced (text-3xl/4xl instead of 4xl/5xl) so it
- *     doesn't have to dominate the whole fold by itself.
- *   - Features: the QR-menu feature is pulled out as one large, wide
- *     featured card (matching the hero paragraph's own emphasis on
- *     "digitale Speisekarte"); the other three (kitchen orders, payments,
- *     analytics -- all still promised in the hero paragraph, so none were
- *     silently dropped, per Opus review on PR #149) sit below it as three
- *     equal supporting cards. Still not four identical top-level columns --
- *     the asymmetry is one wide card + a row of three, not a uniform grid.
- *   - How-it-works: no longer 3 identical circle-badges in a symmetric grid.
- *     Step 1 is visually heavier (larger badge/type) as the anchor, steps 2
- *     and 3 are smaller and follow along a dashed connector line, all
- *     left-aligned in a horizontal flow rather than 3 centered columns.
- *   - Closing CTA: kept, but no longer a plain centered rounded rectangle -
- *     copy is left-aligned and the button is offset to the side. An earlier
- *     draft also echoed the hero's ticket-perforation edge on this band, but
- *     that render was invisible (bg-on-bg) and was removed rather than
- *     faked (Opus review, PR #149) -- the ticket motif stays the hero's ONE
- *     bold moment.
- *
- * The `.ticket-edge`/`.ticket-stamp` utilities (`globals.css`) were
- * previously scoped to "cards that literally represent your order" (cart,
- * checkout, order-status). This ticket explicitly asks to reuse that exact
- * established motif as the landing page's one bold visual moment instead of
- * inventing a new shape - done deliberately here as a second, narrow,
- * documented exception (the marketing hero mockup only), not a general
- * license to scatter it decoratively elsewhere; `packages/ui/src/tokens.ts`'s
- * own "Signature element" section is updated in this same PR to state this
- * second exception explicitly, so the two docs agree.
- * Real dish photos were deliberately not used for the same reason as before
- * (`ATTRIBUTION.md`: seed-data only, and the motif is cuisine-agnostic).
- *
- * Pass 2 (critique): avoids the cold blue/purple SaaS gradient (still the
- * warm espresso gradient used elsewhere in the product); every section now
- * has a different visual rhythm so the page doesn't read as repeated
- * templated blocks; accent colors stay restrained (ember only for the one
- * "price" moment in the ticket mockup, gold only for small badges/tags,
- * matching the rest of the product's established restraint).
+ * Server component. The only client code is the tiny `HoloCard` pointer
+ * glare wrapper. All colors are design tokens (see `landing.css` and the
+ * `--lp-*` variables in `globals.css`); all motion is gated behind
+ * `prefers-reduced-motion: no-preference` in `landing.css`. Screenshots live
+ * in `public/landing/` and are mapped to roles in `docs/design/landing-assets.md`.
  */
+
+const IMG = "/landing";
+
+const BTN =
+  "inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-semibold";
+
+const H2 = "text-4xl font-bold leading-[1.08] tracking-tight text-foreground sm:text-5xl";
+
 export default function Home() {
   return (
     <>
-      <header className="sticky top-0 z-10 border-b border-neutral-200 bg-surface">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
-          <span className="font-display text-xl font-semibold tracking-tight text-foreground">
-            gastro-saas
-          </span>
-          <nav className="flex items-center gap-4 text-sm" aria-label="Hauptnavigation">
-            <Link href="/login" className="font-medium text-link-foreground underline">
-              Anmelden
+      <a
+        href="#inhalt"
+        className="lp-skip lp-focus-ink rounded-md bg-surface px-4 py-2 font-medium text-foreground"
+      >
+        Zum Inhalt springen
+      </a>
+
+      <header className="lp-bar sticky top-0 z-40 text-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3 sm:px-8">
+          <Link
+            href="/"
+            className="lp-focus rounded-md text-xl font-bold tracking-tight text-white"
+          >
+            {BRAND_NAME}
+          </Link>
+          <nav className="flex items-center gap-2 text-sm sm:gap-3" aria-label="Hauptnavigation">
+            <Link
+              href={LOGIN_HREF}
+              className="lp-focus rounded-full border border-white/40 bg-white/12 px-4 py-2 font-medium text-white transition-colors hover:bg-white/20"
+            >
+              Login
             </Link>
             <Link
-              href="/register"
-              className="rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+              href={REGISTER_HREF}
+              className="lp-focus rounded-full bg-brand-50 px-4 py-2 font-semibold text-brand-800 transition-colors hover:bg-brand-100"
             >
-              Jetzt starten
+              Registrieren
             </Link>
           </nav>
         </div>
       </header>
 
-      <main>
-        {/* Hero - asymmetric ~55/45 split, no eyebrow-above-headline.
-            Same warm espresso gradient as the public menu hero, deliberately
-            reused rather than a generic blue-gradient SaaS hero. */}
-        <section className="overflow-hidden bg-gradient-to-br from-espresso-900 to-espresso-800 px-5 py-16 sm:px-8 sm:py-24">
-          <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1.2fr_1fr] lg:items-center">
-            <div className="flex flex-col items-start gap-6">
-              <h1 className="max-w-xl font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                Ihr Restaurant verdient mehr als ein Kassenbuch und einen Stapel Papierkarten.
-              </h1>
-              <p className="max-w-lg text-lg leading-relaxed text-white/80">
-                gastro-saas bündelt digitale Speisekarte, Bestellannahme, Küchen-Workflow, Zahlungen
-                und Auswertungen in einem System, das an einem Nachmittag startklar ist - kein
-                Papierkram, keine Fachkenntnisse nötig.
+      <main id="inhalt">
+        {/* Hero */}
+        <section className="relative overflow-hidden px-5 pb-20 pt-14 sm:px-8 sm:pb-28 sm:pt-20">
+          <div aria-hidden="true">
+            <div className="lp-glow lp-glow--brand -left-24 -top-24 h-[28rem] w-[28rem]" />
+            <div className="lp-glow lp-glow--ember -right-20 top-10 h-[30rem] w-[30rem]" />
+            <div className="lp-glow lp-glow--gold bottom-0 left-1/3 h-80 w-80" />
+          </div>
+
+          <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[1.1fr_1fr]">
+            <div className="flex flex-col items-start gap-7">
+              <p className="lp-holo-ring inline-flex rounded-full px-4 py-1.5 text-sm font-medium text-foreground">
+                Pilotphase, Zahlungen im Testmodus
               </p>
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/register"
-                  className="rounded-md bg-brand-600 px-5 py-3 font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
-                >
-                  Jetzt registrieren
+              <h1 className="text-5xl font-bold leading-[1.04] tracking-tight text-foreground sm:text-6xl lg:text-7xl">
+                Speisekarte, Bestellung und Zahlung{" "}
+                <span className="lp-text-gradient">in einem System</span>
+              </h1>
+              <p className="max-w-xl text-lg leading-relaxed text-lp-muted sm:text-xl">
+                Gäste scannen den QR-Code am Tisch, bestellen und bezahlen online. Sie behalten
+                Bestellungen, Auswertungen und Bewertungen im Restaurant-Dashboard im Blick.
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <Link href={DEMO_HREF} className={`${BTN} lp-btn-glow lp-focus-ink`}>
+                  Live-Demo ansehen
                 </Link>
                 <Link
-                  href="/login"
-                  className="rounded-full border border-white/25 bg-white/12 px-5 py-3 font-medium text-white transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
+                  href={REGISTER_HREF}
+                  className={`${BTN} lp-glass lp-focus-ink text-foreground transition-colors hover:bg-surface`}
                 >
-                  Anmelden
+                  Restaurant registrieren
                 </Link>
               </div>
             </div>
 
-            {/* Single bold visual anchor: a kitchen-order-ticket mockup, angled
-                and bleeding past its column so it doesn't read as a plain
-                contained rectangle. Hidden on small screens rather than
-                shrunk, so it stays legible where it does appear.
-                Deliberately fixed light colors, not the scheme-aware
-                `bg-surface` token -- `text-ember-700` fails AA against
-                `bg-surface`'s dark-mode value (Opus review finding on PR
-                #149), and a printed paper ticket reads correctly as a
-                fixed-light surface regardless of the visitor's OS theme.
-                Uses the `--color-neutral-0` CSS variable via an arbitrary
-                Tailwind background value rather than the equivalent plain
-                utility class, which `no-hardcoded-surface-colors.test.ts`
-                (issue #83 regression guard) forbids repo-wide precisely
-                because a hardcoded literal is how the original white-on-white
-                dark-mode bug crept back in -- this still resolves to the same
-                real design-token value, just spelled so the grep-based guard
-                doesn't (and shouldn't) need a per-case exception list. */}
-            <div className="hidden lg:block lg:justify-self-end">
-              <div className="ticket-edge w-full max-w-sm rotate-[3deg] rounded-t-lg border border-neutral-200 bg-[var(--color-neutral-0)] px-6 pt-6 shadow-2xl lg:translate-x-8">
-                <span className="ticket-stamp px-2 py-1 font-mono text-xs uppercase tracking-wide">
-                  Digitale Bestellung
-                </span>
-                <p className="mt-4 font-mono text-xs text-neutral-600">
-                  Bestellung #0842 · Tisch 7
-                </p>
-                <ul className="mt-3 divide-y divide-neutral-200 text-sm text-neutral-900">
-                  <li className="flex justify-between py-2">
-                    <span>1× Margherita</span>
-                    <span className="font-mono">9,50 €</span>
-                  </li>
-                  <li className="flex justify-between py-2">
-                    <span>2× Aperol Spritz</span>
-                    <span className="font-mono">14,00 €</span>
-                  </li>
-                  <li className="flex justify-between py-2">
-                    <span>1× Tiramisu</span>
-                    <span className="font-mono">5,50 €</span>
-                  </li>
-                </ul>
-                <div className="flex items-center justify-between pt-3">
-                  <span className="font-semibold text-neutral-900">Gesamt</span>
-                  <span className="font-display text-lg font-semibold text-ember-700">29,00 €</span>
+            <div className="relative mx-auto h-[26rem] w-full max-w-md sm:h-[34rem]">
+              <div className="absolute left-0 top-14 z-10 w-[9.5rem] -rotate-6 sm:w-[11.5rem]">
+                <div className="lp-float lp-float--delay">
+                  <div className="lp-phone overflow-hidden rounded-[1.8rem] bg-espresso-900">
+                    <img
+                      src={`${IMG}/hero-phone-cart.webp`}
+                      width={390}
+                      height={844}
+                      alt="Warenkorb der digitalen Speisekarte auf dem Smartphone"
+                      decoding="async"
+                      className="block h-auto w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="absolute left-1/2 top-0 z-20 w-[11rem] -translate-x-1/2 sm:w-[14rem]">
+                <div className="lp-float">
+                  <div className="lp-phone overflow-hidden rounded-[2.2rem] bg-espresso-900">
+                    <img
+                      src={`${IMG}/hero-phone-menu.webp`}
+                      width={390}
+                      height={844}
+                      alt="Digitale Speisekarte einer Trattoria auf dem Smartphone"
+                      decoding="async"
+                      fetchPriority="high"
+                      className="block h-auto w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="absolute right-0 top-24 z-10 w-[9.5rem] rotate-6 sm:w-[11.5rem]">
+                <div className="lp-float lp-float--delay">
+                  <div className="lp-phone overflow-hidden rounded-[1.8rem] bg-espresso-900">
+                    <img
+                      src={`${IMG}/hero-phone-status.webp`}
+                      width={390}
+                      height={844}
+                      alt="Bestellstatus einer Bestellung auf dem Smartphone"
+                      decoding="async"
+                      className="block h-auto w-full"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Features - one larger featured card + two smaller supporting
-            cards, not four identical columns. */}
+        {/* Herausforderung */}
         <section
-          className="bg-surface-secondary px-5 py-16 sm:px-8 sm:py-20"
-          aria-labelledby="features-heading"
+          className="relative overflow-hidden px-5 py-16 sm:px-8 sm:py-24"
+          aria-labelledby="herausforderung"
+        >
+          <div aria-hidden="true">
+            <div className="lp-glow lp-glow--ember -left-24 top-1/3 h-96 w-96" />
+          </div>
+          <div className="relative z-10 mx-auto max-w-6xl">
+            <p className="text-sm font-semibold uppercase tracking-widest text-lp-accent">
+              Herausforderung
+            </p>
+            <h2 id="herausforderung" className={`${H2} mt-3 max-w-3xl`}>
+              Der Alltag im Service lässt viel <span className="lp-text-gradient">Zeit liegen</span>
+            </h2>
+            <ul className="mt-12 grid gap-6 md:grid-cols-3">
+              {CHALLENGES.map((item, index) => {
+                const Icon = [FileText, Clock, EyeOff][index]!;
+                return (
+                  <li key={item.title} className="lp-glass rounded-3xl p-7">
+                    <span className="lp-holo-ring flex h-12 w-12 items-center justify-center rounded-2xl text-link-foreground">
+                      <Icon className="h-6 w-6" aria-hidden="true" />
+                    </span>
+                    <h3 className="mt-5 text-xl font-bold tracking-tight text-foreground">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 leading-relaxed text-lp-muted">{item.description}</p>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+
+        {/* Produkt-Showcase */}
+        <section
+          className="relative overflow-hidden px-5 pb-24 pt-8 sm:px-8 sm:pb-32"
+          aria-labelledby="showcase"
         >
           <div className="mx-auto max-w-6xl">
-            <h2
-              id="features-heading"
-              className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
-            >
-              Alles, was der Betrieb braucht - an einem Ort
-            </h2>
-            <p className="mt-2 max-w-2xl text-foreground-secondary">
-              Kein Zusammenflicken mehr aus Kassensystem, Lieferzettel und Excel-Tabelle.
+            <p className="text-sm font-semibold uppercase tracking-widest text-lp-accent">
+              Das Restaurant-Dashboard
             </p>
+            <h2 id="showcase" className={`${H2} mt-3 max-w-3xl`}>
+              Ihr Restaurant <span className="lp-text-gradient">auf einen Blick</span>
+            </h2>
 
-            <div className="mt-10 flex flex-col gap-6">
-              <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-surface p-8 shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_20px_rgba(0,0,0,.06)] md:flex-row md:items-center md:gap-8">
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
-                  <FEATURED.icon className="h-7 w-7" aria-hidden="true" />
-                </span>
-                <div>
-                  <h3 className="font-display text-xl font-semibold tracking-tight text-foreground">
-                    {FEATURED.title}
-                  </h3>
-                  <p className="mt-1 max-w-md text-base leading-relaxed text-foreground-secondary">
-                    {FEATURED.description}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-3">
-                {SUPPORTING_FEATURES.map((feature) => (
+            <div className="relative mt-12">
+              <div
+                aria-hidden="true"
+                className="lp-band absolute -inset-x-3 bottom-[-2.5rem] top-24 rounded-[2.5rem] sm:-inset-x-6"
+              />
+              <div className="relative z-10 mx-auto max-w-5xl px-2 sm:px-8">
+                <div className="overflow-hidden rounded-3xl border border-neutral-200 bg-surface shadow-[0_40px_90px_-30px_var(--lp-shadow)]">
                   <div
-                    key={feature.title}
-                    className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-surface p-6 shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_20px_rgba(0,0,0,.06)]"
+                    aria-hidden="true"
+                    className="flex items-center gap-2 border-b border-neutral-200 bg-surface-secondary px-4 py-3"
                   >
-                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-600">
-                      <feature.icon className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <h3 className="font-display text-lg font-semibold tracking-tight text-foreground">
+                    <span className="h-3 w-3 rounded-full bg-ember-300" />
+                    <span className="h-3 w-3 rounded-full bg-gold-300" />
+                    <span className="h-3 w-3 rounded-full bg-brand-300" />
+                  </div>
+                  <img
+                    src={`${IMG}/showcase-dashboard.webp`}
+                    width={1280}
+                    height={800}
+                    alt={`Bestell-Dashboard von ${BRAND_NAME} mit den Spalten Neu, Angenommen, In Zubereitung, Fertig, Abgeschlossen und Storniert`}
+                    loading="lazy"
+                    decoding="async"
+                    className="block h-auto w-full"
+                  />
+                </div>
+                <HoloCard className="absolute -bottom-10 right-0 hidden w-72 overflow-hidden rounded-2xl sm:block lg:-right-6 lg:w-80">
+                  <img
+                    src={`${IMG}/showcase-analytics.webp`}
+                    width={640}
+                    height={400}
+                    alt="Analytics-Ansicht mit Kennzahlen zu Umsatz und beliebten Gerichten"
+                    loading="lazy"
+                    decoding="async"
+                    className="block h-auto w-full"
+                  />
+                </HoloCard>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section
+          className="relative overflow-hidden px-5 py-16 sm:px-8 sm:py-24"
+          aria-labelledby="funktionen"
+        >
+          <div aria-hidden="true">
+            <div className="lp-glow lp-glow--brand -right-24 top-0 h-[30rem] w-[30rem]" />
+            <div className="lp-glow lp-glow--gold -left-24 bottom-0 h-80 w-80" />
+          </div>
+          <div className="relative z-10 mx-auto max-w-6xl">
+            <h2 id="funktionen" className={`${H2} max-w-3xl`}>
+              Alles, was der Betrieb braucht, <span className="lp-text-gradient">an einem Ort</span>
+            </h2>
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {FEATURES.map((feature) => (
+                <HoloCard key={feature.title} className="flex flex-col rounded-3xl p-4">
+                  <img
+                    src={`${IMG}/${feature.image}`}
+                    width={feature.width}
+                    height={feature.height}
+                    alt={feature.alt}
+                    loading="lazy"
+                    decoding="async"
+                    className="block h-auto w-full rounded-2xl border border-neutral-200 object-cover"
+                  />
+                  <div className="px-2 pb-3 pt-5">
+                    <p className="text-xs font-bold uppercase tracking-widest text-lp-accent">
+                      {feature.eyebrow}
+                    </p>
+                    <h3 className="mt-2 text-xl font-bold tracking-tight text-foreground">
                       {feature.title}
                     </h3>
-                    <p className="text-sm leading-relaxed text-foreground-secondary">
+                    <p className="mt-2 text-sm leading-relaxed text-lp-muted">
                       {feature.description}
                     </p>
                   </div>
-                ))}
-              </div>
+                </HoloCard>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* How it works - asymmetric horizontal flow: step 1 is the visually
-            heavier anchor, steps 2/3 are smaller and follow a dashed
-            connector, all left-aligned rather than 3 identical centered
-            circles. */}
+        {/* Zahlarten */}
         <section
-          className="bg-background px-5 py-16 sm:px-8 sm:py-20"
-          aria-labelledby="how-it-works-heading"
+          className="relative overflow-hidden px-5 py-16 sm:px-8 sm:py-20"
+          aria-labelledby="zahlarten"
         >
-          <div className="mx-auto max-w-6xl">
-            <h2
-              id="how-it-works-heading"
-              className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
-            >
-              In drei Schritten startklar
+          <div aria-hidden="true">
+            <div className="lp-glow lp-glow--ember left-1/2 top-0 h-80 w-[36rem] -translate-x-1/2" />
+          </div>
+          <div className="relative z-10 mx-auto max-w-4xl text-center">
+            <p className="text-sm font-semibold uppercase tracking-widest text-lp-accent">
+              Bezahlen
+            </p>
+            <h2 id="zahlarten" className={`${H2} mt-3`}>
+              Zahlen, wie Ihre Gäste es <span className="lp-text-gradient">gewohnt sind</span>
             </h2>
-
-            {/* All three steps are direct `li` children of the `ol` -- the
-                dashed connector after step 1 is an `aria-hidden` decorative
-                span positioned inside that `li`, not a sibling element,
-                so the list/listitem ownership relation stays intact for
-                assistive tech (Opus review finding on PR #149: an `ol` with
-                non-`li` direct children breaks that relation). */}
-            <ol className="mt-10 flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-6">
-              <li className="relative flex items-start gap-4 lg:w-2/5">
-                <span
-                  aria-hidden="true"
-                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gold-100 font-display text-2xl font-semibold text-gold-800"
+            <ul className="mt-10 flex flex-wrap justify-center gap-3" aria-label="Zahlungsarten">
+              {PAYMENT_METHODS.map((method) => (
+                <li
+                  key={method}
+                  className="lp-holo-ring rounded-full px-6 py-2.5 text-base font-semibold text-foreground"
                 >
-                  1
-                </span>
-                <div>
-                  <h3 className="font-display text-xl font-semibold tracking-tight text-foreground">
-                    {STEPS[0].title}
-                  </h3>
-                  <p className="mt-1 text-sm leading-relaxed text-foreground-secondary">
-                    {STEPS[0].description}
-                  </p>
-                </div>
-                <span
-                  aria-hidden="true"
-                  className="absolute -right-3 top-7 hidden h-px w-6 border-t border-dashed border-neutral-300 lg:block"
-                />
-              </li>
+                  {method}
+                </li>
+              ))}
+            </ul>
+            <p className="lp-glass mx-auto mt-8 max-w-2xl rounded-2xl px-5 py-4 text-lp-muted">
+              <strong className="font-semibold text-foreground">Pilotphase / Testmodus:</strong> Die
+              Abwicklung läuft über Stripe, derzeit ausschließlich im Testmodus. Es werden keine
+              echten Beträge abgebucht.
+            </p>
+          </div>
+        </section>
 
-              {STEPS.slice(1).map((step, index) => (
-                <li key={step.title} className="flex items-start gap-3 lg:w-[30%]">
+        {/* Schritte */}
+        <section className="px-5 py-16 sm:px-8 sm:py-24" aria-labelledby="schritte">
+          <div className="mx-auto max-w-6xl">
+            <h2 id="schritte" className={`${H2} max-w-3xl`}>
+              In drei Schritten <span className="lp-text-gradient">startklar</span>
+            </h2>
+            <ol className="mt-12 grid gap-10 md:grid-cols-3">
+              {STEPS.map((step) => (
+                <li key={step.title}>
+                  <div aria-hidden="true" className="lp-bar h-1 w-full rounded-full" />
                   <span
                     aria-hidden="true"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-100 font-display text-sm font-semibold text-gold-800"
+                    className="lp-text-gradient mt-6 block text-7xl font-bold leading-none tracking-tight"
                   >
-                    {index + 2}
+                    {step.number}
                   </span>
-                  <div>
-                    <h3 className="font-display text-base font-semibold tracking-tight text-foreground">
-                      {step.title}
-                    </h3>
-                    <p className="mt-1 text-sm leading-relaxed text-foreground-secondary">
-                      {step.description}
-                    </p>
-                  </div>
+                  <h3 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 leading-relaxed text-lp-muted">{step.description}</p>
                 </li>
               ))}
             </ol>
           </div>
         </section>
 
-        {/* Closing CTA - no longer a plain centered box: copy/button are
-            asymmetrically split rather than stacked and centered. (An
-            earlier draft echoed the hero's ticket-perforation edge here too,
-            but a `bg-background`-on-`bg-background` strip renders no visible
-            teeth -- removed rather than faked, per Opus review on PR #149;
-            this also keeps the ticket motif to the ONE bold hero moment,
-            matching `packages/ui/src/tokens.ts`'s "never decoratively
-            elsewhere" rule.) */}
-        <section className="bg-brand-700 px-5 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto flex max-w-6xl flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-xl">
-              <h2 className="font-display text-3xl font-semibold tracking-tight text-white">
-                Bereit, loszulegen?
-              </h2>
-              <p className="mt-2 text-white/85">
-                Registrieren Sie Ihr Restaurant in wenigen Minuten.
-              </p>
-            </div>
-            <Link
-              href="/register"
-              className="self-start rounded-md bg-brand-50 px-6 py-3 font-medium text-brand-700 transition-colors hover:bg-brand-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300 lg:self-auto"
+        {/* Werte */}
+        <section
+          className="relative overflow-hidden px-5 py-16 sm:px-8 sm:py-20"
+          aria-labelledby="werte"
+        >
+          <div aria-hidden="true">
+            <div className="lp-glow lp-glow--brand -left-20 top-10 h-96 w-96" />
+            <div className="lp-glow lp-glow--ember -right-24 bottom-0 h-96 w-96" />
+          </div>
+          <div className="relative z-10 mx-auto max-w-6xl">
+            <h2 id="werte" className={`${H2} max-w-3xl`}>
+              Gebaut für <span className="lp-text-gradient">Gäste und Gastgeber</span>
+            </h2>
+            <ul className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {VALUES.map((value, index) => {
+                const Icon = [ShieldCheck, Accessibility, Star, Building2][index]!;
+                return (
+                  <li key={value.title} className="lp-glass rounded-3xl p-6">
+                    <Icon className="h-7 w-7 text-link-foreground" aria-hidden="true" />
+                    <h3 className="mt-4 text-lg font-bold tracking-tight text-foreground">
+                      {value.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-lp-muted">
+                      {value.description}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+
+        {/* CTA-Band */}
+        <section className="px-5 py-10 sm:px-8" aria-labelledby="cta-band">
+          <div className="lp-band relative mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] px-6 py-14 text-center text-white sm:px-12 sm:py-20">
+            <h2
+              id="cta-band"
+              className="mx-auto max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl"
             >
-              Restaurant registrieren
-            </Link>
+              Bereit für Ihre digitale Speisekarte?
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-lg text-white/90">
+              Registrieren Sie Ihr Restaurant oder sehen Sie sich zuerst die Demo an.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
+              <Link
+                href={REGISTER_HREF}
+                className={`${BTN} lp-focus bg-brand-50 text-brand-800 shadow-[0_0_36px_-4px_var(--color-brand-200)] transition-colors hover:bg-brand-100`}
+              >
+                Restaurant registrieren
+              </Link>
+              <Link
+                href={DEMO_HREF}
+                className={`${BTN} lp-focus border border-white/50 bg-white/12 text-white transition-colors hover:bg-white/20`}
+              >
+                Live-Demo ansehen
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section className="px-5 py-16 sm:px-8 sm:py-24" aria-labelledby="faq">
+          <div className="mx-auto max-w-3xl">
+            <h2 id="faq" className={`${H2} text-center`}>
+              Häufige <span className="lp-text-gradient">Fragen</span>
+            </h2>
+            <div className="lp-faq mt-10 flex flex-col gap-3">
+              {FAQS.map((faq) => (
+                <details key={faq.question} className="lp-glass rounded-2xl">
+                  <summary className="lp-focus-ink flex cursor-pointer items-center justify-between gap-4 rounded-2xl p-5 text-lg font-semibold text-foreground">
+                    {faq.question}
+                  </summary>
+                  <p className="px-5 pb-5 leading-relaxed text-lp-muted">{faq.answer}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Kontakt / CTA */}
+        <section
+          className="relative overflow-hidden px-5 pb-24 pt-4 sm:px-8"
+          aria-labelledby="kontakt"
+        >
+          <div aria-hidden="true">
+            <div className="lp-glow lp-glow--gold left-1/2 top-0 h-72 w-[34rem] -translate-x-1/2" />
+          </div>
+          <div className="relative z-10 mx-auto max-w-3xl text-center">
+            <h2
+              id="kontakt"
+              className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
+            >
+              Noch unsicher?
+            </h2>
+            <p className="mt-3 text-lg text-lp-muted">
+              Probieren Sie die Live-Demo aus oder melden Sie sich an, wenn Sie bereits ein Konto
+              haben.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
+              <Link href={DEMO_HREF} className={`${BTN} lp-btn-glow lp-focus-ink`}>
+                Live-Demo ansehen
+              </Link>
+              <Link
+                href={LOGIN_HREF}
+                className={`${BTN} lp-glass lp-focus-ink text-foreground transition-colors hover:bg-surface`}
+              >
+                Login
+              </Link>
+            </div>
           </div>
         </section>
       </main>
 
       <footer className="border-t border-neutral-200 bg-surface px-5 py-8 sm:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm text-foreground-secondary sm:flex-row sm:items-center sm:justify-between">
-          <span>gastro-saas</span>
-          <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Footer">
-            <Link href="/login" className="font-medium text-link-foreground underline">
-              Anmelden
+          <span>{BRAND_NAME}, Pilotphase (Testmodus)</span>
+          <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Footer">
+            <Link
+              href={LOGIN_HREF}
+              className="lp-focus-ink font-medium text-link-foreground underline"
+            >
+              Login
             </Link>
-            <Link href="/register" className="font-medium text-link-foreground underline">
+            <Link
+              href={REGISTER_HREF}
+              className="lp-focus-ink font-medium text-link-foreground underline"
+            >
               Restaurant registrieren
             </Link>
-            <Link href="/datenschutz" className="font-medium text-link-foreground underline">
+            <Link
+              href={DEMO_HREF}
+              className="lp-focus-ink font-medium text-link-foreground underline"
+            >
+              Live-Demo ansehen
+            </Link>
+            <Link
+              href="/datenschutz"
+              className="lp-focus-ink font-medium text-link-foreground underline"
+            >
               Datenschutz
             </Link>
             <PlatformCookieLink />
@@ -331,44 +493,3 @@ export default function Home() {
     </>
   );
 }
-
-const FEATURED = {
-  icon: QrCode,
-  title: "Digitale Speisekarte per QR-Code",
-  description:
-    "Karten in Sekunden aktualisieren. Gäste scannen den Code am Tisch und bestellen direkt - ohne App, ohne Wartezeit auf Bedienung.",
-} as const;
-
-const SUPPORTING_FEATURES = [
-  {
-    icon: ClipboardList,
-    title: "Bestellungen live in der Küche",
-    description:
-      "Jede Bestellung landet sofort im Küchen-Dashboard - kein Zuruf, kein Zettel-Chaos.",
-  },
-  {
-    icon: Wallet,
-    title: "Zahlungen ohne eigenes Kassensystem",
-    description: "Gäste zahlen direkt online, sicher über Stripe abgewickelt.",
-  },
-  {
-    icon: LineChart,
-    title: "Auswertungen statt Bauchgefühl",
-    description: "Topseller, Trends und Zusatzverkäufe auf einen Blick.",
-  },
-] as const;
-
-const STEPS = [
-  {
-    title: "Registrieren",
-    description: "Restaurant anlegen in unter fünf Minuten.",
-  },
-  {
-    title: "Speisekarte einrichten",
-    description: "Gerichte, Preise und Kategorien selbst pflegen, jederzeit anpassbar.",
-  },
-  {
-    title: "QR-Code aufstellen & loslegen",
-    description: "Gäste bestellen direkt am Tisch - Ihre Küche sieht es sofort.",
-  },
-] as const;
