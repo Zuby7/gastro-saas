@@ -9,7 +9,7 @@ The MVP is done when this full journey works end-to-end in Stripe **test mode**:
 3. **Restaurant operation**: staff accepts the order → kitchen role sees prep details, changes status to preparing → ready → an unauthorized role cannot see revenue/refunds → a dish can be marked sold out and the public menu reflects it immediately.
 4. **Analytics**: the paid order affects revenue/quantity/extra-revenue rankings; a refund correctly reduces net sales; data is correctly scoped to tenant and timezone.
 5. **Ratings**: a customer with a completed, verified order can submit a rating; without a valid order token, they cannot.
-6. **Tenant isolation**: two test tenants with similar data — neither can read or modify the other's menu, orders, analytics, users, payment config, images, ratings, or settings.
+6. **Tenant isolation**: two test tenants with similar data - neither can read or modify the other's menu, orders, analytics, users, payment config, images, ratings, or settings.
 
 ## In scope for MVP
 
@@ -21,8 +21,8 @@ The MVP is done when this full journey works end-to-end in Stripe **test mode**:
 - Custom roles with fine-grained permissions (owner/manager/kitchen/service/marketing templates + custom).
 - Core sales analytics computed from the platform's own order data (not from a third-party analytics tool).
 - Verified ratings tied to completed orders.
-- Digital order receipt (ticket #153): after payment is confirmed by the webhook, the guest can open `/r/[slug]/orders/[token]/beleg` (linked from the order-status page), print it or save it as PDF via the browser. It lists items, totals, "Online bezahlt" and the payment time (taken from the first `received` status-history entry). It is explicitly labelled "Digitaler Bestellbeleg – kein steuerlich qualifizierter Kassenbeleg"; no VAT, TSE/KassenSichV, server-side PDF or e-mail attachment (non-goals).
-- A provider-neutral integration interface with a mock provider — no real Lieferando/Wolt/Uber Eats/POS connection.
+- Digital order receipt (ticket #153): after payment is confirmed by the webhook, the guest can open `/r/[slug]/orders/[token]/beleg` (linked from the order-status page), print it or save it as PDF via the browser. It lists items, totals, "Online bezahlt" and the payment time (taken from the first `received` status-history entry). It is explicitly labelled "Digitaler Bestellbeleg - kein steuerlich qualifizierter Kassenbeleg"; no VAT, TSE/KassenSichV, server-side PDF or e-mail attachment (non-goals).
+- A provider-neutral integration interface with a mock provider - no real Lieferando/Wolt/Uber Eats/POS connection.
 
 ## Explicitly deferred (see `non-goals.md` for the full list)
 

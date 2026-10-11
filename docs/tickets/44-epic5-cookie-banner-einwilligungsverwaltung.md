@@ -22,7 +22,7 @@ Schriften werden self-hosted (`next/font`), kein Google-Fonts-Request. Keine Mar
 - Entscheidung versioniert speichern (`{ version, timestamp, statistics: bool }` im Consent-Cookie); bei neuer Banner-Version oder nach 6 Monaten erneute Abfrage; Nachweis (Art. 7 Abs. 1 DSGVO) = Version + Zeitstempel + Auswahl.
 - Dauerhafter Link "Cookie-Einstellungen" auf **allen** öffentlichen Seiten (Widerruf so einfach wie Erteilung, Art. 7 Abs. 3); Widerruf löscht das `menu_view`-Cookie.
 - Statistik-Cookie wird **nur** nach Opt-in gesetzt (Middleware prüft die Kategorie, nicht mehr nur "accepted").
-- Datenschutzerklärung (`/r/[slug]/datenschutz`) um Cookie-Tabelle, Rechtsgrundlagen (§ 25 TDDDG, Art. 6 Abs. 1 lit. a/f DSGVO), Widerrufshinweis und Hinweis auf Stripe ergänzen — Inhalt muss exakt dem Code-Inventar entsprechen (falsche/unvollständige Angaben machen die Einwilligung unwirksam).
+- Datenschutzerklärung (`/r/[slug]/datenschutz`) um Cookie-Tabelle, Rechtsgrundlagen (§ 25 TDDDG, Art. 6 Abs. 1 lit. a/f DSGVO), Widerrufshinweis und Hinweis auf Stripe ergänzen - Inhalt muss exakt dem Code-Inventar entsprechen (falsche/unvollständige Angaben machen die Einwilligung unwirksam).
 - Doku: `docs/legal/` Cookie-Inventar, Pflegeregel ("jedes neue Cookie/Skript → Inventar + Banner + Datenschutz im selben PR"), Hinweis auf externe Rechtsprüfung.
 
 ## Explizite Nicht-Ziele

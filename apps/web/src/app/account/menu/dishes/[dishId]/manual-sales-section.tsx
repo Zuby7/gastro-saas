@@ -151,7 +151,7 @@ export function ManualSalesSection({ dishId, entries }: ManualSalesSectionProps)
               <tr key={entry.id} className="border-t border-neutral-200">
                 <td className="py-1">{formatDate(entry.sale_date)}</td>
                 <td className="py-1">{entry.quantity}</td>
-                <td className="py-1">{entry.channel ?? "–"}</td>
+                <td className="py-1">{entry.channel ?? "-"}</td>
               </tr>
             ))}
           </tbody>

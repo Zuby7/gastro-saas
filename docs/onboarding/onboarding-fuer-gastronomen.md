@@ -193,7 +193,7 @@ _Abbildung 10: Die Speisekarte in der Verwaltung. Im Bild ist der Entwurf noch l
 
 **Wofür?** Hier bauen Sie Ihre Karte auf: Kategorien, Gerichte, Preise, Fotos, Allergene, Varianten und Extras.
 
-**Entwurf und veröffentlicht, einfach erklärt:** Alles, was Sie hier bearbeiten, ist zuerst ein **Entwurf**. Das ist Ihr Arbeitsstand. Im Bild steht dazu: "Dies ist der Entwurf – Kunden sehen nur die zuletzt veröffentlichte Version." Ihre Gäste sehen den Entwurf also **nicht**. Erst wenn Sie auf **Veröffentlichen** klicken, wird der Entwurf für alle sichtbar. So können Sie in Ruhe ändern, ohne dass Gäste halbfertige Karten sehen.
+**Entwurf und veröffentlicht, einfach erklärt:** Alles, was Sie hier bearbeiten, ist zuerst ein **Entwurf**. Das ist Ihr Arbeitsstand. Im Bild steht dazu: "Dies ist der Entwurf - Kunden sehen nur die zuletzt veröffentlichte Version." Ihre Gäste sehen den Entwurf also **nicht**. Erst wenn Sie auf **Veröffentlichen** klicken, wird der Entwurf für alle sichtbar. So können Sie in Ruhe ändern, ohne dass Gäste halbfertige Karten sehen.
 
 **So geht's:**
 

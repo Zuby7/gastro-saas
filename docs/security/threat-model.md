@@ -12,7 +12,7 @@ Scope: multi-tenant gastronomy SaaS handling menu data, orders, payments (via St
 | Stolen sessions                                                                  | Secure, httpOnly, short-lived session cookies; session invalidation on password change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Invitation abuse                                                                 | Invitations are single-use, expiring, scoped to one tenant + role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Owner lockout                                                                    | At least one Owner membership and one RBAC Owner role assignment required per tenant at all times; enforced at the DB constraint level, not just UI                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Stolen Owner/Manager credentials (controls Stripe Connect payouts and refunds)   | Optional TOTP MFA (Supabase Auth supports it on the free tier) offered to Owner/Manager roles — **accepted risk for MVP if not built in time**, see `docs/decisions/assumptions.md`; must be revisited before real payouts flow through a tenant's account                                                                                                                                                                                                                                                                                                                                                   |
+| Stolen Owner/Manager credentials (controls Stripe Connect payouts and refunds)   | Optional TOTP MFA (Supabase Auth supports it on the free tier) offered to Owner/Manager roles - **accepted risk for MVP if not built in time**, see `docs/decisions/assumptions.md`; must be revisited before real payouts flow through a tenant's account                                                                                                                                                                                                                                                                                                                                                   |
 | Payment manipulation / price tampering                                           | Server always recalculates order totals from current menu data; client-submitted totals are never trusted (`.claude/rules/payments.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Webhook spoofing / replay                                                        | Stripe webhook signature verification on every event (`apps/web/src/app/api/webhooks/stripe/route.ts`, ticket #25); `payment_webhook_events` table enforces idempotency by event ID; amount and connected-account/tenant identity are independently cross-checked against the order's own server-calculated total before an order is ever marked paid -- a mismatch flags the payment for manual review instead of trusting either side (`apps/web/src/lib/payments/webhook-service.ts`, `.claude/rules/payments.md`)                                                                                        |
 | Order tampering                                                                  | Orders are immutable once paid; state machine rejects invalid transitions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -24,7 +24,7 @@ Scope: multi-tenant gastronomy SaaS handling menu data, orders, payments (via St
 | SSRF                                                                             | No server-side fetch of tenant-supplied URLs without an allow-list (e.g. image import from URL is out of MVP scope specifically to avoid this)                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Secret leakage                                                                   | Stripe secret keys and Supabase service-role key live server-side only, never shipped to the browser; `.env*` blocked from commits by a Claude Code hook                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Log leakage                                                                      | Structured logs redact payment data, tokens, and free-text customer notes beyond what's operationally necessary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Audit-log leakage / tampering                                                    | `audit_logs` (ticket #6) is append-only (no UPDATE/DELETE from application code, enforced by GRANTs + a trigger) and RLS-scoped per tenant; `recordAuditEvent()` rejects secret-/payment-shaped metadata before insert — see `docs/data/domain-model.md`'s Audit section                                                                                                                                                                                                                                                                                                                                     |
+| Audit-log leakage / tampering                                                    | `audit_logs` (ticket #6) is append-only (no UPDATE/DELETE from application code, enforced by GRANTs + a trigger) and RLS-scoped per tenant; `recordAuditEvent()` rejects secret-/payment-shaped metadata before insert - see `docs/data/domain-model.md`'s Audit section                                                                                                                                                                                                                                                                                                                                     |
 | Rate-limit abuse / credential stuffing                                           | Rate limiting on auth and checkout endpoints                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Review spam                                                                      | Ratings require a verified completed-order token; moderation queue before public display                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Order spam                                                                       | Rate limiting + basic bot protection (Cloudflare Turnstile) on guest checkout                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -39,12 +39,12 @@ Ticket #36. Tenant-scoped, Owner/`tenant.settings.write`-gated data export
 (`export_tenant_data()`, `apps/web/src/app/api/account/privacy/export/route.ts`)
 and an Owner-only (`tenant.data.delete`) deletion-request workflow
 (`process_tenant_data_deletion_request()`,
-`apps/web/src/app/account/privacy/actions.ts`) —
+`apps/web/src/app/account/privacy/actions.ts`) -
 `supabase/migrations/20260819110000_privacy_export_retention_and_deletion_requests.sql`.
 
 - Order/payment data is never hard-deleted: rows still inside the documented
   legal retention window (3650 days / 10 years, modelled on the German
-  commercial/tax retention duty for business records, HGB §257 / AO §147 —
+  commercial/tax retention duty for business records, HGB §257 / AO §147 -
   **not legal advice**, see this ticket's own explicit non-goal and the
   residual-responsibility split below) are left completely untouched; rows
   past that window have only their customer-identifying columns anonymized,
@@ -52,12 +52,12 @@ and an Owner-only (`tenant.data.delete`) deletion-request workflow
 - `analytics_events` has a tenant-configurable retention period
   (`privacy_retention_settings`, default 365 days). This repo has no
   cron/scheduled-job infrastructure (checked `supabase/config.toml` and the
-  existing migrations before writing this) — the configured period is **not**
+  existing migrations before writing this) - the configured period is **not**
   purged automatically on a schedule. It is enforced in two ways only: (1) in
   full, immediately, whenever an Owner submits a deletion request
   (`process_tenant_data_deletion_request()`, since analytics carries no legal
   retention duty), and (2) on demand, whenever a `tenant.settings.write`
-  holder invokes `purge_expired_analytics_events()` — exposed in the UI as
+  holder invokes `purge_expired_analytics_events()` - exposed in the UI as
   the "Jetzt bereinigen" action on the retention-settings form
   (`apps/web/src/app/account/privacy/retention-settings-form.tsx`). Until a
   scheduled-job mechanism exists for this platform, rows older than the
@@ -66,7 +66,7 @@ and an Owner-only (`tenant.data.delete`) deletion-request workflow
   window): migration `20260906170000_schedule_analytics_attempt_purge.sql`
   (issue #164) schedules `purge_stale_*_attempts()` daily via Supabase
   pg_cron (no-op where pg_cron is unavailable). It only takes effect on the
-  hosted project once the migration SQL has been run there — see
+  hosted project once the migration SQL has been run there - see
   `docs/operations/deployment-strategy.md`. IP hashes are HMAC-SHA256 keyed
   with the `IP_HASH_SECRET` Worker secret. Rollout order: set the secret,
   deploy the Worker, then run the migration SQL and verify
@@ -91,7 +91,7 @@ and an Owner-only (`tenant.data.delete`) deletion-request workflow
   as a real, callable cleanup path for an operator (or a future
   scheduled-job ticket) rather than no path at all.
 - Explicit non-goal: this workflow does not delete the tenant record itself,
-  staff accounts/memberships, menu data, or the audit trail — full
+  staff accounts/memberships, menu data, or the audit trail - full
   tenant/account deletion is a materially larger, separately-tracked effort.
 
 ## Impressum, Datenschutzhinweis & Consent (Ticket #41)
@@ -108,29 +108,29 @@ Datenschutzerklärung.
 
 - **XSS mitigation**: the free text is rendered as a plain React text node
   only (never `dangerouslySetInnerHTML`, no markdown-to-HTML rendering
-  pipeline was added) — React's default output encoding is the sanitization
+  pipeline was added) - React's default output encoding is the sanitization
   guarantee here, matching the "Stored/reflected XSS" row above.
 - **Publish-quality-check**: `run_menu_publish_checks()` emits a non-blocking
   `warning` (`imprint-text-missing` / `privacy-text-missing`) when either
-  text is empty — never a `blocker`, per the ticket's acceptance criteria.
+  text is empty - never a `blocker`, per the ticket's acceptance criteria.
 - **Compliance scope**: exactly the same residual-responsibility split as
-  below applies — the platform provides the mechanism to publish this text
+  below applies - the platform provides the mechanism to publish this text
   and a non-blocking reminder if it's missing; it does not verify the
   text's legal accuracy/completeness and the product must never claim it
   does.
 - **PostHog**: not yet integrated into this codebase at all (checked
   `apps/web/package.json` and the repo for any `posthog` reference before
-  this ticket — none found). Since there is no init/config path to gate,
+  this ticket - none found). Since there is no init/config path to gate,
   this ticket doesn't add a feature flag; it only records here that
   whichever ticket first wires up PostHog must default it to **off** per
   tenant until a documented lawful basis/consent flow exists
-  (`docs/platform/service-register.md`'s PostHog entry) — tracked as a
+  (`docs/platform/service-register.md`'s PostHog entry) - tracked as a
   requirement for that future ticket, not solved here.
 
 ## Explicit residual responsibility split
 
 - **Enforced by software**: tenant isolation, payment integrity, webhook verification, auth/authorization, input validation, rate limiting, secret handling.
-- **Tenant's legal responsibility, not automatable**: accuracy of allergen/additive declarations, correctness of legal/imprint content, compliance with local food-safety and consumer-protection law. The platform's rule-based quality checks (§11 of the source brief) catch _missing_ or _structurally inconsistent_ data — they are not legal compliance certification, and the product must never claim otherwise. The admin allergen/additive/dietary-label editor (`apps/web/src/app/account/menu/dishes/[dishId]/assignable-lookup-section.tsx`) surfaces this same boundary directly in its UI copy ("vom Restaurant angegeben, keine Rechtsprüfung").
+- **Tenant's legal responsibility, not automatable**: accuracy of allergen/additive declarations, correctness of legal/imprint content, compliance with local food-safety and consumer-protection law. The platform's rule-based quality checks (§11 of the source brief) catch _missing_ or _structurally inconsistent_ data - they are not legal compliance certification, and the product must never claim otherwise. The admin allergen/additive/dietary-label editor (`apps/web/src/app/account/menu/dishes/[dishId]/assignable-lookup-section.tsx`) surfaces this same boundary directly in its UI copy ("vom Restaurant angegeben, keine Rechtsprüfung").
 
 ## Not yet assessed (flag for `/security-gate` before each relevant ticket)
 

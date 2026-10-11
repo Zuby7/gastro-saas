@@ -53,7 +53,7 @@ describe("validateContrastRatio", () => {
   });
 
   it("applies the relaxed 3:1 AA threshold for large text", () => {
-    // ratio is ~3.54:1 — fails normal-text AA (4.5) but passes large-text AA (3)
+    // ratio is ~3.54:1 - fails normal-text AA (4.5) but passes large-text AA (3)
     const result = validateContrastRatio("#888888", "#ffffff", "large");
     expect(result.ratio).toBeGreaterThanOrEqual(3);
     expect(result.ratio).toBeLessThan(4.5);

@@ -111,7 +111,7 @@ describe("ReceiptPage", () => {
     await renderReceipt("demo", "valid-token");
 
     expect(
-      screen.getByText("Digitaler Bestellbeleg – kein steuerlich qualifizierter Kassenbeleg."),
+      screen.getByText("Digitaler Bestellbeleg - kein steuerlich qualifizierter Kassenbeleg."),
     ).toBeInTheDocument();
     const button = screen.getByRole("button", { name: "Beleg drucken / als PDF speichern" });
     expect(button).toHaveClass("print:hidden");

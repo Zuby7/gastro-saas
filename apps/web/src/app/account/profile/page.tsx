@@ -128,7 +128,7 @@ export default async function ProfilePage() {
         */}
         <p className="rounded-md border border-neutral-300 bg-surface-muted p-3 text-sm text-foreground-secondary">
           Bitte tragen Sie im Impressum-Feld unten vollständige Geschäftsangaben ein (Firmenname,
-          Anschrift, Vertretungsberechtigte, ggf. Handelsregisternummer, Kontaktdaten) — das ist
+          Anschrift, Vertretungsberechtigte, ggf. Handelsregisternummer, Kontaktdaten) - das ist
           Ihre gesetzliche Impressumspflicht (§ 5 TMG), nicht die des Betreibers dieser Plattform.
           Laden Sie außerdem nur Gerichte-Fotos hoch, die Sie selbst erstellt haben oder für die Sie
           die Nutzungsrechte besitzen.

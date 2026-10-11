@@ -8,7 +8,7 @@ Als Owner möchte ich Umsatz, Bestellzahlen und Durchschnittswerte auf einen Bli
 
 ## Umfang
 
-Dashboard mit Umsatz heute, bezahlte Bestellungen, Ø-Bestellwert, offene Bestellungen, Zahlungsfehlschläge — berechnet ausschließlich aus den eigenen Order-/Payment-Daten.
+Dashboard mit Umsatz heute, bezahlte Bestellungen, Ø-Bestellwert, offene Bestellungen, Zahlungsfehlschläge - berechnet ausschließlich aus den eigenen Order-/Payment-Daten.
 
 ## Explizite Nicht-Ziele
 

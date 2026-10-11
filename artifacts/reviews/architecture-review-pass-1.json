@@ -65,7 +65,7 @@
   ],
   "residual_risks": [
     "Supabase free tier pauses after 7 days idle and has no built-in backups (mitigated via the new R2 job, but the restore path is untested until Epic 11)",
-    "@opennextjs/cloudflare is a community adapter — raw-body handling for Stripe webhook signature verification on Workers must be proven in ticket 25",
+    "@opennextjs/cloudflare is a community adapter - raw-body handling for Stripe webhook signature verification on Workers must be proven in ticket 25",
     "Cloudflare Workers free tier caps at 100,000 requests/day",
     "Resend free tier caps at 100 emails/day",
     "Sentry free tier allows only 1 dashboard user",
