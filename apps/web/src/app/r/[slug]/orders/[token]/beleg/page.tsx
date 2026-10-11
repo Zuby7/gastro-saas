@@ -165,7 +165,7 @@ export default async function ReceiptPage({ params }: ReceiptPageProps) {
           </section>
 
           <p className="border-t border-neutral-200 pt-3 text-sm text-foreground-secondary">
-            Digitaler Bestellbeleg – kein steuerlich qualifizierter Kassenbeleg.
+            Digitaler Bestellbeleg - kein steuerlich qualifizierter Kassenbeleg.
           </p>
         </article>
 

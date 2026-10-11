@@ -155,7 +155,7 @@ const darkPairs: TokenPair[] = [
   },
 ];
 
-describe("scheme-aware surface/foreground token pairs (WCAG AA) — light", () => {
+describe("scheme-aware surface/foreground token pairs (WCAG AA) - light", () => {
   for (const pair of lightPairs) {
     it(`${pair.description} passes AA for ${pair.textSize} text`, () => {
       const result = validateContrastRatio(pair.foreground, pair.background, pair.textSize);
@@ -164,7 +164,7 @@ describe("scheme-aware surface/foreground token pairs (WCAG AA) — light", () =
   }
 });
 
-describe("scheme-aware surface/foreground token pairs (WCAG AA) — dark (prefers-color-scheme: dark)", () => {
+describe("scheme-aware surface/foreground token pairs (WCAG AA) - dark (prefers-color-scheme: dark)", () => {
   for (const pair of darkPairs) {
     it(`${pair.description} passes AA for ${pair.textSize} text`, () => {
       const result = validateContrastRatio(pair.foreground, pair.background, pair.textSize);

@@ -3,7 +3,7 @@ name: bootstrap-project
 description: One-time project bootstrap for gastro-saas - inspects the environment, creates initial documentation, Claude configuration, repo structure, ticket templates, and the first stack evaluation. Explicitly invoked only, never runs automatically.
 ---
 
-Manual-invocation only — do not trigger this automatically from a routine coding request.
+Manual-invocation only - do not trigger this automatically from a routine coding request.
 
 ## Steps
 
@@ -14,4 +14,4 @@ Manual-invocation only — do not trigger this automatically from a routine codi
 5. Produce a concise architecture proposal and have it validated by `opus-validator` before any implementation ticket starts.
 6. Report what was created, what's still a blocker (accounts, domain, production approval), and the next command to run.
 
-Do not implement product features in this skill — foundation only.
+Do not implement product features in this skill - foundation only.

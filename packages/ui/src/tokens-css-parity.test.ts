@@ -8,8 +8,8 @@ import { colors, spacing, typography } from "./tokens";
  * "keep in sync manually" comment at the top of theme.css). This test
  * parses the actual `--*` custom property values out of `theme.css` and
  * asserts they equal the corresponding `tokens.ts` values (not just that a
- * variable with the right name exists), so a drifted value — not just a
- * missing one — is caught. It also checks the reverse direction for the
+ * variable with the right name exists), so a drifted value - not just a
+ * missing one - is caught. It also checks the reverse direction for the
  * categories covered here (colors, spacing, fontWeight, fontSize): every
  * `--color-*`/`--spacing-*`/`--font-weight-*`/`--font-size-*` custom
  * property in `theme.css` must have a `tokens.ts` counterpart, so orphaned

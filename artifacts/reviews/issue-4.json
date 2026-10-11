@@ -37,7 +37,7 @@
     }
   ],
   "residual_risks": [
-    "service_role can still re-parent an Owner membership into a foreign tenant without that tenant's consent — ticket #8 (invitations) must not use raw UPDATE tenant_id as a transfer mechanism.",
+    "service_role can still re-parent an Owner membership into a foreign tenant without that tenant's consent - ticket #8 (invitations) must not use raw UPDATE tenant_id as a transfer mechanism.",
     "Integration suite only runs via the migration-check CI job, not root pnpm test.",
     "authenticated has all-column UPDATE grant on tenants (RLS/FK make it harmless today, cosmetic tightening later)."
   ],

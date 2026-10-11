@@ -29,7 +29,7 @@
     {
       "severity": "low",
       "area": "data-integrity",
-      "summary": "auth.users rows still inserted before the transaction — can leak on partial failure (unresolved from cycle 1)."
+      "summary": "auth.users rows still inserted before the transaction - can leak on partial failure (unresolved from cycle 1)."
     },
     {
       "severity": "low",
@@ -38,7 +38,7 @@
     }
   ],
   "residual_risks": [
-    "packages/database's ad-hoc queryAsUser/probe copy from ticket #4 isn't migrated onto this harness — two implementations can drift.",
+    "packages/database's ad-hoc queryAsUser/probe copy from ticket #4 isn't migrated onto this harness - two implementations can drift.",
     "Documented, unfixed helper gaps: aggregate queries and 'permission denied' vs. missing-GRANT ambiguity."
   ],
   "required_actions": []

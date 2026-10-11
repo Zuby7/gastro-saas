@@ -12,7 +12,7 @@ Tabellen `integration_accounts`, `integration_sync_jobs`, `integration_errors`; 
 
 ## Explizite Nicht-Ziele
 
-Keine echte Lieferando/Wolt/Uber-Eats/POS-Anbindung — nur offizielle, autorisierte APIs kämen später in Frage, niemals Scraping.
+Keine echte Lieferando/Wolt/Uber-Eats/POS-Anbindung - nur offizielle, autorisierte APIs kämen später in Frage, niemals Scraping.
 
 ## Abhängigkeiten
 

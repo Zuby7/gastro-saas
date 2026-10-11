@@ -2,10 +2,10 @@
 
 ## Actors
 
-- **Restaurant owner / staff** (Owner, Manager, Kitchen, Service, Marketing roles) — use the admin app to configure the restaurant, manage the menu, run operations, view analytics.
-- **Customer** — browses the public menu, orders, pays, rates.
-- **Platform operator** (the gastro-saas team) — provisions tenants, monitors the platform, approves production changes.
-- **External systems** (future) — delivery marketplaces, POS systems, accounting tools, reservation systems — via the integration layer only, never direct database access.
+- **Restaurant owner / staff** (Owner, Manager, Kitchen, Service, Marketing roles) - use the admin app to configure the restaurant, manage the menu, run operations, view analytics.
+- **Customer** - browses the public menu, orders, pays, rates.
+- **Platform operator** (the gastro-saas team) - provisions tenants, monitors the platform, approves production changes.
+- **External systems** (future) - delivery marketplaces, POS systems, accounting tools, reservation systems - via the integration layer only, never direct database access.
 
 ## High-level architecture
 
@@ -34,13 +34,13 @@ Deployed on Cloudflare Pages/Workers (via the `@opennextjs/cloudflare` adapter).
 
 One deployable Next.js application internally organized into domain modules (identity, tenants, authorization, restaurant profile, menu, ordering, payments, analytics, reviews, integrations, notifications, audit). Modules communicate through explicit interfaces in `packages/domain`, not direct cross-module database queries. See ADR-0001 for the full reasoning and `domain-boundaries.md` for module contracts.
 
-## Tenant isolation strategy (summary — full detail in `docs/security/tenant-isolation.md`)
+## Tenant isolation strategy (summary - full detail in `docs/security/tenant-isolation.md`)
 
 Every tenant-owned table carries an explicit `tenant_id`. Postgres Row Level Security policies enforce isolation at the database layer as a second line of defense behind application-layer authorization checks. No cross-tenant query is ever expressed without an explicit, tested boundary.
 
-## Payment flow (summary — full detail in `docs/security/threat-model.md` and rules under `.claude/rules/payments.md`)
+## Payment flow (summary - full detail in `docs/security/threat-model.md` and rules under `.claude/rules/payments.md`)
 
-Server always recalculates the order total. Stripe is the only component that ever sees card data. Order state changes to "paid" only via a verified, idempotent Stripe webhook — never from a client redirect.
+Server always recalculates the order total. Stripe is the only component that ever sees card data. Order state changes to "paid" only via a verified, idempotent Stripe webhook - never from a client redirect.
 
 ## Deployment environments
 

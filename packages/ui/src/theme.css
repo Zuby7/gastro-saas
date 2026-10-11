@@ -1,6 +1,6 @@
 /*
  * Tailwind v4 theme extension mirroring `tokens.ts`.
- * Keep in sync manually with the TS token source of truth — there is no
+ * Keep in sync manually with the TS token source of truth - there is no
  * build step generating one from the other yet (tracked as a possible
  * follow-up, not required for the current foundation ticket).
  */
