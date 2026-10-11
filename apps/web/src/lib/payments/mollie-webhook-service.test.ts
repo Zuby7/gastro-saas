@@ -29,6 +29,8 @@ interface State {
   payment: Record<string, unknown> | null;
   order: Record<string, unknown> | null;
   rpcResult: boolean;
+  paymentError?: { message: string } | null;
+  orderError?: { message: string } | null;
 }
 
 let state: State;
@@ -42,7 +44,14 @@ function fakeAdmin(): SupabaseClient {
       if (table === "payments") {
         return {
           select: () => ({
-            eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: state.payment }) }) }),
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: state.payment,
+                  error: state.paymentError ?? null,
+                }),
+              }),
+            }),
           }),
           update: (values: Record<string, unknown>) => {
             paymentUpdates.push(values);
@@ -52,7 +61,11 @@ function fakeAdmin(): SupabaseClient {
       }
       if (table === "orders") {
         return {
-          select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: state.order }) }) }),
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: state.order, error: state.orderError ?? null }),
+            }),
+          }),
         };
       }
       if (table === "order_status_events") {
@@ -255,10 +268,55 @@ describe("handleMolliePaymentWebhook", () => {
     expect(flaggedActions()).toContain("payment_after_order_cancelled_flagged");
   });
 
-  it("flags instead of guessing when the restaurant is no longer connected", async () => {
+  it("leaves a possibly paid payment pending and retries (5xx) when the restaurant is not connected, with an accurately named audit event", async () => {
     getAccessMock.mockRejectedValue(new MollieNotConnectedError());
-    await handleMolliePaymentWebhook(fakeAdmin(), "tr_abc123");
+    await expect(handleMolliePaymentWebhook(fakeAdmin(), "tr_abc123")).rejects.toThrow(
+      /will be retried/,
+    );
     expect(getMolliePaymentMock).not.toHaveBeenCalled();
+    expect(rpcCalls).toHaveLength(0);
+    // Never irreversibly flagged for something we could not even verify.
+    expect(paymentUpdates).toHaveLength(0);
+    expect(flaggedActions()).toEqual(["mollie_payment_unverifiable_not_connected"]);
+  });
+
+  it("throws (5xx, Mollie retries) on a payments lookup DB error instead of answering neutrally", async () => {
+    state.paymentError = { message: "connection reset" };
+    await expect(handleMolliePaymentWebhook(fakeAdmin(), "tr_abc123")).rejects.toThrow(
+      /payments lookup failed/,
+    );
+    expect(getMolliePaymentMock).not.toHaveBeenCalled();
+  });
+
+  it("throws on an order lookup DB error, but only a genuinely missing payment is a neutral no-op", async () => {
+    state.orderError = { message: "timeout" };
+    await expect(handleMolliePaymentWebhook(fakeAdmin(), "tr_abc123")).rejects.toThrow(
+      /order lookup failed/,
+    );
+    expect(rpcCalls).toHaveLength(0);
+
+    state.payment = null;
+    state.paymentError = null;
+    await expect(handleMolliePaymentWebhook(fakeAdmin(), "tr_none")).resolves.toBeUndefined();
+  });
+
+  it("requires profile id and method to be present: missing means mismatch and flags", async () => {
+    getMolliePaymentMock.mockResolvedValue(molliePayment({ profileId: null }));
+    await handleMolliePaymentWebhook(fakeAdmin(), "tr_abc123");
+    expect(rpcCalls).toHaveLength(0);
+    expect(paymentUpdates).toEqual([{ status: "flagged_for_review" }]);
+
+    paymentUpdates.length = 0;
+    getAccessMock.mockResolvedValue({ accessToken: "tok", profileId: null });
+    getMolliePaymentMock.mockResolvedValue(molliePayment());
+    await handleMolliePaymentWebhook(fakeAdmin(), "tr_abc123");
+    expect(rpcCalls).toHaveLength(0);
+    expect(paymentUpdates).toEqual([{ status: "flagged_for_review" }]);
+
+    paymentUpdates.length = 0;
+    getAccessMock.mockResolvedValue({ accessToken: "tok", profileId: "pfl_1" });
+    getMolliePaymentMock.mockResolvedValue(molliePayment({ method: null }));
+    await handleMolliePaymentWebhook(fakeAdmin(), "tr_abc123");
     expect(rpcCalls).toHaveLength(0);
     expect(paymentUpdates).toEqual([{ status: "flagged_for_review" }]);
   });

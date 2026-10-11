@@ -79,13 +79,40 @@ describe("mollie token storage", () => {
     expect(updates[0]).toHaveProperty("access_token_ciphertext");
   });
 
-  it("flags needs_reauth when Mollie rejects the refresh", async () => {
-    refreshMock.mockRejectedValue(new MollieApiError("nope", 400));
+  it.each([
+    ["invalid_grant", new MollieApiError("nope", 400, "invalid_grant")],
+    ["401", new MollieApiError("nope", 401)],
+  ])("flags needs_reauth when Mollie rejects the grant (%s)", async (_name, rejection) => {
+    refreshMock.mockRejectedValue(rejection);
     const { admin, updates } = fakeAdmin(await rowFor(-10));
     await expect(getMollieAccessForTenant(admin, "tenant-1")).rejects.toBeInstanceOf(
       MollieNotConnectedError,
     );
     expect(updates).toEqual([{ status: "needs_reauth" }]);
+  });
+
+  it.each([
+    ["429", new MollieApiError("rate", 429)],
+    ["400 other", new MollieApiError("bad", 400, "invalid_request")],
+    ["503", new MollieApiError("down", 503)],
+    ["network", new MollieApiError("net", 0)],
+  ])("does NOT flag needs_reauth for a transient failure (%s)", async (_name, failure) => {
+    refreshMock.mockRejectedValue(failure);
+    const { admin, updates } = fakeAdmin(await rowFor(-10));
+    await expect(getMollieAccessForTenant(admin, "tenant-1")).rejects.toBe(failure);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("keeps the stored refresh token when the refresh response omits one", async () => {
+    refreshMock.mockResolvedValue({
+      accessToken: "access-2",
+      refreshToken: "refresh-1",
+      expiresInSeconds: 3600,
+    });
+    const { admin } = fakeAdmin(await rowFor(-10));
+    await expect(getMollieAccessForTenant(admin, "tenant-1")).resolves.toMatchObject({
+      accessToken: "access-2",
+    });
   });
 
   it("propagates ambiguous refresh failures without flagging", async () => {

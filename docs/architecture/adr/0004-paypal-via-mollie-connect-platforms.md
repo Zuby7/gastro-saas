@@ -34,6 +34,18 @@ Offer PayPal through Mollie, platform model:
 
 Mollie's webhook is unsigned and POSTs only `id=<paymentId>`. Nothing in the request is trusted. The server looks up its own `payments` row for that id, loads that tenant's token (refreshing if needed), **fetches the payment from Mollie** and only then, if status is `paid`, amount and currency equal the order's server-calculated total, `metadata.orderId`/`tenantId` match our row, the profile matches the tenant's, the method is PayPal and the mode is test (unless live is explicitly allowed), marks the order received through the same atomic `mark_order_received_and_paid` RPC as Stripe. Any mismatch flags the payment for manual review and leaves the order unpaid. Replays are no-ops because only a `pending` payment of an `awaiting_payment` order can transition. Unknown or malformed ids get a neutral 200 (no information leak); unexpected failures return 5xx so Mollie retries.
 
+Verification details (fail-safe choices):
+
+- A database error while looking up the payment or order throws (5xx, Mollie retries). Only a genuinely missing payment id gets the neutral 200.
+- If the restaurant's connection is unusable (disconnected, `needs_reauth`), a possibly paid payment is NOT flagged irreversibly. It stays `pending`, an audit event `mollie_payment_unverifiable_not_connected` is written and the webhook answers 5xx so Mollie retries; reconnecting within Mollie's retry window recovers it.
+- The payment's profile id, the tenant's stored profile id and (for `paid`) the method must all be present. Missing means mismatch and the payment is flagged for review: a visible flag is safer than silently accepting or retrying forever on an API shape we have not yet verified.
+- A Mollie refund with status `failed` or `canceled` is treated as failed, never succeeded.
+- Only `invalid_grant` or HTTP 401 from the token endpoint marks a connection `needs_reauth`; 429, 5xx and network errors are transient. A refresh response without a new `refresh_token` keeps the stored one.
+
+### Payment expiry gap (known, tracked in #200)
+
+Mollie payments get no expiry aligned with the 30 minute awaiting-payment timeout. Mollie's `expiresAt` is, to our reading of the docs (unverified), limited to a minimum of "tomorrow", so it cannot express 30 minutes. If the timeout sweep cancels an order, the Mollie payment may stay open; if the guest pays late, the webhook flags the payment (`payment_after_order_cancelled_flagged`) for manual refund. Follow-up #200: cancel the open Mollie payment when the sweep cancels the order.
+
 ### Test/live gate
 
 Payments are created and fetched with `testmode: true` unless `MOLLIE_LIVE_ALLOWED === '1'`. Production activation needs explicit approval, same as Stripe.

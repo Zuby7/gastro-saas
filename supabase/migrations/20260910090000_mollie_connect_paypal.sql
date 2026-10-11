@@ -256,3 +256,9 @@ begin
   return new;
 end;
 $$;
+
+comment on function ensure_payment_matches_order() is
+  'DB-level defense-in-depth (risk:payment), provider-aware since issue #195: rejects any payments INSERT whose amount_cents/currency does not exactly match the referenced order''s own immutable total or whose tenant differs from the order''s. For provider stripe additionally requires the tenant''s own charges_enabled Connect account; for provider mollie requires a tenant_mollie_accounts row with status connected and paypal_enabled. Independent of and beneath the application-code checks.';
+
+comment on function guard_payments_immutable_fields_change() is
+  'Rejects changes to payments.tenant_id/order_id/provider/stripe_checkout_session_id/stripe_account_id/mollie_payment_id/amount_cents/currency from app-facing roles (risk:payment, extended by issue #195) -- only status/stripe_payment_intent_id/updated_at may change once a payment row exists, exclusively via the verified webhook handlers.';

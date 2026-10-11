@@ -29,9 +29,20 @@ export class MollieApiError extends Error {
     message: string,
     /** HTTP status; 0 for a transport failure (no response received). */
     readonly status: number,
+    /** OAuth `error` code from a token endpoint response (e.g. invalid_grant), if any. */
+    readonly code?: string,
   ) {
     super(message);
     this.name = "MollieApiError";
+  }
+
+  /**
+   * The token endpoint rejected the credentials themselves (revoked/expired
+   * grant, or 401). Only this -- never a 429, 5xx or network failure -- may
+   * mark a connection as needing re-authorization.
+   */
+  get isAuthRejection(): boolean {
+    return this.status === 401 || this.code === "invalid_grant";
   }
 
   /**
@@ -111,7 +122,11 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
   }
 }
 
-async function requestTokens(body: URLSearchParams): Promise<MollieTokenResponse> {
+async function requestTokens(
+  body: URLSearchParams,
+  /** Refresh grant: keep the stored refresh token if the response omits a new one. */
+  fallbackRefreshToken?: string,
+): Promise<MollieTokenResponse> {
   const { clientId, clientSecret } = getMollieOAuthConfig();
   const response = await mollieFetch(MOLLIE_TOKEN_URL, {
     method: "POST",
@@ -123,21 +138,25 @@ async function requestTokens(body: URLSearchParams): Promise<MollieTokenResponse
     body,
   });
   const json = await readJson(response);
+  const refreshToken =
+    typeof json.refresh_token === "string" ? json.refresh_token : fallbackRefreshToken;
   if (
     !response.ok ||
     typeof json.access_token !== "string" ||
-    typeof json.refresh_token !== "string" ||
+    refreshToken === undefined ||
     typeof json.expires_in !== "number"
   ) {
-    // Never include the response body (could echo secrets) in the message.
+    // Never include the response body (could echo secrets) in the message;
+    // only the short OAuth error code is kept.
     throw new MollieApiError(
       `Mollie token request failed (HTTP ${response.status}).`,
       response.status || 502,
+      !response.ok && typeof json.error === "string" ? json.error : undefined,
     );
   }
   return {
     accessToken: json.access_token,
-    refreshToken: json.refresh_token,
+    refreshToken,
     expiresInSeconds: json.expires_in,
   };
 }
@@ -158,6 +177,7 @@ export function exchangeMollieAuthorizationCode(params: {
 export function refreshMollieAccessToken(refreshToken: string): Promise<MollieTokenResponse> {
   return requestTokens(
     new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
+    refreshToken,
   );
 }
 

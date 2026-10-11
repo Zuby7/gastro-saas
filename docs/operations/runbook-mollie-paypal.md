@@ -49,7 +49,13 @@ The code was written against docs.mollie.com but has **not yet been run against 
 - The token revoke call used on disconnect (`DELETE /oauth2/tokens`) works; failure is non-fatal.
 - Mollie refund ids start with `re_` (they are stored in `refunds.stripe_refund_id`, which checks `^re_`).
 
+- Concurrent token refreshes: two simultaneous webhooks for one restaurant may both refresh an expired token. Verify in the sandbox that Mollie tolerates this (refresh tokens are not single-use or rotated); if it rotates them, refreshes need serialization per tenant.
+- Whether the payment and profile responses always contain `profileId` and `method`. If not, legitimate payments would be flagged (missing means mismatch).
+- Payment expiry: Mollie's `expiresAt` cannot express 30 minutes (unverified). Open payments of orders cancelled by the sweep stay payable until Mollie expires them; a late payment is flagged `payment_after_order_cancelled_flagged`. Tracked in #200.
+
 ## 6. Operations
+
+- A webhook that returns 5xx with the audit event `mollie_payment_unverifiable_not_connected` means the restaurant's Mollie connection was unusable; the payment stays `pending` and Mollie retries. Have the restaurant reconnect, then check the payment in the Mollie dashboard.
 
 - Payment flagged for review (`payments.status = 'flagged_for_review'`): see `docs/operations/refund-reconciliation.md`; check the audit log entry (`payment_amount_mismatch_flagged`, `payment_webhook_tenant_mismatch_flagged`, `payment_after_order_cancelled_flagged`) and the Mollie dashboard.
 - A restaurant shows "Verbindung abgelaufen": Mollie rejected the token refresh; the restaurant reconnects.

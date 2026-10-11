@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getMolliePayment, isMollieTestMode, type MolliePayment } from "@/lib/mollie/client";
+import { recordOrderAuditEvent } from "@/lib/audit/record-order-audit-event";
 import { MollieNotConnectedError, getMollieAccessForTenant } from "@/lib/mollie/tokens";
 import {
-  fetchOrder,
+  type OrderRecord,
   flagPaymentForReview,
   markOrderCancelledForPaymentFailure,
   markOrderReceived,
@@ -59,7 +60,12 @@ async function fetchMolliePaymentRecord(
       provider: string;
     }>();
 
-  if (error || !data) {
+  if (error) {
+    // A database failure is NOT "no such payment": throw so the route answers
+    // 5xx and Mollie retries instead of the notification being lost.
+    throw new Error("mollie webhook: payments lookup failed");
+  }
+  if (!data) {
     return null;
   }
 
@@ -77,6 +83,43 @@ async function fetchMolliePaymentRecord(
   };
 }
 
+async function fetchOrderStrict(
+  admin: SupabaseClient,
+  orderId: string,
+): Promise<OrderRecord | null> {
+  const { data, error } = await admin
+    .from("orders")
+    .select("id, tenant_id, status, total_cents, currency")
+    .eq("id", orderId)
+    .maybeSingle<{
+      id: string;
+      tenant_id: string;
+      status: string;
+      total_cents: number;
+      currency: string;
+    }>();
+
+  if (error) {
+    throw new Error("mollie webhook: order lookup failed");
+  }
+  if (!data) {
+    return null;
+  }
+  return {
+    id: data.id,
+    tenantId: data.tenant_id,
+    status: data.status,
+    totalCents: data.total_cents,
+    currency: data.currency,
+  };
+}
+
+/**
+ * Missing profile ids count as a mismatch (flag for manual review): both the
+ * payment's and the tenant's profile id must be present and equal. This is the
+ * safest reading of an unverified API shape, because a flag is visible to
+ * operators while a silent accept or an endless retry is not.
+ */
 function identityIsConsistent(
   payment: PaymentRecord,
   mollie: MolliePayment,
@@ -86,7 +129,7 @@ function identityIsConsistent(
   if (mollie.id !== molliePaymentId) return false;
   if (mollie.metadata.orderId !== payment.orderId) return false;
   if (mollie.metadata.tenantId !== payment.tenantId) return false;
-  if (mollie.profileId && tenantProfileId && mollie.profileId !== tenantProfileId) return false;
+  if (!mollie.profileId || !tenantProfileId || mollie.profileId !== tenantProfileId) return false;
   return true;
 }
 
@@ -105,7 +148,7 @@ export async function handleMolliePaymentWebhook(
     return;
   }
 
-  const order = await fetchOrder(admin, payment.orderId);
+  const order = await fetchOrderStrict(admin, payment.orderId);
   if (!order || order.tenantId !== payment.tenantId) {
     console.error("[mollie-webhook] order not found or tenant mismatch for payment", payment.id);
     return;
@@ -119,12 +162,18 @@ export async function handleMolliePaymentWebhook(
   } catch (error) {
     if (error instanceof MollieNotConnectedError) {
       // The restaurant disconnected (or needs to reconnect) so we cannot
-      // verify the payment: never guess -- flag for manual review.
-      await flagPaymentForReview(admin, payment, "payment_webhook_tenant_mismatch_flagged", {
-        ...auditBase,
-        reason: "mollie_not_connected",
+      // verify the payment. A genuinely paid payment must not be irreversibly
+      // flagged for that: leave it pending, record an accurately named audit
+      // event and fail with 5xx so Mollie retries (a reconnect within the
+      // retry window recovers it automatically).
+      await recordOrderAuditEvent(admin, {
+        tenantId: payment.tenantId,
+        action: "mollie_payment_unverifiable_not_connected",
+        targetType: "order",
+        targetId: order.id,
+        metadata: auditBase,
       });
-      return;
+      throw new Error("mollie webhook: tenant has no usable Mollie connection, will be retried");
     }
     throw error;
   }
@@ -153,10 +202,7 @@ export async function handleMolliePaymentWebhook(
 
     // A live payment while live mode is not allowed, or a non-PayPal method,
     // is never silently accepted.
-    if (
-      (mollie.mode === "live" && isMollieTestMode()) ||
-      (mollie.method !== null && mollie.method !== "paypal")
-    ) {
+    if ((mollie.mode === "live" && isMollieTestMode()) || mollie.method !== "paypal") {
       await flagPaymentForReview(admin, payment, "payment_amount_mismatch_flagged", {
         ...auditBase,
         reason: "mode_or_method_mismatch",

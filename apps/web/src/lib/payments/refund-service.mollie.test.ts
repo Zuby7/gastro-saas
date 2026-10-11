@@ -170,14 +170,21 @@ describe("issueRefundForOrder with a Mollie (PayPal) payment", () => {
     });
   });
 
-  it("treats a synchronously failed Mollie refund as failed", async () => {
-    createMollieRefundMock.mockResolvedValue({ id: "re_x", status: "failed" });
-    await expect(issueRefundForOrder(fakeSupabase(), input)).rejects.toThrow();
-    expect(finalizeMock).toHaveBeenCalledWith(
-      "finalize_refund",
-      expect.objectContaining({ p_status: "failed" }),
-    );
-  });
+  it.each(["failed", "canceled"])(
+    "treats a synchronously %s Mollie refund as failed, never succeeded",
+    async (status) => {
+      createMollieRefundMock.mockResolvedValue({ id: "re_x", status });
+      await expect(issueRefundForOrder(fakeSupabase(), input)).rejects.toThrow();
+      expect(finalizeMock).toHaveBeenCalledWith(
+        "finalize_refund",
+        expect.objectContaining({ p_status: "failed" }),
+      );
+      expect(finalizeMock).not.toHaveBeenCalledWith(
+        "finalize_refund",
+        expect.objectContaining({ p_status: "succeeded" }),
+      );
+    },
+  );
 
   it("does not touch Mollie for a Stripe payment", async () => {
     payment = {

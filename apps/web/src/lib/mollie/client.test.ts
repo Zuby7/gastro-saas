@@ -134,6 +134,44 @@ describe("mollie client", () => {
     expect(body.get("refresh_token")).toBe("old_refresh");
   });
 
+  it("keeps the stored refresh token when the refresh response omits one, but requires one on code exchange", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({ access_token: "a2", expires_in: 100 }));
+    await expect(refreshMollieAccessToken("old_refresh")).resolves.toEqual({
+      accessToken: "a2",
+      refreshToken: "old_refresh",
+      expiresInSeconds: 100,
+    });
+    await expect(
+      exchangeMollieAuthorizationCode({ code: "c", redirectUri: "https://cb" }),
+    ).rejects.toBeInstanceOf(MollieApiError);
+  });
+
+  it("exposes the OAuth error code and classifies only credential rejections as auth rejections", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: "invalid_grant" }, 400));
+    const grant = (await refreshMollieAccessToken("r").catch((e: unknown) => e)) as MollieApiError;
+    expect(grant.code).toBe("invalid_grant");
+    expect(grant.isAuthRejection).toBe(true);
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 401));
+    expect(
+      ((await refreshMollieAccessToken("r").catch((e: unknown) => e)) as MollieApiError)
+        .isAuthRejection,
+    ).toBe(true);
+
+    for (const status of [429, 500, 503]) {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ error: "temporarily_unavailable" }, status));
+      const error = (await refreshMollieAccessToken("r").catch(
+        (e: unknown) => e,
+      )) as MollieApiError;
+      expect(error.isAuthRejection).toBe(false);
+    }
+    fetchMock.mockRejectedValueOnce(new Error("net"));
+    expect(
+      ((await refreshMollieAccessToken("r").catch((e: unknown) => e)) as MollieApiError)
+        .isAuthRejection,
+    ).toBe(false);
+  });
+
   it("does not leak the response body or secrets in token errors", async () => {
     fetchMock.mockResolvedValue(jsonResponse({ error: "invalid_grant", secret: "leak" }, 400));
     const error = await refreshMollieAccessToken("r").catch((e: unknown) => e);

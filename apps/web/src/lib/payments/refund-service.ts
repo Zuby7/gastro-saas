@@ -490,8 +490,8 @@ export async function issueRefundForOrder(
           idempotencyKey: `refund:${reservedRefund.id}`,
         },
       );
-      if (mollieRefund.status === "failed") {
-        // Mollie synchronously reports the refund as failed: known not done.
+      if (mollieRefund.status === "failed" || mollieRefund.status === "canceled") {
+        // Mollie synchronously reports the refund as failed or canceled: known not done.
         throw new MollieApiError("Mollie refund failed.", 422);
       }
       stripeRefund = { id: mollieRefund.id };

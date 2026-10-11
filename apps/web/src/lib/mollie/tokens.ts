@@ -86,7 +86,9 @@ export async function getMollieAccessForTenant(
   try {
     refreshed = await refreshMollieAccessToken(refreshToken);
   } catch (error) {
-    if (error instanceof MollieApiError && error.isDefinitive) {
+    // Only an explicit credential rejection (invalid_grant / 401) flips the
+    // row; 429, 5xx and network failures are transient and just propagate.
+    if (error instanceof MollieApiError && error.isAuthRejection) {
       await admin
         .from("tenant_mollie_accounts")
         .update({ status: "needs_reauth" })
