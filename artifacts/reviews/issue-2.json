@@ -33,7 +33,7 @@
     {
       "severity": "medium",
       "area": "Secret scanning coverage",
-      "summary": ".gitleaks.toml allowlists all of .env.example by path, not just the known demo values — a real secret pasted there later would be silently ignored."
+      "summary": ".gitleaks.toml allowlists all of .env.example by path, not just the known demo values - a real secret pasted there later would be silently ignored."
     },
     {
       "severity": "low",
@@ -57,7 +57,7 @@
     }
   ],
   "residual_risks": [
-    "No required_pull_request_reviews on branch protection — a PR can be merged as soon as checks are green, Opus verdict is not itself a required status check.",
+    "No required_pull_request_reviews on branch protection - a PR can be merged as soon as checks are green, Opus verdict is not itself a required status check.",
     "Migration Check workflow is not in the required-checks list on main.",
     "gitleaks SARIF is uploaded as an artifact but not fed into GitHub code scanning."
   ],

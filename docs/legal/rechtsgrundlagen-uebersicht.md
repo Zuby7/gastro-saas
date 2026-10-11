@@ -6,7 +6,7 @@
 > **muss** eine Rechtsanwältin/ein Rechtsanwalt AGB, Widerrufsrecht,
 > Datenschutzerklärung und branchenspezifische Pflichten (Lebensmittelrecht,
 > Preisangabenverordnung) prüfen. Siehe auch CLAUDE.md: "Claiming legal
-> compliance without qualification" ist explizit verboten — nichts in diesem
+> compliance without qualification" ist explizit verboten - nichts in diesem
 > Dokument oder im Produkt behauptet rechtliche Konformität.
 
 ## Zweck
@@ -29,15 +29,15 @@ Technische Bausteine im Produkt:
 - Bewertungsmoderation (Ticket #34) und Aufbewahrungsfristen (Ticket #36) für
   nutzergenerierte Inhalte.
 - Consent-Banner für das nicht-essenzielle `menu_view`-Analytics-Cookie
-  (Ticket #67/#146) — Cookies, die keine Consent-Grundlage brauchen (Supabase
+  (Ticket #67/#146) - Cookies, die keine Consent-Grundlage brauchen (Supabase
   Auth, Warenkorb-Session), werden weiterhin ohne Banner gesetzt, da sie
   technisch notwendig sind (Art. 6 Abs. 1 lit. b/f DSGVO als denkbare
-  Rechtsgrundlage — final zu prüfen).
+  Rechtsgrundlage - final zu prüfen).
 - Kein PostHog oder anderes Drittanbieter-Tracking ist aktuell im Code
-  eingebunden (Stand dieses Tickets) — falls das später hinzukommt, braucht es
+  eingebunden (Stand dieses Tickets) - falls das später hinzukommt, braucht es
   eine eigene Einordnung und ggf. Erweiterung des Consent-Banners.
 
-## TMG (Telemediengesetz) — Impressumspflicht
+## TMG (Telemediengesetz) - Impressumspflicht
 
 Betrifft: jede geschäftsmäßige Website, hier: jede veröffentlichte
 Restaurant-Speisekarte.
@@ -48,7 +48,7 @@ Technische Bausteine:
   Ticket #41), verlinkt im Footer der öffentlichen Speisekarte.
 - Hinweistext im Restaurant-Profil-Formular, dass das Impressum vollständige
   Pflichtangaben enthalten muss (Firmenname, Anschrift,
-  Vertretungsberechtigte, ggf. Handelsregister, Kontaktdaten) — die
+  Vertretungsberechtigte, ggf. Handelsregister, Kontaktdaten) - die
   Vollständigkeit selbst ist technisch nicht prüfbar, nur die
   Erinnerung/das Feld.
 - Nicht-blockierende Publish-Warnung, falls das Impressum-Feld leer ist.
@@ -70,16 +70,16 @@ Betrifft: online abgeschlossene Bestellverträge zwischen Restaurant und Gast.
 Technische Bausteine:
 
 - Tenant-editierbares AGB-Freitextfeld inkl. Widerrufsrecht-/
-  Rückerstattungsrichtlinie (`/r/[slug]/agb`, Ticket #146) — der tatsächliche
+  Rückerstattungsrichtlinie (`/r/[slug]/agb`, Ticket #146) - der tatsächliche
   Rechtstext (z. B. ob und wie ein Widerrufsrecht bei zubereiteten
   Speisen überhaupt greift, siehe § 312g Abs. 2 Nr. 2 BGB
   "kundenspezifisch hergestellte Waren") ist vom Betreiber selbst
-  einzutragen und anwaltlich zu prüfen — dieses Feld ist ein reiner
+  einzutragen und anwaltlich zu prüfen - dieses Feld ist ein reiner
   Platzhalter-Container, kein von Claude verfasster Rechtstext.
 - Explizite Zustimmungs-Checkbox zu AGB/Datenschutz bei Registrierung und
   Checkout (Ticket #146), serverseitig validiert.
 - Server-seitig neu berechnete Preise/Gesamtsummen bei Checkout (nie
-  Client-Werte vertraut) — relevant für die Nachweisbarkeit des tatsächlich
+  Client-Werte vertraut) - relevant für die Nachweisbarkeit des tatsächlich
   vereinbarten Preises.
 
 ## Barrierefreiheit (BITV/WCAG, perspektivisch BFSG)

@@ -4,7 +4,7 @@ export { UnsafeAuditMetadataError, assertSafeAuditMetadata };
 
 /**
  * Minimal query-capable client `recordAuditEvent` needs. Deliberately not
- * tied to `pg`/Supabase directly — `packages/domain` stays a pure module per
+ * tied to `pg`/Supabase directly - `packages/domain` stays a pure module per
  * `docs/architecture/domain-boundaries.md`; the caller (an API route,
  * `packages/database`, or a test) supplies the actual DB client.
  */

@@ -12,7 +12,7 @@ Implementierung der im `/release-check`-Skill beschriebenen Prüfungen (Migratio
 
 ## Explizite Nicht-Ziele
 
-Kein automatisches Deployment nach Produktion — das bleibt immer eine separate, explizit freizugebende Aktion.
+Kein automatisches Deployment nach Produktion - das bleibt immer eine separate, explizit freizugebende Aktion.
 
 ## Abhängigkeiten
 

@@ -23,12 +23,12 @@ A single independent gastronomy business (café, pizzeria, restaurant, snack bar
 9. Custom roles and fine-grained permissions per employee.
 10. Strict tenant data isolation.
 11. Rule-based menu quality/compliance checks before publication.
-12. Integration-ready architecture for delivery marketplaces, POS, accounting, and reservation systems — without building a consumer marketplace itself.
+12. Integration-ready architecture for delivery marketplaces, POS, accounting, and reservation systems - without building a consumer marketplace itself.
 
 ## Growth path
 
-The architecture supports future multi-location businesses and restaurant groups (tenant → brand → location), but the initial onboarding and UI present exactly one location per tenant. Complexity is introduced only when a ticket requires it — see `non-goals.md`.
+The architecture supports future multi-location businesses and restaurant groups (tenant → brand → location), but the initial onboarding and UI present exactly one location per tenant. Complexity is introduced only when a ticket requires it - see `non-goals.md`.
 
 ## Why this exists
 
-Independent restaurants are increasingly dependent on third-party marketplaces (commission fees, no customer relationship, no real sales insight) or have no digital ordering at all. gastro-saas gives them their own branded ordering channel, secure payments, and analytics they can actually understand — without needing an IT department to run it.
+Independent restaurants are increasingly dependent on third-party marketplaces (commission fees, no customer relationship, no real sales insight) or have no digital ordering at all. gastro-saas gives them their own branded ordering channel, secure payments, and analytics they can actually understand - without needing an IT department to run it.

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 /**
  * Issue #83 follow-up: the original migration to scheme-aware surface tokens
  * (`bg-surface`, `bg-surface-secondary`, `bg-surface-muted`) missed every
- * `bg-white` usage — Opus review caught ~19 card surfaces still hardcoding
+ * `bg-white` usage - Opus review caught ~19 card surfaces still hardcoding
  * `bg-white` combined with `text-foreground`, which reproduces the exact
  * white-on-white unreadable-text bug that caused dark mode to be disabled in
  * the first place (`--foreground` becomes `neutral-50` in dark mode).

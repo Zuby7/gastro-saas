@@ -9,7 +9,7 @@
         {
           "severity": "high",
           "area": "accessibility",
-          "summary": "Dark-mode homepage heading contrast ~1.07:1 (globals.css background #0a0a0a vs. text-neutral-900 #141311) — far below WCAG."
+          "summary": "Dark-mode homepage heading contrast ~1.07:1 (globals.css background #0a0a0a vs. text-neutral-900 #141311) - far below WCAG."
         },
         {
           "severity": "high",
@@ -59,7 +59,7 @@
         {
           "severity": "medium",
           "area": "maintainability",
-          "reason": "tokens-css-parity.test.ts only asserts CSS var presence, not value equality — cycle-1 finding about value drift not actually closed."
+          "reason": "tokens-css-parity.test.ts only asserts CSS var presence, not value equality - cycle-1 finding about value drift not actually closed."
         },
         {
           "severity": "low",
@@ -98,7 +98,7 @@
         {
           "action": "1. Scheme-aware link color passing WCAG AA in both schemes + a11y test covering every rendered fg/bg pair in both schemes",
           "status": "PASS",
-          "evidence": "globals.css introduces --link-foreground (:root = --color-brand-600; dark = --color-brand-300). Independently recomputed: link light 6.62:1, link dark 9.10:1, h1 light 18.57:1, h1 dark 16.80:1, p light 6.99:1, p dark 7.65:1 — all pass. Old defect reproduced for confirmation: 2.80:1 fail on the un-fixed pairing."
+          "evidence": "globals.css introduces --link-foreground (:root = --color-brand-600; dark = --color-brand-300). Independently recomputed: link light 6.62:1, link dark 9.10:1, h1 light 18.57:1, h1 dark 16.80:1, p light 6.99:1, p dark 7.65:1 - all pass. Old defect reproduced for confirmation: 2.80:1 fail on the un-fixed pairing."
         },
         {
           "action": "2. Token/CSS parity test must compare VALUES (both directions, incl. fontSize)",
@@ -135,7 +135,7 @@
       "review_findings": [
         {
           "severity": "high",
-          "area": "accessibility (pre-existing on main, OUT of this ticket's scope — does not gate this verdict)",
+          "area": "accessibility (pre-existing on main, OUT of this ticket's scope - does not gate this verdict)",
           "reason": "The same WCAG AA failure (text-brand-600 on dark neutral-900, 2.80:1) remains at 11 other call sites introduced by the Epic 3-5 / frontend-polish work, not touched by PR #74.",
           "evidence": "apps/web/src/app/login/page.tsx:71, register/page.tsx:138, invite/[token]/page.tsx:30, account/menu/page.tsx:60,112, account/menu/dish-row.tsx:22, account/menu/dishes/[dishId]/page.tsx:58,217, account/profile/page.tsx:56,106, r/[slug]/dish-detail.tsx:48.",
           "required_correction": "Tracked as a separate follow-up issue; must land before the epic-level Opus batch verdict for the frontend-polish/Epic 3-5 work can be APPROVED.",
@@ -144,7 +144,7 @@
         {
           "severity": "medium",
           "area": "testing / maintainability",
-          "reason": "page.a11y.test.ts hand-mirrors the globals.css token mapping instead of parsing globals.css directly — same coupling-by-convention weakness that allowed the cycle-2 defect to slip through originally.",
+          "reason": "page.a11y.test.ts hand-mirrors the globals.css token mapping instead of parsing globals.css directly - same coupling-by-convention weakness that allowed the cycle-2 defect to slip through originally.",
           "required_correction": "Non-blocking follow-up: derive test pairs from a parsed globals.css, matching the stronger pattern already used in tokens-css-parity.test.ts."
         },
         {
@@ -154,12 +154,12 @@
         }
       ],
       "residual_risks": [
-        "App-wide dark-mode link contrast failure at 11 sites remains on main — PR #74 improves but does not close this class of defect.",
+        "App-wide dark-mode link contrast failure at 11 sites remains on main - PR #74 improves but does not close this class of defect.",
         "page.a11y.test.ts still mirrors globals.css by hand instead of parsing it.",
         "No axe/Playwright a11y run exists; coverage is contrast-math + semantic-role assertions only."
       ],
       "required_actions": [
-        "None blocking issue #1 / PR #74 — merge unblocked from this ticket's perspective.",
+        "None blocking issue #1 / PR #74 - merge unblocked from this ticket's perspective.",
         "Open a follow-up ticket for the 11 remaining text-brand-600 dark-mode contrast failures; must land before the epic-level Opus verdict for the frontend-polish/Epic 3-5 batch."
       ]
     }

@@ -8,7 +8,7 @@ Als Entwicklerteam möchte ich ein lauffähiges, typisiertes Projekt-Grundgerüs
 
 ## Umfang
 
-pnpm-Workspace, Next.js (App Router) unter `apps/web`, TypeScript strict, ESLint, Prettier, Tailwind, Basis-Ordnerstruktur gemäß `docs/architecture/domain-boundaries.md`. Zusätzlich (nach Opus-Architektur-Review vorgezogen): Grundgerüst des Design-Token-Systems in `packages/ui` (Farben, Abstände, Typografie als Tailwind-Theme-Erweiterung) inkl. einer wiederverwendbaren Kontrast-Validierungsfunktion für Tenant-Branding-Eingaben — damit spätere UI-Tickets (insb. Ticket "Speisekarten-UI mit Kategorien-Navigation") nicht ad hoc improvisieren müssen.
+pnpm-Workspace, Next.js (App Router) unter `apps/web`, TypeScript strict, ESLint, Prettier, Tailwind, Basis-Ordnerstruktur gemäß `docs/architecture/domain-boundaries.md`. Zusätzlich (nach Opus-Architektur-Review vorgezogen): Grundgerüst des Design-Token-Systems in `packages/ui` (Farben, Abstände, Typografie als Tailwind-Theme-Erweiterung) inkl. einer wiederverwendbaren Kontrast-Validierungsfunktion für Tenant-Branding-Eingaben - damit spätere UI-Tickets (insb. Ticket "Speisekarten-UI mit Kategorien-Navigation") nicht ad hoc improvisieren müssen.
 
 ## Explizite Nicht-Ziele
 

@@ -13,7 +13,7 @@ const LABEL_TEXT: Record<DishPerformanceLabel, string> = {
   topseller: "Topseller",
   low_performer: "Low Performer",
   insufficient_data: "Zu wenig Daten",
-  normal: "—",
+  normal: "-",
 };
 
 function formatMoney(cents: number, currency: string): string {
@@ -21,7 +21,7 @@ function formatMoney(cents: number, currency: string): string {
 }
 
 function formatConversion(rate: number | null): string {
-  if (rate === null) return "–";
+  if (rate === null) return "-";
   return `${(rate * 100).toFixed(1)} %`;
 }
 

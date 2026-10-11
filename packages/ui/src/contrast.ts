@@ -24,7 +24,7 @@ const HEX_COLOR_PATTERN = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 /**
  * Parses a hex color string (`#rgb`, `#rrggbb`, with or without the leading
- * `#`) into 0–255 sRGB channel values. Throws on any other input.
+ * `#`) into 0-255 sRGB channel values. Throws on any other input.
  */
 export function parseHexColor(hex: string): { r: number; g: number; b: number } {
   const match = HEX_COLOR_PATTERN.exec(hex.trim());
@@ -62,7 +62,7 @@ export function relativeLuminance(hex: string): number {
   return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
 }
 
-/** Raw WCAG contrast ratio (1–21) between two hex colors, order-independent. */
+/** Raw WCAG contrast ratio (1-21) between two hex colors, order-independent. */
 export function contrastRatio(colorA: string, colorB: string): number {
   const luminanceA = relativeLuminance(colorA);
   const luminanceB = relativeLuminance(colorB);

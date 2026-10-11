@@ -3,7 +3,7 @@
 All images in this directory are real dish photos sourced from Wikimedia
 Commons (`commons.wikimedia.org`), downloaded via each file's stable
 `Special:FilePath` redirect. Used here as local-dev/demo seed data only
-(`supabase/seed.sql` + `supabase/seed-assets/upload-dish-media.mjs`) — never
+(`supabase/seed.sql` + `supabase/seed-assets/upload-dish-media.mjs`) - never
 served as production content. All licenses are free/permissive
 (CC0/CC BY/CC BY-SA); attribution below per Commons' own license terms.
 

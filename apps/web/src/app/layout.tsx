@@ -8,7 +8,7 @@ const geistSans = Geist({
 });
 
 // Display/heading face for the design pass v2 (see packages/ui/src/tokens.ts
-// for the full rationale) — a structural slab serif that reads like diner/
+// for the full rationale) - a structural slab serif that reads like diner/
 // menu-board signage, replacing the previous soft-serif (Fraunces), kept
 // separate from the body face (Geist Sans) for a clear type hierarchy.
 const robotoSlab = Roboto_Slab({
@@ -18,7 +18,7 @@ const robotoSlab = Roboto_Slab({
 });
 
 // Utility/ticket face, used ONLY for order numbers/status codes/ticket
-// badges (see the "ticket-edge" signature element in globals.css) — a
+// badges (see the "ticket-edge" signature element in globals.css) - a
 // typewriter-style monospace that reinforces the receipt/order-chit
 // metaphor. Deliberately not used for running text or code.
 const spaceMono = Space_Mono({
