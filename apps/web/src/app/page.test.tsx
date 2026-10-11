@@ -123,7 +123,7 @@ describe("Home (Startseite / marketing landing page)", () => {
   it("uses no em dashes or en dashes in the visible copy", () => {
     const { container } = render(<Home />);
 
-    expect(container.textContent).not.toMatch(/[–—]/);
+    expect(container.textContent).not.toMatch(new RegExp("[\u2013\u2014]"));
   });
 
   it("invents no prices, statistics or contact data", () => {
