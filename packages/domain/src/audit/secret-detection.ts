@@ -1,7 +1,7 @@
 /**
  * Rejects secret-/payment-shaped values before they ever reach the
  * append-only `audit_logs.metadata` column. Deliberately heuristic, not a
- * general-purpose secret scanner (that's gitleaks' job in CI) — this only
+ * general-purpose secret scanner (that's gitleaks' job in CI) - this only
  * needs to catch the realistic ways a developer would accidentally log a
  * credential or card number while building an audit-log call site.
  *

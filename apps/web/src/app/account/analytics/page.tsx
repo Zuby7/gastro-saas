@@ -24,7 +24,7 @@ function formatMoney(cents: number, currency: string): string {
  *      same permission via `require_tenant_permission` -- a bug or bypass in
  *      (1) can never let an unauthorized session read revenue data.
  *
- * Empty states (acceptance criterion 3): average order value renders "–"
+ * Empty states (acceptance criterion 3): average order value renders "-"
  * (never a fabricated 0) when there were no paid orders today, and every
  * tile pairs its number with a plain-text label/unit -- no chart-only
  * information (accessibility requirement: "Kennzahlen mit Textalternative,
@@ -119,7 +119,7 @@ export default async function AnalyticsDashboardPage() {
             <p className="text-2xl font-semibold text-foreground">
               {hasPaidOrdersToday
                 ? formatMoney(summary.netRevenueTodayCents, summary.currency)
-                : "–"}
+                : "-"}
             </p>
             {!hasPaidOrdersToday ? (
               <p className="text-sm text-foreground">Noch keine bezahlten Bestellungen heute.</p>
@@ -156,7 +156,7 @@ export default async function AnalyticsDashboardPage() {
             <p className="text-2xl font-semibold text-foreground">
               {summary.avgOrderValueCents !== null
                 ? formatMoney(summary.avgOrderValueCents, summary.currency)
-                : "–"}
+                : "-"}
             </p>
             {summary.avgOrderValueCents === null ? (
               <p className="text-sm text-foreground">

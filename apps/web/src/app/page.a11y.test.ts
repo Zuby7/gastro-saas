@@ -11,12 +11,12 @@ import { describe, expect, it } from "vitest";
  * `--foreground`/`--foreground-secondary`/`--link-foreground` tokens
  * (`bg-surface`, `bg-surface-secondary`, `bg-background`, `text-foreground`,
  * `text-foreground-secondary`, `text-link-foreground`) for its header,
- * footer, features section, feature cards and the "how it works" section —
+ * footer, features section, feature cards and the "how it works" section -
  * those pairs are checked below for BOTH schemes, mirroring
  * `dark-mode-tokens.a11y.test.ts`'s pattern. `brand`/`gold`/`ember`/
  * `espresso` are NOT scheme-aware (no dark-mode override in `globals.css`),
  * so the hero (including its ticket-mockup visual anchor), closing CTA band
- * and step badges — all fixed brand/gold/ember/espresso colors — only need a
+ * and step badges - all fixed brand/gold/ember/espresso colors - only need a
  * single check, same as `public-menu-design.a11y.test.ts`.
  *
  * Keep this list in sync with `page.tsx`: every text element there should
@@ -41,7 +41,7 @@ function compositeOverBackground(
   return `#${toHexChannel(blend(fg.r, bg.r))}${toHexChannel(blend(fg.g, bg.g))}${toHexChannel(blend(fg.b, bg.b))}`;
 }
 
-describe("homepage scheme-aware token pairs (WCAG AA) — light", () => {
+describe("homepage scheme-aware token pairs (WCAG AA) - light", () => {
   it("header/footer: text-foreground on bg-surface", () => {
     const result = validateContrastRatio(colors.neutral[900], colors.neutral[0]);
     expect(result.passesAA).toBe(true);
@@ -88,7 +88,7 @@ describe("homepage scheme-aware token pairs (WCAG AA) — light", () => {
   });
 });
 
-describe("homepage scheme-aware token pairs (WCAG AA) — dark (prefers-color-scheme: dark)", () => {
+describe("homepage scheme-aware token pairs (WCAG AA) - dark (prefers-color-scheme: dark)", () => {
   it("header/footer: text-foreground on bg-surface (dark)", () => {
     const result = validateContrastRatio(colors.neutral[50], colors.neutral[800]);
     expect(result.passesAA).toBe(true);
@@ -135,7 +135,7 @@ describe("homepage scheme-aware token pairs (WCAG AA) — dark (prefers-color-sc
   });
 });
 
-describe("homepage fixed-color pairs (WCAG AA) — brand/gold/espresso are not scheme-aware", () => {
+describe("homepage fixed-color pairs (WCAG AA) - brand/gold/espresso are not scheme-aware", () => {
   const HERO_WORST_CASE_STOP = colors.espresso[800];
 
   it("hero h1 (white, large text) on the hero's worst-case (lighter) gradient stop passes AA", () => {

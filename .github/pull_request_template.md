@@ -30,4 +30,4 @@ Closes #
 
 ## Opus-Validator Verdict
 
-<!-- APPROVED / CHANGES_REQUESTED / BLOCKED — Link auf artifacts/reviews/issue-<nr>.json -->
+<!-- APPROVED / CHANGES_REQUESTED / BLOCKED - Link auf artifacts/reviews/issue-<nr>.json -->

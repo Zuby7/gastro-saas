@@ -8,7 +8,7 @@ Als Plattformbetreiber möchte ich sicherheitsrelevante Aktionen nachvollziehen 
 
 ## Umfang
 
-Tabelle `audit_logs` (tenant, actor, action, target_type, target_id, timestamp, safe metadata, correlation id) + Write-only-Interface in `packages/domain/audit`. Zusätzlich (nach Opus-Architektur-Review vorgezogen, damit spätere Tickets nicht gegen eine fehlende Tabelle schreiben): Grundgerüst der Tabelle `analytics_events` (tenant, event_type, dish/order-Referenz, timestamp) — ohne Auswertungslogik, die folgt erst in Epic 9.
+Tabelle `audit_logs` (tenant, actor, action, target_type, target_id, timestamp, safe metadata, correlation id) + Write-only-Interface in `packages/domain/audit`. Zusätzlich (nach Opus-Architektur-Review vorgezogen, damit spätere Tickets nicht gegen eine fehlende Tabelle schreiben): Grundgerüst der Tabelle `analytics_events` (tenant, event_type, dish/order-Referenz, timestamp) - ohne Auswertungslogik, die folgt erst in Epic 9.
 
 ## Explizite Nicht-Ziele
 

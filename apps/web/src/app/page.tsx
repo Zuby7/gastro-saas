@@ -9,16 +9,16 @@ import { ClipboardList, LineChart, QrCode, Wallet } from "lucide-react";
  * shipped in the prior pass.
  *
  * Design notes (no `frontend-design` skill/plugin available in this
- * session — see `.claude/rules/frontend.md`'s note that it's optional if
+ * session - see `.claude/rules/frontend.md`'s note that it's optional if
  * not installed):
  *
  * Pass 1 (plan): reuse the existing token system (`packages/ui/src/tokens.ts`)
- * unchanged — no new colors/fonts. The three specific "AI slop" patterns
+ * unchanged - no new colors/fonts. The three specific "AI slop" patterns
  * called out for this page (eyebrow-label-above-giant-centered-headline,
  * uniform icon-card grid, identical heading→box rhythm repeated every
  * section) are each broken structurally, not just re-skinned:
  *   - Hero: no floating eyebrow label at all. Instead an asymmetric ~55/45
- *     two-column layout — headline+copy left, a single bold visual anchor
+ *     two-column layout - headline+copy left, a single bold visual anchor
  *     right (a `.ticket-edge` kitchen-order-ticket mockup, angled and
  *     bleeding past its column on large screens). The small "tag" that would
  *     otherwise have been a floating eyebrow is docked onto that ticket
@@ -36,7 +36,7 @@ import { ClipboardList, LineChart, QrCode, Wallet } from "lucide-react";
  *     Step 1 is visually heavier (larger badge/type) as the anchor, steps 2
  *     and 3 are smaller and follow along a dashed connector line, all
  *     left-aligned in a horizontal flow rather than 3 centered columns.
- *   - Closing CTA: kept, but no longer a plain centered rounded rectangle —
+ *   - Closing CTA: kept, but no longer a plain centered rounded rectangle -
  *     copy is left-aligned and the button is offset to the side. An earlier
  *     draft also echoed the hero's ticket-perforation edge on this band, but
  *     that render was invisible (bg-on-bg) and was removed rather than
@@ -47,7 +47,7 @@ import { ClipboardList, LineChart, QrCode, Wallet } from "lucide-react";
  * previously scoped to "cards that literally represent your order" (cart,
  * checkout, order-status). This ticket explicitly asks to reuse that exact
  * established motif as the landing page's one bold visual moment instead of
- * inventing a new shape — done deliberately here as a second, narrow,
+ * inventing a new shape - done deliberately here as a second, narrow,
  * documented exception (the marketing hero mockup only), not a general
  * license to scatter it decoratively elsewhere; `packages/ui/src/tokens.ts`'s
  * own "Signature element" section is updated in this same PR to state this
@@ -85,7 +85,7 @@ export default function Home() {
       </header>
 
       <main>
-        {/* Hero — asymmetric ~55/45 split, no eyebrow-above-headline.
+        {/* Hero - asymmetric ~55/45 split, no eyebrow-above-headline.
             Same warm espresso gradient as the public menu hero, deliberately
             reused rather than a generic blue-gradient SaaS hero. */}
         <section className="overflow-hidden bg-gradient-to-br from-espresso-900 to-espresso-800 px-5 py-16 sm:px-8 sm:py-24">
@@ -96,7 +96,7 @@ export default function Home() {
               </h1>
               <p className="max-w-lg text-lg leading-relaxed text-white/80">
                 gastro-saas bündelt digitale Speisekarte, Bestellannahme, Küchen-Workflow, Zahlungen
-                und Auswertungen in einem System, das an einem Nachmittag startklar ist — kein
+                und Auswertungen in einem System, das an einem Nachmittag startklar ist - kein
                 Papierkram, keine Fachkenntnisse nötig.
               </p>
               <div className="flex flex-wrap gap-3">
@@ -163,7 +163,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Features — one larger featured card + two smaller supporting
+        {/* Features - one larger featured card + two smaller supporting
             cards, not four identical columns. */}
         <section
           className="bg-surface-secondary px-5 py-16 sm:px-8 sm:py-20"
@@ -174,7 +174,7 @@ export default function Home() {
               id="features-heading"
               className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
             >
-              Alles, was der Betrieb braucht — an einem Ort
+              Alles, was der Betrieb braucht - an einem Ort
             </h2>
             <p className="mt-2 max-w-2xl text-foreground-secondary">
               Kein Zusammenflicken mehr aus Kassensystem, Lieferzettel und Excel-Tabelle.
@@ -217,7 +217,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* How it works — asymmetric horizontal flow: step 1 is the visually
+        {/* How it works - asymmetric horizontal flow: step 1 is the visually
             heavier anchor, steps 2/3 are smaller and follow a dashed
             connector, all left-aligned rather than 3 identical centered
             circles. */}
@@ -283,7 +283,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Closing CTA — no longer a plain centered box: copy/button are
+        {/* Closing CTA - no longer a plain centered box: copy/button are
             asymmetrically split rather than stacked and centered. (An
             earlier draft echoed the hero's ticket-perforation edge here too,
             but a `bg-background`-on-`bg-background` strip renders no visible
@@ -336,7 +336,7 @@ const FEATURED = {
   icon: QrCode,
   title: "Digitale Speisekarte per QR-Code",
   description:
-    "Karten in Sekunden aktualisieren. Gäste scannen den Code am Tisch und bestellen direkt — ohne App, ohne Wartezeit auf Bedienung.",
+    "Karten in Sekunden aktualisieren. Gäste scannen den Code am Tisch und bestellen direkt - ohne App, ohne Wartezeit auf Bedienung.",
 } as const;
 
 const SUPPORTING_FEATURES = [
@@ -344,7 +344,7 @@ const SUPPORTING_FEATURES = [
     icon: ClipboardList,
     title: "Bestellungen live in der Küche",
     description:
-      "Jede Bestellung landet sofort im Küchen-Dashboard — kein Zuruf, kein Zettel-Chaos.",
+      "Jede Bestellung landet sofort im Küchen-Dashboard - kein Zuruf, kein Zettel-Chaos.",
   },
   {
     icon: Wallet,
@@ -369,6 +369,6 @@ const STEPS = [
   },
   {
     title: "QR-Code aufstellen & loslegen",
-    description: "Gäste bestellen direkt am Tisch — Ihre Küche sieht es sofort.",
+    description: "Gäste bestellen direkt am Tisch - Ihre Küche sieht es sofort.",
   },
 ] as const;

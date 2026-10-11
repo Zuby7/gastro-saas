@@ -12,7 +12,7 @@ Als Gast möchte ich nach erfolgreicher Online-Zahlung einen übersichtlichen di
 - Inhalt: Restaurantname, Bestellnummer/-datum, Bestellart, Positionen mit Menge/Einzelpreis/Zeilensumme, Gesamtsumme, Zahlungsart-Hinweis ("Online bezahlt"), Zeitpunkt der Zahlung.
 - Beleg nur für **bezahlte** Bestellungen (nicht `awaiting_payment`/abgebrochen); sonst neutrale Hinweisseite.
 - Druck-/PDF-freundliches Layout (Print-Stylesheet), Button "Beleg drucken / als PDF speichern" (`window.print()`), Link von der Bestellstatus-Seite.
-- Rechtlicher Hinweis auf dem Beleg: "Digitaler Bestellbeleg — kein steuerlich qualifizierter Kassenbeleg" (keine Behauptung von Steuer-/KassenSichV-Konformität; steuerliche Angaben des Betreibers sind ein separates Thema).
+- Rechtlicher Hinweis auf dem Beleg: "Digitaler Bestellbeleg - kein steuerlich qualifizierter Kassenbeleg" (keine Behauptung von Steuer-/KassenSichV-Konformität; steuerliche Angaben des Betreibers sind ein separates Thema).
 
 ## Explizite Nicht-Ziele
 
@@ -20,7 +20,7 @@ Keine TSE/Fiskalisierung, keine USt-Ausweisung/Steuerberechnung, kein PDF-Server
 
 ## Abhängigkeiten
 
-Abhängig von #22 (Bestellstatus), #24/#25 (Zahlung/Webhook) — umgesetzt.
+Abhängig von #22 (Bestellstatus), #24/#25 (Zahlung/Webhook) - umgesetzt.
 
 ## Akzeptanzkriterien
 

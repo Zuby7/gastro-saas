@@ -19,7 +19,7 @@ Keine Änderung der Bestell-Zustandsmaschine, der Preisberechnung oder des Strip
 
 ## Abhängigkeiten
 
-Abhängig von "Bestell-Zustandsmaschine und Checkout-Flow" (#21) und "Checkout-Zahlungsabwicklung" (#24) — beide umgesetzt.
+Abhängig von "Bestell-Zustandsmaschine und Checkout-Flow" (#21) und "Checkout-Zahlungsabwicklung" (#24) - beide umgesetzt.
 
 ## Akzeptanzkriterien
 

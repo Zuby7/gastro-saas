@@ -12,4 +12,4 @@ Never deploys to production. Only validates readiness; any actual production dep
 3. Verify observability is wired up (Sentry, Better Stack, PostHog) and receiving data.
 4. Verify a backup/rollback plan exists for the current state.
 5. Run smoke tests against staging.
-6. Report a pass/fail checklist. If everything passes, state clearly that production deployment still requires the user's explicit approval — do not proceed on its own.
+6. Report a pass/fail checklist. If everything passes, state clearly that production deployment still requires the user's explicit approval - do not proceed on its own.

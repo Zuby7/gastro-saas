@@ -8,7 +8,7 @@ gastro-saas does not build a Lieferando/Wolt/Uber-Eats-style multi-restaurant di
 
 ## No AI dependency for core functionality
 
-The product must work without any AI API. Menu quality checks, publication blockers/warnings, low-performer detection, and recommendations are deterministic and rule-based in the MVP. Future AI features (PDF menu import, translation, description suggestions, review summarization) must sit behind a provider abstraction, be opt-in per tenant, and have a non-AI fallback — none of this is built now.
+The product must work without any AI API. Menu quality checks, publication blockers/warnings, low-performer detection, and recommendations are deterministic and rule-based in the MVP. Future AI features (PDF menu import, translation, description suggestions, review summarization) must sit behind a provider abstraction, be opt-in per tenant, and have a non-AI fallback - none of this is built now.
 
 ## No multi-location UI yet
 
@@ -24,7 +24,7 @@ Guest checkout only. Optional customer accounts are a later phase.
 
 ## No real external integrations
 
-Lieferando/Wolt/Uber Eats/POS/accounting/reservation integrations are designed for (provider-neutral interface + mock provider) but not connected. Only official, authorized partner APIs will ever be used — no scraping, no reverse engineering, no unofficial production connections, ever.
+Lieferando/Wolt/Uber Eats/POS/accounting/reservation integrations are designed for (provider-neutral interface + mock provider) but not connected. Only official, authorized partner APIs will ever be used - no scraping, no reverse engineering, no unofficial production connections, ever.
 
 ## No production infrastructure yet
 
@@ -32,7 +32,7 @@ No production Stripe activation, no purchased domain, no production deployment, 
 
 ## No microservices
 
-Modular monolith only. Service extraction is only justified by a documented, measured need — not speculative future scale.
+Modular monolith only. Service extraction is only justified by a documented, measured need - not speculative future scale.
 
 ## No large, unscoped ticket work
 

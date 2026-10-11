@@ -1,6 +1,6 @@
 # Domain Model
 
-Entities are introduced through tickets as they're needed (§12 of the source brief) — this document is the target shape, not a mandate to create every table immediately.
+Entities are introduced through tickets as they're needed (§12 of the source brief) - this document is the target shape, not a mandate to create every table immediately.
 
 ## Identity & tenancy
 
@@ -8,14 +8,14 @@ Entities are introduced through tickets as they're needed (§12 of the source br
 
 > **Implemented (ticket #4):** `tenants`, `tenant_memberships`, `brands`, `locations` and their RLS policies ship in
 > `supabase/migrations/20260801040000_tenant_membership_brand_location_model.sql`. `tenant_memberships` currently
-> carries a minimal fixed `role` column (`owner` | `manager` | `staff`) rather than the full RBAC tables below — those
+> carries a minimal fixed `role` column (`owner` | `manager` | `staff`) rather than the full RBAC tables below - those
 > land with ticket #9. A tenant is guaranteed at least one Owner membership at all times via two deferred
-> database constraint triggers — one on `tenant_memberships` (covering delete/demote/re-parent of the last Owner)
-> and one on `tenants` (covering a tenant inserted with zero memberships) — see the migration's header comment.
+> database constraint triggers - one on `tenant_memberships` (covering delete/demote/re-parent of the last Owner)
+> and one on `tenants` (covering a tenant inserted with zero memberships) - see the migration's header comment.
 > All SECURITY DEFINER helper functions use `search_path = ''` with fully schema-qualified references to prevent
 > a `pg_temp` table-shadowing RLS bypass. **Prerequisite for future onboarding/account-deletion tickets:** because
 > `tenant_memberships.user_id` cascades from `auth.users`, deleting the `auth.users` row of a tenant's sole Owner
-> now fails at commit (the Owner-guard trigger aborts the whole `DELETE`) — an ownership transfer or full tenant
+> now fails at commit (the Owner-guard trigger aborts the whole `DELETE`) - an ownership transfer or full tenant
 > deletion must happen first. Users are Supabase `auth.users` (ticket #7, no separate `users` table) and `invitations` shipped with ticket #8 (`20260801100000_invitations.sql`).
 
 ## Authorization
@@ -61,7 +61,7 @@ Implemented (Epic 7): `payment_accounts` (Connect status `pending`/`restricted`/
 
 `analytics_events`, `daily_analytics_aggregates`.
 
-Ticket #30 (Epic 9) implements the Analytics-Grunddashboard: revenue today (net of same-day refunds), paid order count, average order value, open orders, and payment failures today, computed live from the tenant's own `orders`/`payments`/`refunds` rows (no third-party product analytics for revenue figures) via the timezone-aware `get_analytics_dashboard_summary()` RPC (`supabase/migrations/20260818090000_analytics_dashboard_summary.sql`), which enforces `analytics.read` itself. `daily_analytics_aggregates` remains an unimplemented, documented target shape for a later ticket if incremental pre-aggregation is ever needed for performance -- today's live-query approach (backed by a `payments (tenant_id, status, created_at)` index) is deliberately simpler and always correct. Admin UI: `apps/web/src/app/account/analytics` (dashboard tiles with honest empty states -- average order value renders as "–", never a fabricated 0, when there is no data yet).
+Ticket #30 (Epic 9) implements the Analytics-Grunddashboard: revenue today (net of same-day refunds), paid order count, average order value, open orders, and payment failures today, computed live from the tenant's own `orders`/`payments`/`refunds` rows (no third-party product analytics for revenue figures) via the timezone-aware `get_analytics_dashboard_summary()` RPC (`supabase/migrations/20260818090000_analytics_dashboard_summary.sql`), which enforces `analytics.read` itself. `daily_analytics_aggregates` remains an unimplemented, documented target shape for a later ticket if incremental pre-aggregation is ever needed for performance -- today's live-query approach (backed by a `payments (tenant_id, status, created_at)` index) is deliberately simpler and always correct. Admin UI: `apps/web/src/app/account/analytics` (dashboard tiles with honest empty states -- average order value renders as "-", never a fabricated 0, when there is no data yet).
 
 Ticket #31 (Epic 9) implements the Topseller-/Low-Performer-Analyse on top of #30: `get_dish_performance_stats()` (`supabase/migrations/20260818100000_dish_performance_stats.sql`) returns raw per-dish stats (units sold, revenue, views, add-to-cart) for the tenant's currently published, non-archived dishes over a configurable trailing window (default 30 days), also enforcing `analytics.read` itself. Ranking (by quantity and, separately, by revenue) and topseller/low-performer classification are pure, unit-tested TypeScript logic (`packages/domain/src/analytics/dish-performance.ts`, `classifyDishPerformance()`) applied to those raw stats -- mirroring this repo's established "pure domain logic + DB aggregation query" split. A dish is never labeled "Low Performer" without a configurable minimum combined evidence threshold (views + add-to-cart + units sold); below that threshold it is labeled "insufficient data" instead, regardless of how low its sales are. **Instrumentation (updated 2026-10-09)**: when #31 shipped, nothing wrote `dish_view`/`add_to_cart` rows. Since ticket #120 (`20260906091000_dish_view_and_add_to_cart_analytics.sql`, `20260906130000_dish_views_batched_rpc_and_retention.sql`) the public menu and cart record them via the `record_dish_view(s)` / `record_add_to_cart_event` RPCs (consent-gated, deduplicated, HMAC'd IP; see `docs/development/architecture-overview.md`), so the counts reflect real opted-in visitors only and remain 0 where there is no consent or `IP_HASH_SECRET` is unset in production; `unitsSold`/`revenueCents` (derived from `order_items`) are independent of this. Admin UI: `apps/web/src/app/account/analytics/dishes` (two ranked tables -- by quantity and by revenue -- each row showing its full evidence basis, gated on `analytics.read`).
 
@@ -79,12 +79,12 @@ Ticket #58 (Epic 9 follow-up) adds `manual_sales_entries` -- a brand-new, struct
 
 ## Audit
 
-`audit_logs` (append-only, tenant-scoped, immutable — no UPDATE/DELETE from application code) and `analytics_events` (Grundgerüst only, no aggregation logic — that's Epic 9). Write-only via `recordAuditEvent()` in `packages/domain/src/audit`, which rejects secret-/payment-shaped metadata before it reaches the table. See `docs/security/threat-model.md`'s audit section and `supabase/migrations/20260801050000_audit_log_and_analytics_events_skeleton.sql`.
+`audit_logs` (append-only, tenant-scoped, immutable - no UPDATE/DELETE from application code) and `analytics_events` (Grundgerüst only, no aggregation logic - that's Epic 9). Write-only via `recordAuditEvent()` in `packages/domain/src/audit`, which rejects secret-/payment-shaped metadata before it reaches the table. See `docs/security/threat-model.md`'s audit section and `supabase/migrations/20260801050000_audit_log_and_analytics_events_skeleton.sql`.
 
 ## Cross-cutting rules
 
-- **Tenant ownership**: every tenant-scoped table has an explicit `tenant_id` column, even where it could technically be inferred through a join — see `docs/security/tenant-isolation.md`.
+- **Tenant ownership**: every tenant-scoped table has an explicit `tenant_id` column, even where it could technically be inferred through a join - see `docs/security/tenant-isolation.md`.
 - **Money**: integer minor units (cents), never floating point. Every monetary table has an explicit `currency` column.
 - **Order immutability**: `order_items`/`order_item_selections` store a purchase-time snapshot (name, price, tax, variant, extras) independent of the live `dishes`/`dish_variants` rows, so later menu edits never rewrite history -- implemented by ticket #21, see the "Ordering" section above and `supabase/migrations/20260804090000_orders_state_machine_and_checkout.sql`.
 - **Soft delete over hard delete**: menu entities that participate in historical orders are archived, not deleted, to preserve order integrity.
-- **Public data**: the public menu/restaurant-profile read path goes through deliberately scoped public queries — no table is broadly world-readable by default.
+- **Public data**: the public menu/restaurant-profile read path goes through deliberately scoped public queries - no table is broadly world-readable by default.

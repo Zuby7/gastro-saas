@@ -1,7 +1,7 @@
 {
   "ticket": "3",
   "cycle": 1,
-  "note": "Backfilled per-ticket review after cadence reverted to per-ticket-always (2026-08-01); originally only covered by the retired end-of-epic batch mode. Reviews only ticket #3's own remaining scope (config.toml, seed.sql, .env.example, migration-check.yml, CLI devDependency) — the tenant schema itself was superseded by #4's already-APPROVED migration.",
+  "note": "Backfilled per-ticket review after cadence reverted to per-ticket-always (2026-08-01); originally only covered by the retired end-of-epic batch mode. Reviews only ticket #3's own remaining scope (config.toml, seed.sql, .env.example, migration-check.yml, CLI devDependency) - the tenant schema itself was superseded by #4's already-APPROVED migration.",
   "verdict": "CHANGES_REQUESTED",
   "acceptance_criteria": [
     { "criterion": "supabase start läuft lokal", "status": "PASS" },
@@ -34,7 +34,7 @@
     {
       "severity": "high",
       "area": "CI enforcement",
-      "summary": "Migration Validation job (now also runs the tenant-isolation integration test) is NOT in main's required status checks — advisory only, a broken migration or failing RLS test can merge."
+      "summary": "Migration Validation job (now also runs the tenant-isolation integration test) is NOT in main's required status checks - advisory only, a broken migration or failing RLS test can merge."
     },
     {
       "severity": "medium",
@@ -44,7 +44,7 @@
     {
       "severity": "medium",
       "area": "toolchain reproducibility",
-      "summary": "CI installs supabase CLI 'latest' while packages/database is lockfile-pinned to 2.111.0 — can silently drift."
+      "summary": "CI installs supabase CLI 'latest' while packages/database is lockfile-pinned to 2.111.0 - can silently drift."
     },
     {
       "severity": "medium",
