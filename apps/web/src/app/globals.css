@@ -37,6 +37,34 @@
 
   /* Accent text (prices, totals, accent links): ember-700 fails AA on dark surfaces, so it swaps to ember-300 in dark mode (issue #159). */
   --accent-foreground: var(--color-ember-700);
+
+  /*
+   * Landing page gradient/glow helper tokens (issue #196). Built only from
+   * existing palette variables (color-mix over token colors), with dark-scheme
+   * variants below. Text-bearing gradients (header bar, CTA band) always keep
+   * light text on dark stops; see `app/page.a11y.test.ts` for the checked pairs.
+   */
+  --lp-muted: var(--color-neutral-600);
+  --lp-accent: var(--color-ember-700);
+  --lp-glare: color-mix(in srgb, var(--color-gold-200) 26%, transparent);
+  --lp-text-from: var(--color-brand-600);
+  --lp-text-to: var(--color-ember-500);
+  --lp-glow-brand: color-mix(in srgb, var(--color-brand-400) 26%, transparent);
+  --lp-glow-ember: color-mix(in srgb, var(--color-ember-300) 26%, transparent);
+  --lp-glow-gold: color-mix(in srgb, var(--color-gold-200) 34%, transparent);
+  --lp-glass: color-mix(in srgb, var(--surface) 72%, transparent);
+  --lp-glass-border: color-mix(in srgb, var(--foreground) 14%, transparent);
+  --lp-holo-1: var(--color-brand-400);
+  --lp-holo-2: var(--color-ember-300);
+  --lp-holo-3: var(--color-gold-200);
+  --lp-holo-4: var(--color-brand-200);
+  --lp-bar-from: var(--color-espresso-900);
+  --lp-bar-via: var(--color-espresso-800);
+  --lp-bar-to: var(--color-ember-700);
+  --lp-band-from: var(--color-brand-800);
+  --lp-band-via: var(--color-espresso-900);
+  --lp-band-to: var(--color-ember-700);
+  --lp-shadow: color-mix(in srgb, var(--color-espresso-900) 22%, transparent);
 }
 
 @theme inline {
@@ -49,6 +77,8 @@
   --color-surface-muted: var(--surface-muted);
   --color-danger-foreground: var(--danger-foreground);
   --color-accent-foreground: var(--accent-foreground);
+  --color-lp-muted: var(--lp-muted);
+  --color-lp-accent: var(--lp-accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-space-mono);
   --font-display: var(--font-roboto-slab);
@@ -78,6 +108,18 @@
     --surface-muted: var(--color-neutral-700);
     --danger-foreground: var(--color-danger-300);
     --accent-foreground: var(--color-ember-300);
+    --lp-muted: var(--color-neutral-200);
+    --lp-accent: var(--color-ember-200);
+    --lp-glare: color-mix(in srgb, var(--color-gold-200) 12%, transparent);
+    --lp-text-from: var(--color-brand-300);
+    --lp-text-to: var(--color-ember-300);
+    --lp-glow-brand: color-mix(in srgb, var(--color-brand-500) 24%, transparent);
+    --lp-glow-ember: color-mix(in srgb, var(--color-ember-500) 24%, transparent);
+    --lp-glow-gold: color-mix(in srgb, var(--color-gold-400) 20%, transparent);
+    --lp-holo-1: var(--color-brand-300);
+    --lp-holo-3: var(--color-gold-300);
+    --lp-holo-4: var(--color-brand-400);
+    --lp-shadow: color-mix(in srgb, var(--color-neutral-900) 70%, transparent);
   }
 }
 
