@@ -409,6 +409,31 @@ In manchen Anzeigen kann auch die Bezeichnung **Mitarbeiter** erscheinen. Das is
 
 Die Anwendung speichert **keine Kartendaten**. Die Summe berechnet immer das System. Sie wird nie vom Handy des Gastes übernommen.
 
+### PayPal verbinden
+
+> **Testmodus:** PayPal ist derzeit nur als **Test** vorgesehen. Es wird kein echtes Geld bewegt. Ob und wann es für den Echtbetrieb freigegeben wird, steht noch nicht fest.
+
+Gäste können auf Wunsch mit **PayPal** bezahlen. Das läuft nicht über Stripe, sondern über den Zahlungsdienst **Mollie**. Dafür braucht Ihr Restaurant:
+
+1. ein eigenes **Mollie-Konto** (Sie sind dort selbst der Vertragspartner, Mollie prüft Ihr Unternehmen),
+2. ein **PayPal-Geschäftskonto**,
+3. in Ihrem Mollie-Konto die Zahlungsmethode PayPal. Aktivieren Sie sie unter Einstellungen > Zahlungsmethoden > PayPal mit "Mit PayPal verbinden".
+
+**So geht's:**
+
+1. Auf der Seite **Zahlungen** im Kasten "PayPal über Mollie verbinden" auf **PayPal über Mollie verbinden** klicken. Das kann nur der Inhaber.
+2. Bei Mollie anmelden und der Anwendung die Freigabe erteilen.
+3. Zurück auf der Seite steht dort "Verbunden, PayPal aktiv". Steht dort "PayPal noch nicht aktiviert", aktivieren Sie PayPal im Mollie-Dashboard und klicken auf **PayPal-Status prüfen**.
+4. An der Kasse sehen Gäste dann die Auswahl "Karte, Klarna, Apple Pay und weitere" oder "PayPal".
+
+**Worauf achten:**
+
+- Das Geld geht direkt auf Ihr PayPal-Konto. Rückerstattungen und Rückbuchungen betreffen Sie als Händler.
+- Die Anwendung gilt eine Bestellung erst als bezahlt, wenn sie die Zahlung bei Mollie selbst nachgeprüft hat. Die Rückkehr des Gastes auf die Bestellseite genügt nicht.
+- Mit **Trennen** entfernen Sie die Verbindung jederzeit. PayPal erscheint dann nicht mehr an der Kasse.
+- Gäste, die mit PayPal zahlen, erhalten derzeit **keine Bestätigungs-E-Mail**, weil Mollie die E-Mail-Adresse nicht mitliefert. Der Bestellstatus und der Beleg funktionieren wie gewohnt.
+- Das ist keine Rechtsberatung. Lassen Sie die Bedingungen von Mollie und PayPal vor dem Echtbetrieb von einer Fachperson prüfen.
+
 ### Aktuell: Testmodus
 
 > **Wichtig:** Die Anwendung läuft derzeit **ausschließlich im Testmodus**. Gäste zahlen mit Test-Karten. Es wird **kein echtes Geld** bewegt und es gibt keine echten Auszahlungen. Die Seite Zahlungen zeigt das mit dem Hinweis "Test-Modus".

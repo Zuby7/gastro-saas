@@ -63,6 +63,8 @@ describe("cookie inventory matches the code", () => {
     }
     expect(writers.sort()).toEqual(
       [
+        "app/account/payments/mollie/callback/route.ts",
+        "app/account/payments/mollie/connect/route.ts",
         "app/r/[slug]/cookie-consent-banner.tsx",
         "lib/cart/cookie.ts",
         "lib/orders/cookie.ts",
@@ -94,7 +96,11 @@ describe("cookie inventory matches the code", () => {
 
 describe("platform cookie subset (#163)", () => {
   it("contains only the auth session and the consent cookie, never statistics", () => {
-    expect(PLATFORM_COOKIES.map((c) => c.name)).toEqual(["gastro_cookie_consent", "sb-*"]);
+    expect(PLATFORM_COOKIES.map((c) => c.name)).toEqual([
+      "gastro_cookie_consent",
+      "sb-*",
+      "gastro_mollie_oauth_nonce",
+    ]);
     expect(PLATFORM_COOKIES.every((c) => c.category === "necessary")).toBe(true);
   });
 });

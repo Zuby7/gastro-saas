@@ -4,6 +4,20 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { OnboardingButton } from "./onboarding-button";
+import { MollieCard } from "./mollie-card";
+
+const MOLLIE_FLASH_MESSAGES: Record<string, string> = {
+  connected: "Mollie wurde verbunden. PayPal ist aktiv und im Checkout verfügbar.",
+  connected_no_paypal:
+    "Mollie wurde verbunden, aber PayPal ist in Ihrem Mollie-Konto noch nicht aktiviert. Aktivieren Sie PayPal im Mollie-Dashboard und prüfen Sie den Status erneut.",
+  disconnected: "Die Verbindung wurde getrennt.",
+  forbidden: "Sie haben nicht die erforderliche Berechtigung, die PayPal-Verbindung zu ändern.",
+  unavailable: "PayPal über Mollie ist auf dieser Plattform noch nicht eingerichtet.",
+  denied: "Die Freigabe bei Mollie wurde abgebrochen. Es wurde nichts verbunden.",
+  invalid_state:
+    "Die Verbindungsanfrage ist abgelaufen oder ungültig. Bitte starten Sie die Verbindung erneut.",
+  failed: "Die Verbindung mit Mollie ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
+};
 
 interface PaymentAccountRow {
   status: "pending" | "restricted" | "enabled";
@@ -25,7 +39,11 @@ const STATUS_LABEL: Record<PaymentAccountRow["status"], string> = {
  * TEST MODE ONLY: the underlying Stripe calls (`lib/stripe/client.ts`)
  * hard-refuse a non-test-mode secret key.
  */
-export default async function PaymentsPage() {
+export default async function PaymentsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ mollie?: string }>;
+} = {}) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -80,6 +98,18 @@ export default async function PaymentsPage() {
       throw error;
     }
   }
+
+  // Issue #195: non-secret Mollie status via the SECURITY DEFINER RPC (the
+  // token table itself has no grants for the session client).
+  const { data: mollieRows } = await supabase.rpc("get_mollie_connection_status", {
+    p_tenant_id: membership.tenantId,
+  });
+  const mollieStatus = Array.isArray(mollieRows)
+    ? (mollieRows[0] as { status: string; paypal_enabled: boolean } | undefined)
+    : undefined;
+  const flashCode = (await searchParams)?.mollie;
+  // Fixed lookup: only known codes map to text, input is never reflected.
+  const flashMessage = flashCode ? (MOLLIE_FLASH_MESSAGES[flashCode] ?? null) : null;
 
   return (
     <main className="min-h-screen bg-surface-secondary">
@@ -146,6 +176,14 @@ export default async function PaymentsPage() {
             </p>
           )}
         </section>
+
+        <MollieCard
+          connected={Boolean(mollieStatus)}
+          needsReauth={mollieStatus?.status === "needs_reauth"}
+          paypalEnabled={Boolean(mollieStatus?.paypal_enabled)}
+          canConnect={canConnect}
+          flashMessage={flashMessage}
+        />
       </div>
     </main>
   );
