@@ -13,6 +13,11 @@ vi.mock("@/lib/orders/service", () => ({
   getOrderStatusByToken: (...args: unknown[]) => getOrderStatusByTokenMock(...args),
 }));
 
+const getPaidPaymentMethodLabelMock = vi.fn();
+vi.mock("@/lib/payments/payment-method-label", () => ({
+  getPaidPaymentMethodLabel: (...args: unknown[]) => getPaidPaymentMethodLabelMock(...args),
+}));
+
 vi.mock("@/lib/orders/token", () => ({
   hashOrderAccessToken: (token: string) => `hashed-${token}`,
 }));
@@ -66,9 +71,19 @@ const NOT_FOUND_COPY =
 beforeEach(() => {
   vi.clearAllMocks();
   getPublicMenuMock.mockResolvedValue({ tenant: { name: "Demo Restaurant" } });
+  getPaidPaymentMethodLabelMock.mockResolvedValue(null);
 });
 
 describe("ReceiptPage", () => {
+  it("labels a Mollie-paid order as PayPal (issue #195)", async () => {
+    getOrderStatusByTokenMock.mockResolvedValue(buildOrder());
+    getPaidPaymentMethodLabelMock.mockResolvedValue("PayPal");
+    await renderReceipt("demo", "valid-token");
+
+    expect(getPaidPaymentMethodLabelMock).toHaveBeenCalledWith("order-1");
+    expect(screen.getByText("Online bezahlt (PayPal)")).toBeInTheDocument();
+  });
+
   it("renders the receipt with server-side totals for a paid order", async () => {
     getOrderStatusByTokenMock.mockResolvedValue(buildOrder());
     await renderReceipt("demo", "valid-token");

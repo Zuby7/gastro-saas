@@ -24,6 +24,26 @@ vi.mock("./onboarding-button", () => ({
   OnboardingButton: ({ label }: { label: string }) => <button>{label}</button>,
 }));
 
+vi.mock("./mollie-card", () => ({
+  MollieCard: (props: {
+    connected: boolean;
+    needsReauth: boolean;
+    paypalEnabled: boolean;
+    canConnect: boolean;
+    flashMessage: string | null;
+  }) => (
+    <div
+      data-testid="mollie-card"
+      data-connected={String(props.connected)}
+      data-needs-reauth={String(props.needsReauth)}
+      data-paypal={String(props.paypalEnabled)}
+      data-can-connect={String(props.canConnect)}
+    >
+      {props.flashMessage}
+    </div>
+  ),
+}));
+
 interface AccountRow {
   status: "pending" | "restricted" | "enabled";
   charges_enabled: boolean;
@@ -36,6 +56,7 @@ function setup(options: {
   account?: AccountRow | null;
   denied?: string[];
   unexpectedError?: string;
+  mollie?: Array<{ status: string; paypal_enabled: boolean }>;
 }) {
   const membership =
     options.membership === undefined
@@ -54,7 +75,10 @@ function setup(options: {
       }),
     }),
   }));
-  rpcMock.mockImplementation(async (_fn: string, args: { p_permission_key: string }) => {
+  rpcMock.mockImplementation(async (fn: string, args: { p_permission_key: string }) => {
+    if (fn === "get_mollie_connection_status") {
+      return { data: options.mollie ?? [], error: null };
+    }
     if (options.unexpectedError === args.p_permission_key) {
       throw new Error("db down");
     }
@@ -64,9 +88,13 @@ function setup(options: {
   });
 }
 
-async function render(): Promise<string> {
+async function render(mollieFlash?: string): Promise<string> {
   const { default: PaymentsPage } = await import("./page");
-  return renderToStaticMarkup(await PaymentsPage());
+  return renderToStaticMarkup(
+    await PaymentsPage(
+      mollieFlash ? { searchParams: Promise.resolve({ mollie: mollieFlash }) } : {},
+    ),
+  );
 }
 
 beforeEach(() => {
@@ -163,5 +191,39 @@ describe("PaymentsPage", () => {
   it("rethrows non-permission errors from the payments.connect gate", async () => {
     setup({ unexpectedError: "payments.connect" });
     await expect(render()).rejects.toThrow("db down");
+  });
+
+  describe("Mollie / PayPal card (issue #195)", () => {
+    it("passes 'not connected' to the card when there is no Mollie row", async () => {
+      setup({ mollie: [] });
+      const html = await render();
+      expect(html).toContain('data-connected="false"');
+      expect(html).toContain('data-can-connect="true"');
+    });
+
+    it("passes the connected status, PayPal flag and re-auth flag", async () => {
+      setup({ mollie: [{ status: "connected", paypal_enabled: true }] });
+      const html = await render();
+      expect(html).toContain('data-connected="true"');
+      expect(html).toContain('data-paypal="true"');
+      expect(html).toContain('data-needs-reauth="false"');
+
+      setup({ mollie: [{ status: "needs_reauth", paypal_enabled: false }] });
+      expect(await render()).toContain('data-needs-reauth="true"');
+    });
+
+    it("passes canConnect=false for members without payments.connect", async () => {
+      setup({ denied: ["payments.connect"] });
+      expect(await render()).toContain('data-can-connect="false"');
+    });
+
+    it("maps only known flash codes to text and never reflects unknown input", async () => {
+      setup({});
+      expect(await render("connected_no_paypal")).toContain(
+        "PayPal ist in Ihrem Mollie-Konto noch nicht aktiviert",
+      );
+      const unknown = await render("<script>alert(1)</script>");
+      expect(unknown).not.toContain("script");
+    });
   });
 });

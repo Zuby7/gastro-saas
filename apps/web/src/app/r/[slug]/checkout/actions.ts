@@ -11,6 +11,8 @@ import { writeOrderAccessTokenCookie } from "@/lib/orders/cookie";
 import { CheckoutDomainError, createOrderFromCart } from "@/lib/orders/service";
 import { createOrderAccessToken, hashOrderAccessToken } from "@/lib/orders/token";
 import { createCheckoutSessionForOrder, isTenantChargeReady } from "@/lib/payments/service";
+import { createMolliePaymentForOrder } from "@/lib/payments/mollie-service";
+import { isTenantPaypalAvailable } from "@/lib/mollie/tokens";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { CheckoutSchema } from "./schemas";
 
@@ -35,6 +37,8 @@ export async function checkoutAction(
     tableIdentifier: formData.get("tableIdentifier") ?? "",
     customerNote: formData.get("customerNote") ?? "",
     acceptTerms: formData.get("acceptTerms") ?? "",
+    // Absent field (form without the radio group) means the default method.
+    paymentMethod: formData.get("paymentMethod") ?? "stripe",
   });
 
   if (!parsed.success) {
@@ -111,7 +115,19 @@ export async function checkoutAction(
     // again immediately before payment creation, and the DB-level
     // `ensure_payment_matches_order()` trigger re-checks it a third,
     // unbypassable time on INSERT.
-    if (!(await isTenantChargeReady(tenantId))) {
+    const paymentMethod = parsed.data.paymentMethod;
+
+    if (paymentMethod === "paypal") {
+      // Issue #195: PayPal (via the restaurant's own Mollie account) is only
+      // accepted when the SERVER sees a connected account with PayPal
+      // enabled -- the client-rendered radio is never authorization.
+      if (!(await isTenantPaypalAvailable(admin, tenantId))) {
+        return {
+          error:
+            "PayPal ist für dieses Restaurant derzeit nicht verfügbar. Bitte wählen Sie eine andere Zahlungsart.",
+        };
+      }
+    } else if (!(await isTenantChargeReady(tenantId))) {
       return {
         error:
           "Dieses Restaurant kann derzeit keine Kartenzahlungen entgegennehmen. Bitte versuchen Sie es später erneut.",
@@ -152,7 +168,9 @@ export async function checkoutAction(
     // renders whatever the order's real, webhook-driven status is,
     // regardless of whether the guest completed or abandoned Stripe
     // checkout.
-    const { checkoutUrl } = await createCheckoutSessionForOrder({
+    const createPayment =
+      paymentMethod === "paypal" ? createMolliePaymentForOrder : createCheckoutSessionForOrder;
+    const { checkoutUrl } = await createPayment({
       tenantId,
       tenantSlug,
       orderId: order.orderId,

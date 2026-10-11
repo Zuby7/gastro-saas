@@ -9,11 +9,21 @@ import { checkoutAction, type CheckoutFormState } from "./actions";
 interface CheckoutFormProps {
   tenantSlug: string;
   checkoutReady: boolean;
+  /**
+   * Issue #195: true only when the server found a connected Mollie account
+   * with PayPal enabled for this tenant. Display only -- the action
+   * re-validates the chosen method server-side.
+   */
+  paypalAvailable?: boolean;
 }
 
 const initialState: CheckoutFormState = {};
 
-export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
+export function CheckoutForm({
+  tenantSlug,
+  checkoutReady,
+  paypalAvailable = false,
+}: CheckoutFormProps) {
   // `tenantSlug` is bound server-side, not read from a client-editable form
   // field -- see the doc comment on `checkoutAction` in `./actions.ts`.
   const [state, formAction, isPending] = usePreservedFormAction(
@@ -21,6 +31,7 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
     initialState,
   );
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "table">("pickup");
+  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "paypal">("stripe");
 
   return (
     <form {...formAction} className="flex flex-col gap-6" noValidate>
@@ -198,18 +209,52 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
         glyphs, not brand logos, to sidestep trademark/brand-guideline
         concerns for Visa/Mastercard/Klarna marks.
       */}
+      {paypalAvailable ? (
+        <fieldset className="flex flex-col gap-3">
+          <legend className="text-sm font-semibold text-foreground">Zahlungsart</legend>
+          <label className="flex items-center gap-2 text-foreground">
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="stripe"
+              checked={paymentMethod === "stripe"}
+              onChange={() => setPaymentMethod("stripe")}
+              className="h-4 w-4 accent-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
+            />
+            Karte, Klarna, Apple Pay und weitere
+          </label>
+          <label className="flex items-center gap-2 text-foreground">
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="paypal"
+              checked={paymentMethod === "paypal"}
+              onChange={() => setPaymentMethod("paypal")}
+              className="h-4 w-4 accent-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600"
+            />
+            PayPal
+          </label>
+        </fieldset>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-foreground-secondary">
         <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span className="whitespace-nowrap">Sichere Zahlung über Stripe</span>
-        <span aria-hidden="true">·</span>
-        <span className="flex items-center gap-1.5">
-          <CreditCard className="h-4 w-4 shrink-0" aria-hidden="true" />
-          Kreditkarte
-        </span>
-        <span aria-hidden="true">·</span>
-        <span>Klarna</span>
-        <span aria-hidden="true">·</span>
-        <span>weitere Zahlarten</span>
+        {paymentMethod === "paypal" ? (
+          <span className="whitespace-nowrap">Sichere Zahlung über PayPal (Mollie)</span>
+        ) : (
+          <>
+            <span className="whitespace-nowrap">Sichere Zahlung über Stripe</span>
+            <span aria-hidden="true">·</span>
+            <span className="flex items-center gap-1.5">
+              <CreditCard className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Kreditkarte
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>Klarna</span>
+            <span aria-hidden="true">·</span>
+            <span>weitere Zahlarten</span>
+          </>
+        )}
       </div>
 
       <button

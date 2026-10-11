@@ -61,7 +61,7 @@ async function fetchChargeReadyAccount(tenantId: string): Promise<{ stripeAccoun
  * the order's own guarded total (see the payments migration's header for
  * the same rationale, enforced a second time at the DB layer).
  */
-async function fetchOrderPaymentSnapshot(
+export async function fetchOrderPaymentSnapshot(
   tenantId: string,
   orderId: string,
 ): Promise<OrderPaymentSnapshot> {
