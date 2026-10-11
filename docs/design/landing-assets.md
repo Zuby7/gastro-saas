@@ -2,27 +2,26 @@
 
 The marketing landing page (`apps/web/src/app/page.tsx`, issue #196) shows
 product screenshots from `apps/web/public/landing/`. Files are named by role, so
-swapping an asset later means replacing the file with the same name and size
+swapping an asset later means replacing the file with the same name (phone and feature files are exported at 2x for sharpness, the img tags carry the CSS size)
 (keep width/height, because the `<img>` tags carry fixed dimensions to avoid
 layout shift). Plain `<img>` is used on purpose (Cloudflare Workers deployment,
 no `next/image`).
 
-| Role file (`public/landing/`) | Size (px) | Current source (`docs/onboarding/img/`) | Used in                          |
-| ----------------------------- | --------- | --------------------------------------- | -------------------------------- |
-| `hero-phone-menu.webp`        | 390x844   | `21-gast-speisekarte.png` (top crop)    | Hero, center phone               |
-| `hero-phone-cart.webp`        | 390x844   | `22-gast-warenkorb.png` (top crop)      | Hero, left phone                 |
-| `hero-phone-status.webp`      | 390x844   | `24-gast-bestellstatus.png` (top crop)  | Hero, right phone                |
-| `showcase-dashboard.webp`     | 1280x800  | `03-bestellungen.png`                   | Showcase, large dashboard mockup |
-| `showcase-analytics.webp`     | 640x400   | `05-analytics.png`                      | Showcase, floating holo card     |
-| `feature-menu.webp`           | 390x520   | `21-gast-speisekarte.png` (crop)        | Feature "Speisekarte"            |
-| `feature-orders.webp`         | 390x520   | `03-bestellungen.png` (left crop)       | Feature "Bestellung"             |
-| `feature-checkout.webp`       | 390x520   | `23-gast-kasse.png` (top crop)          | Feature "Zahlung"                |
-| `feature-analytics.webp`      | 390x520   | `05-analytics.png` (center crop)        | Feature "Auswertung"             |
+| Role file (`public/landing/`) | Size (px) | Current source (`docs/landing-shots/`) | Used in                          |
+| ----------------------------- | --------- | -------------------------------------- | -------------------------------- |
+| `hero-phone-menu.webp`        | 390x844   | `menu.png` (top crop)                  | Hero, center phone               |
+| `hero-phone-cart.webp`        | 390x844   | `cart.png` (top crop)                  | Hero, left phone                 |
+| `hero-phone-status.webp`      | 390x844   | `status.png` (top crop)                | Hero, right phone                |
+| `showcase-dashboard.webp`     | 1280x800  | `dashboard.png`                        | Showcase, large dashboard mockup |
+| `showcase-analytics.webp`     | 640x400   | `analytics.png`                        | Showcase, floating holo card     |
+| `feature-menu.webp`           | 390x520   | `menu.png` (crop)                      | Feature "Speisekarte"            |
+| `feature-orders.webp`         | 390x520   | `dashboard.png` (left crop)            | Feature "Bestellung"             |
+| `feature-checkout.webp`       | 390x520   | `checkout.png` (top crop)              | Feature "Zahlung"                |
+| `feature-analytics.webp`      | 390x520   | `analytics.png` (center crop)          | Feature "Auswertung"             |
 
 Notes:
 
-- WebP, quality about 80, generated with `sharp`. Cleaner screenshots from
-  `docs/landing-shots/` can replace these later; re-export to the same sizes.
+- WebP, quality about 80, generated with `sharp` from the clean demo screenshots in `docs/landing-shots/` (demo photos from Unsplash, neutral demo names; the cancelled-orders column of the dashboard is hidden in the screenshot only).
 - Do not use a checkout crop that shows payment-method names the product does
   not offer (the current `feature-checkout.webp` is cropped above them).
 - Alt texts and the file list live in `apps/web/src/app/_landing/content.ts`
