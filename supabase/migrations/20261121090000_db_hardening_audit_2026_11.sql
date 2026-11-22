@@ -389,7 +389,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if current_setting('role', true) in ('authenticated', 'anon') then
+  if current_setting('role', true) in ('authenticated', 'anon', 'service_role') then
     new.status := 'draft';
     new.published_at := null;
     new.published_by_user_id := null;
@@ -399,7 +399,7 @@ end;
 $$;
 
 comment on function guard_menu_versions_insert() is
-  'Forces status = draft and published_at / published_by_user_id = null on INSERT for authenticated/anon. service_role and privileged connections are not restricted (same convention as guard_menu_versions_status_change()).';
+  'Forces status = draft and published_at / published_by_user_id = null on INSERT for authenticated, anon and service_role (same app-facing role set as guard_menu_versions_status_change()). Privileged connections (current_setting(''role'') = ''none'') are not restricted.';
 
 drop trigger if exists menu_versions_force_draft_on_insert on menu_versions;
 create trigger menu_versions_force_draft_on_insert

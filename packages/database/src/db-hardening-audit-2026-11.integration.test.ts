@@ -552,6 +552,8 @@ describe.skipIf(!dbAvailable)("database hardening after audit 2026-11 (issue #20
       "get_extras_performance_stats",
       "get_public_legal_page",
       "get_public_menu",
+      // Added by PR #201 (Mollie); the allow-list may contain names that do not exist (yet).
+      "get_mollie_connection_status",
       "get_tenant_order_payment_statuses",
       "get_trend_period_stats",
       "has_tenant_permission",
@@ -631,6 +633,46 @@ describe.skipIf(!dbAvailable)("database hardening after audit 2026-11 (issue #20
         (name) => !AUTHENTICATED_ALLOW.includes(name),
       );
       expect(unexpected).toEqual([]);
+    });
+
+    it("RPCs the app calls with the signed-in user session remain executable by authenticated", async () => {
+      // Derived from the `.rpc(` call sites in apps/web that use the
+      // user-session client (not the admin client).
+      const userSessionRpcs = [
+        "accept_invitation",
+        "commit_sales_import_batch",
+        "create_initial_draft_menu_version",
+        "create_integration_account",
+        "create_invitation",
+        "create_tenant_with_owner",
+        "export_tenant_data",
+        "get_analytics_dashboard_summary",
+        "get_dish_performance_stats",
+        "get_extras_performance_stats",
+        "get_tenant_order_payment_statuses",
+        "get_trend_period_stats",
+        "has_tenant_permission",
+        "list_integration_accounts",
+        "list_integration_sync_jobs",
+        "list_tenant_ratings_for_moderation",
+        "mark_invitation_email_sent",
+        "moderate_rating",
+        "process_tenant_data_deletion_request",
+        "publish_menu_version",
+        "purge_expired_analytics_events",
+        "record_audit_event",
+        "record_integration_sync_job",
+        "require_tenant_permission",
+        "run_menu_publish_checks",
+        "set_dish_availability",
+        "set_dish_variant_availability",
+        "set_option_availability",
+        "swap_category_sort_order",
+        "transition_order_status",
+      ];
+      const executable = await executableBy("authenticated");
+      const missing = userSessionRpcs.filter((name) => !executable.includes(name));
+      expect(missing).toEqual([]);
     });
 
     it("service_role-only functions are not executable by anon or authenticated", async () => {

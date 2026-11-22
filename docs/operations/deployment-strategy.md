@@ -126,7 +126,21 @@ Runbook:
 
 ## Apply migration 2026-11 on the hosted project (issue #205)
 
-The hosted Supabase project is not migrated automatically. Run `supabase/migrations/20261121090000_db_hardening_audit_2026_11.sql` in the Supabase SQL Editor BEFORE deploying app code that depends on it (audit rows written through `record_audit_event()`, re-scoped order index, clone-on-draft). The file is additive and idempotent, so re-running it is safe; its header contains the rollback note.
+The hosted Supabase project is not migrated automatically. Recommended order:
+
+1. Deploy the app FIRST. `recordMenuAdminAuditEvent()` calls `record_audit_event()` and falls back to the former direct `audit_logs` insert while the RPC does not exist yet (PostgREST `PGRST202` / Postgres `42883`), so audit logging keeps working in both states.
+2. Run `supabase/migrations/20261121090000_db_hardening_audit_2026_11.sql` once, as a single batch, in the Supabase SQL Editor. The file is additive and idempotent; its header contains the rollback note.
+3. Record the migration so a later `supabase db push` does not re-apply it:
+
+```sql
+insert into supabase_migrations.schema_migrations (version, name)
+values ('20261121090000', 'db_hardening_audit_2026_11')
+on conflict (version) do nothing;
+```
+
+(The table has the columns `version text primary key`, `statements text[]`, `name text`; `statements` may stay null.)
+
+Note for PR #201 (Mollie): its migration `20260910090000` sorts before `20261121090000`. It must get a later timestamp before it is merged, otherwise `db push` would see an unapplied migration older than the latest applied one.
 
 Verification after running (only the two public guest RPCs may be listed, expected `get_public_legal_page` and `get_public_menu`):
 
@@ -134,4 +148,4 @@ Verification after running (only the two public guest RPCs may be listed, expect
 select proname from pg_proc where pronamespace='public'::regnamespace and has_function_privilege('anon', oid, 'execute') order by 1;
 ```
 
-Follow-up required in app code (not part of this migration): `apps/web/src/lib/audit/record-menu-admin-audit-event.ts` inserts into `audit_logs` with the signed-in user session; that direct INSERT is now denied, so it must switch to `supabase.rpc("record_audit_event", ...)`. Until then those audit writes fail (they are fire-and-forget, mutations keep working, audit rows are lost).
+After the migration the transitional fallback in `apps/web/src/lib/audit/record-menu-admin-audit-event.ts` is never reached (direct INSERT into `audit_logs` is denied for `authenticated`); it can be removed in a later cleanup once the hosted project is migrated. `export_tenant_data()` is now Owner-only (`tenant.data.delete`), matching the export route.
