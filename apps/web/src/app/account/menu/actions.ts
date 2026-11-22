@@ -171,6 +171,9 @@ export async function moveCategoryAction(
     .select("id, sort_order")
     .eq("menu_version_id", current.menu_version_id)
     .eq("tenant_id", tenantId)
+    // Archived categories are not shown, so they must not count as a
+    // neighbour: swapping with one made the up/down buttons look dead.
+    .is("archived_at", null)
     .order("sort_order", { ascending: true })
     .returns<{ id: string; sort_order: number }[]>();
 
@@ -247,7 +250,7 @@ export async function createDishAction(
     categoryId: formData.get("categoryId"),
     name: formData.get("name"),
     description: formData.get("description") ?? "",
-    priceCents: formData.get("priceCents") ?? "",
+    priceEuro: formData.get("priceEuro") ?? "",
   });
 
   if (!parsed.success) {
@@ -284,7 +287,7 @@ export async function createDishAction(
       category_id: parsed.data.categoryId,
       name: parsed.data.name,
       description: parsed.data.description,
-      price_cents: parsed.data.priceCents ? Number(parsed.data.priceCents) : null,
+      price_cents: parsed.data.priceEuro,
     })
     .select("id")
     .single<{ id: string }>();

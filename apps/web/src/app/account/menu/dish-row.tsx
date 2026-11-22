@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { formatCentsAsEuro } from "@/lib/money/euro";
 import { useActionState } from "react";
+import { ArchiveButton } from "./archive-button";
 import { archiveDishAction, type MenuActionState } from "./actions";
 
 const initialState: MenuActionState = {};
@@ -26,7 +28,7 @@ export function DishRow({ id, name, priceCents, allergenReviewed }: DishRowProps
           {name}
         </Link>
         <span className="ml-2 text-sm text-foreground-secondary">
-          {priceCents !== null ? `${(priceCents / 100).toFixed(2)} €` : "kein Grundpreis"}
+          {priceCents !== null ? `${formatCentsAsEuro(priceCents)} €` : "kein Grundpreis"}
         </span>
         {!allergenReviewed ? (
           <span className="ml-2 rounded-md border border-warning-500 px-1.5 py-0.5 text-xs text-warning-600">
@@ -36,12 +38,7 @@ export function DishRow({ id, name, priceCents, allergenReviewed }: DishRowProps
       </div>
       <form action={formAction}>
         <input type="hidden" name="dishId" value={id} />
-        <button
-          type="submit"
-          className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-foreground"
-        >
-          Archivieren
-        </button>
+        <ArchiveButton itemLabel={name} />
       </form>
       {state.error ? (
         <span role="alert" className="w-full text-sm text-danger-foreground">

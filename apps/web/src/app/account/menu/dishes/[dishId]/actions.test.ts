@@ -113,7 +113,7 @@ describe("updateDishBasicsAction", () => {
     fd.set("dishId", "dish-1");
     fd.set("name", "Margherita");
     fd.set("description", "");
-    fd.set("priceCents", "900");
+    fd.set("priceEuro", "9,00");
 
     const { updateDishBasicsAction } = await import("./actions");
     const result = await updateDishBasicsAction({}, fd);
@@ -143,7 +143,7 @@ describe("createVariantAction", () => {
     const fd = new FormData();
     fd.set("dishId", "dish-1");
     fd.set("name", "Groß");
-    fd.set("priceCents", "1200");
+    fd.set("priceEuro", "12,50");
 
     const { createVariantAction } = await import("./actions");
     const result = await createVariantAction({}, fd);
@@ -152,8 +152,68 @@ describe("createVariantAction", () => {
     expect(insertedRow).toMatchObject({
       tenant_id: "tenant-1",
       dish_id: "dish-1",
-      price_cents: 1200,
+      price_cents: 1250,
     });
+  });
+});
+
+describe("createVariantAction price validation", () => {
+  it.each(["", "abc", "-1", "12,505"])(
+    "rejects the invalid euro price %j with a priceEuro field error",
+    async (price) => {
+      allowPermission();
+      const fd = new FormData();
+      fd.set("dishId", "dish-1");
+      fd.set("name", "Groß");
+      fd.set("priceEuro", price);
+
+      const { createVariantAction } = await import("./actions");
+      const result = await createVariantAction({}, fd);
+
+      expect(result.fieldErrors?.priceEuro).toBeDefined();
+      expect(fromMock).not.toHaveBeenCalledWith("dish_variants");
+    },
+  );
+});
+
+describe("createOptionAction surcharge", () => {
+  const GROUP_ID = "22222222-2222-4222-8222-222222222222";
+
+  async function run(delta: string) {
+    allowPermission();
+    let insertedRow: Record<string, unknown> | undefined;
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") return membershipTable();
+      if (table === "options") {
+        return {
+          insert: async (row: Record<string, unknown>) => {
+            insertedRow = row;
+            return { error: null };
+          },
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("optionGroupId", GROUP_ID);
+    fd.set("name", "Extra Käse");
+    fd.set("priceDeltaEuro", delta);
+    const { createOptionAction } = await import("./actions");
+    const result = await createOptionAction({}, fd);
+    return { result, insertedRow };
+  }
+
+  it("converts the euro surcharge to integer cents, empty means zero", async () => {
+    expect((await run("1,50")).insertedRow).toMatchObject({ price_delta_cents: 150 });
+    expect((await run("")).insertedRow).toMatchObject({ price_delta_cents: 0 });
+    expect((await run("-0,50")).insertedRow).toMatchObject({ price_delta_cents: -50 });
+  });
+
+  it("returns a field error for an unparseable surcharge", async () => {
+    const { result, insertedRow } = await run("1,505");
+    expect(result.fieldErrors?.priceDeltaEuro).toBeDefined();
+    expect(insertedRow).toBeUndefined();
   });
 });
 

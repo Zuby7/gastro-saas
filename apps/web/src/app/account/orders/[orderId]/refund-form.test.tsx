@@ -14,6 +14,15 @@ vi.mock("./actions", () => ({
  * the IDENTICAL `requestToken` both times, otherwise the server-side unique
  * index on `requestToken` never catches the duplicate.
  */
+describe("RefundForm euro input", () => {
+  it("labels the field in euros and pre-fills the remaining amount as a euro string", () => {
+    const { container } = render(<RefundForm orderId="order-1" remainingRefundableCents={1850} />);
+    expect(container.textContent).toContain("Betrag (€, max. 18,50)");
+    const input = container.querySelector('input[name="amountEuro"]') as HTMLInputElement;
+    expect(input.value).toBe("18,50");
+  });
+});
+
 describe("RefundForm request idempotency", () => {
   it("submits the identical requestToken on a rapid double-submit before isPending settles", async () => {
     const { container } = render(<RefundForm orderId="order-1" remainingRefundableCents={1000} />);

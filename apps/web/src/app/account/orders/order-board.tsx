@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { ORDER_STATUS_TRANSITIONS, type OrderStatus } from "@gastro-saas/domain";
 import {
@@ -113,16 +114,25 @@ export function OrderBoard({ initialOrders, initialHasMore, canManageOrders }: O
       setTransitionError(null);
       setPendingOrderId(orderId);
       startTransition(async () => {
-        const result = await transitionOrderStatusAction(orderId, toStatus);
-        setPendingOrderId(null);
-        if (result.error) {
-          setTransitionError(result.error);
-          return;
+        try {
+          const result = await transitionOrderStatusAction(orderId, toStatus);
+          if (result.error) {
+            setTransitionError(result.error);
+            return;
+          }
+          setAnnouncement(
+            `Bestellung ${orderId} ist jetzt "${staffOrderStatusColumnLabel(toStatus)}".`,
+          );
+          await refresh();
+        } catch {
+          // Never surface raw error text; the server action returns German
+          // messages itself, so a throw here is a network/runtime failure.
+          setTransitionError(
+            "Der Bestellstatus konnte nicht geändert werden. Bitte versuchen Sie es erneut.",
+          );
+        } finally {
+          setPendingOrderId(null);
         }
-        setAnnouncement(
-          `Bestellung ${orderId} ist jetzt "${staffOrderStatusColumnLabel(toStatus)}".`,
-        );
-        await refresh();
       });
     },
     [refresh],
@@ -236,6 +246,14 @@ function OrderColumn({
               <span className="w-fit rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-foreground">
                 {paymentStatusLabel(order.paymentStatus)}
               </span>
+
+              <Link
+                href={`/account/orders/${order.id}`}
+                aria-label={`Details und Erstattung zur Bestellung von ${order.customerName}`}
+                className="w-fit text-sm font-medium text-link-foreground underline hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
+              >
+                Details und Erstattung
+              </Link>
 
               {canManageOrders && nextForwardStatuses(order.status).length > 0 ? (
                 <div className="mt-1 flex flex-wrap gap-2">

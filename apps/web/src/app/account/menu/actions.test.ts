@@ -49,7 +49,7 @@ function dishFormData(overrides: Partial<Record<string, string>> = {}): FormData
   fd.set("categoryId", overrides.categoryId ?? "11111111-1111-4111-8111-111111111111");
   fd.set("name", overrides.name ?? "Margherita");
   fd.set("description", overrides.description ?? "");
-  fd.set("priceCents", overrides.priceCents ?? "900");
+  fd.set("priceEuro", overrides.priceEuro ?? "9,00");
   return fd;
 }
 
@@ -137,6 +137,128 @@ describe("createDishAction", () => {
 
     expect(result.error).toContain("nicht die erforderliche Berechtigung");
     expect(fromMock).not.toHaveBeenCalledWith("dishes");
+  });
+});
+
+describe("createDishAction euro price", () => {
+  const CATEGORY_ID = "11111111-1111-4111-8111-111111111111";
+
+  function allowAndCapture() {
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "require_tenant_permission") return { data: null, error: null };
+      if (fn === "create_initial_draft_menu_version") return { data: "draft-1", error: null };
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+    const captured: { row?: Record<string, unknown> } = {};
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") return membershipTable();
+      if (table === "dishes") {
+        return {
+          insert: (row: Record<string, unknown>) => {
+            captured.row = row;
+            return {
+              select: () => ({ single: async () => ({ data: { id: "d1" }, error: null }) }),
+            };
+          },
+        };
+      }
+      if (table === "menu_admin_audit_events" || table === "audit_events") {
+        return { insert: async () => ({ error: null }) };
+      }
+      return { insert: async () => ({ error: null }) };
+    });
+    getUserMock.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    return captured;
+  }
+
+  it.each([
+    ["12,50", 1250],
+    ["12.5", 1250],
+    ["12", 1200],
+    ["", null],
+  ])("stores euro input %j as %s cents", async (input, cents) => {
+    const captured = allowAndCapture();
+    const { createDishAction } = await import("./actions");
+    const result = await createDishAction(
+      {},
+      dishFormData({ categoryId: CATEGORY_ID, priceEuro: input }),
+    );
+
+    expect(result.success).toBeDefined();
+    expect(captured.row).toMatchObject({ price_cents: cents });
+  });
+
+  it("returns a priceEuro field error for too many decimals and does not insert", async () => {
+    const captured = allowAndCapture();
+    const { createDishAction } = await import("./actions");
+    const result = await createDishAction(
+      {},
+      dishFormData({ categoryId: CATEGORY_ID, priceEuro: "12,505" }),
+    );
+
+    expect(result.fieldErrors?.priceEuro).toBeDefined();
+    expect(captured.row).toBeUndefined();
+  });
+});
+
+describe("moveCategoryAction", () => {
+  it("ignores archived categories when picking the neighbour", async () => {
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "require_tenant_permission") return { data: null, error: null };
+      if (fn === "swap_category_sort_order") return { data: null, error: null };
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+    const isMock = vi.fn();
+    fromMock.mockImplementation((table: string) => {
+      if (table === "tenant_memberships") return membershipTable();
+      if (table === "categories") {
+        return {
+          select: () => ({
+            eq: (firstColumn: string) => ({
+              eq: () =>
+                firstColumn === "id"
+                  ? {
+                      maybeSingle: async () => ({
+                        data: { id: "c2", menu_version_id: "v1", sort_order: 2 },
+                        error: null,
+                      }),
+                    }
+                  : {
+                      is: (...args: unknown[]) => {
+                        isMock(...args);
+                        return {
+                          order: () => ({
+                            returns: async () => ({
+                              // The query already excludes the archived row, so
+                              // the previous visible sibling is c1.
+                              data: [
+                                { id: "c1", sort_order: 1 },
+                                { id: "c2", sort_order: 2 },
+                              ],
+                            }),
+                          }),
+                        };
+                      },
+                    },
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const fd = new FormData();
+    fd.set("categoryId", "c2");
+    fd.set("direction", "up");
+    const { moveCategoryAction } = await import("./actions");
+    const result = await moveCategoryAction({}, fd);
+
+    expect(isMock).toHaveBeenCalledWith("archived_at", null);
+    expect(rpcMock).toHaveBeenCalledWith("swap_category_sort_order", {
+      p_category_id: "c2",
+      p_neighbor_id: "c1",
+    });
+    expect(result.success).toBeDefined();
   });
 });
 

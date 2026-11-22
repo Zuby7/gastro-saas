@@ -1,6 +1,7 @@
 "use client";
 
 import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+import { formatCentsAsEuro } from "@/lib/money/euro";
 import { useEffect, useState } from "react";
 import { issueRefundAction, type RefundActionState } from "./actions";
 
@@ -66,22 +67,24 @@ export function RefundForm({
 
       <div className="flex flex-col gap-1">
         <label htmlFor="refund-amount" className="text-sm font-medium text-foreground">
-          Betrag (in Cent, max. {remainingRefundableCents})
+          Betrag (€, max. {formatCentsAsEuro(remainingRefundableCents)})
         </label>
         <input
           id="refund-amount"
-          name="amountCents"
+          name="amountEuro"
           type="text"
-          inputMode="numeric"
+          inputMode="decimal"
           required
-          defaultValue={remainingRefundableCents > 0 ? String(remainingRefundableCents) : undefined}
-          aria-invalid={state.fieldErrors?.amountCents ? true : undefined}
-          aria-describedby={state.fieldErrors?.amountCents ? "refund-amount-error" : undefined}
+          defaultValue={
+            remainingRefundableCents > 0 ? formatCentsAsEuro(remainingRefundableCents) : undefined
+          }
+          aria-invalid={state.fieldErrors?.amountEuro ? true : undefined}
+          aria-describedby={state.fieldErrors?.amountEuro ? "refund-amount-error" : undefined}
           className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
         />
-        {state.fieldErrors?.amountCents ? (
+        {state.fieldErrors?.amountEuro ? (
           <p id="refund-amount-error" role="alert" className="text-sm text-danger-foreground">
-            {state.fieldErrors.amountCents}
+            {state.fieldErrors.amountEuro}
           </p>
         ) : null}
       </div>

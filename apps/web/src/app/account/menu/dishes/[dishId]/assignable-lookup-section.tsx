@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  FieldError,
+  FormFeedback,
+  fieldErrorProps,
+  useDismissOnEdit,
+} from "@/lib/forms/field-feedback";
 import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { useActionState } from "react";
 import { createLookupValueAction, toggleAssignmentAction, type DishActionState } from "./actions";
@@ -40,6 +46,8 @@ export function AssignableLookupSection({
     initialState,
   );
 
+  const { dismissed, onEdit } = useDismissOnEdit(createState);
+
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-surface p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">{heading}</h2>
@@ -79,7 +87,12 @@ export function AssignableLookupSection({
         </p>
       ) : null}
 
-      <form {...createFormAction} className="flex flex-wrap items-end gap-2" noValidate>
+      <form
+        {...createFormAction}
+        onInput={onEdit}
+        className="flex flex-wrap items-end gap-2"
+        noValidate
+      >
         <input type="hidden" name="dishId" value={dishId} />
         <input type="hidden" name="entity" value={entity} />
         <div className="flex flex-col gap-1">
@@ -90,8 +103,10 @@ export function AssignableLookupSection({
             id={`new-${entity}-name`}
             name="name"
             required
+            {...fieldErrorProps(createState, "name", `new-${entity}-name-error`)}
             className="rounded-md border border-neutral-300 px-2 py-1 text-foreground"
           />
+          <FieldError id={`new-${entity}-name-error`} state={createState} name="name" />
         </div>
         <button
           type="submit"
@@ -100,12 +115,8 @@ export function AssignableLookupSection({
         >
           {isCreatePending ? "Wird angelegt…" : "Anlegen"}
         </button>
+        <FormFeedback state={createState} dismissed={dismissed} />
       </form>
-      {createState.error ? (
-        <p role="alert" className="text-sm text-danger-foreground">
-          {createState.error}
-        </p>
-      ) : null}
     </section>
   );
 }

@@ -8,6 +8,8 @@ import { reserveAndCheckRateLimit } from "@/lib/auth/rate-limit";
 import { getClientIp } from "@/lib/auth/client-ip";
 import { RegisterSchema } from "@/lib/auth/schemas";
 import { padToFloor } from "@/lib/timing/floor";
+import { isTenantSlugTaken } from "@/lib/tenant/slug-availability";
+import { ACCOUNT_NOTICE_PARAM } from "@/lib/tenant/account-notices";
 
 /**
  * Issue #204: one message for "new address, confirmation mail sent" and
@@ -108,6 +110,21 @@ export async function registerAction(
     };
   }
 
+  // Check the web address BEFORE signUp: otherwise a slug conflict happens
+  // after the auth user exists, the user fixes the slug, resubmits and then
+  // hits the (intentionally neutral) "already registered" answer, a dead end.
+  // This says nothing about the e-mail address, so it keeps the enumeration
+  // neutrality; the RPC's unique constraint below stays the race backstop.
+  if (await isTenantSlugTaken(admin, tenantSlug)) {
+    await padToFloor(startedAt, REGISTER_RESPONSE_FLOOR_MS);
+    return {
+      error: "Bitte korrigieren Sie die markierten Felder.",
+      fieldErrors: {
+        tenantSlug: "Diese Web-Adresse ist bereits vergeben. Bitte wählen Sie eine andere.",
+      },
+    };
+  }
+
   const supabase = await createSupabaseServerClient();
   // Ticket #60: carry the tenant name/slug through Supabase's email
   // confirmation flow via `user_metadata` (set here through signUp's
@@ -162,16 +179,16 @@ export async function registerAction(
   });
 
   if (rpcError) {
+    // The auth user and session already exist, so an error message here would
+    // strand the user in a loop (resubmitting hits "already registered").
+    // Hand over to /account, whose "create your restaurant" form is prefilled
+    // from the user_metadata stored at signUp and explains what happened.
     const slugTaken =
       rpcError.code === "23505" || rpcError.message.toLowerCase().includes("duplicate");
-    return {
-      error: slugTaken
-        ? "Diese Web-Adresse ist bereits vergeben. Bitte wählen Sie eine andere."
-        : "Ihr Konto wurde erstellt, aber Ihr Restaurant konnte nicht angelegt werden. Bitte melden Sie sich an, um es über Ihr Konto erneut zu versuchen.",
-      fieldErrors: slugTaken
-        ? { tenantSlug: "Diese Web-Adresse ist bereits vergeben." }
-        : undefined,
-    };
+    await rateLimitStore.markSucceeded(attemptId);
+    redirect(
+      `/account?${ACCOUNT_NOTICE_PARAM}=${slugTaken ? "tenant-slug-taken" : "tenant-create-failed"}`,
+    );
   }
 
   await rateLimitStore.markSucceeded(attemptId);

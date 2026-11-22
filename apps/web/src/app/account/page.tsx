@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { roleLabel } from "@/lib/auth/role-labels";
+import { ACCOUNT_NOTICE_PARAM, accountNoticeMessage } from "@/lib/tenant/account-notices";
 import { logoutAction } from "./actions";
 import { CreateTenantForm } from "./create-tenant-form";
 import { InviteMemberForm } from "./invite-member-form";
@@ -32,7 +33,12 @@ interface RoleRow {
  * deferred to first login) renders the "create your restaurant" fallback
  * instead of the normal welcome content.
  */
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+} = {}) {
+  const notice = accountNoticeMessage((await searchParams)?.[ACCOUNT_NOTICE_PARAM]);
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -87,6 +93,15 @@ export default async function AccountPage() {
             ) : null}
           </dl>
         </section>
+
+        {!membership && notice ? (
+          <p
+            role="status"
+            className="rounded-md border border-warning-500 bg-warning-500/10 p-3 text-sm text-foreground"
+          >
+            {notice}
+          </p>
+        ) : null}
 
         {!membership ? (
           <CreateTenantForm
