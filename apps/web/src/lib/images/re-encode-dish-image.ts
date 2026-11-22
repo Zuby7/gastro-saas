@@ -35,7 +35,7 @@
 import { PhotonImage, resize, SamplingFilter } from "@cf-wasm/photon";
 import { readImageDimensionsFromHeader } from "./image-header-dimensions";
 
-export const MAX_DIMENSION_PX = 1600;
+export const MAX_DIMENSION_PX = 1200;
 export const JPEG_QUALITY = 82;
 
 /**

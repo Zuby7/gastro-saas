@@ -1,6 +1,7 @@
+import { Blob } from "node:buffer";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const createSignedUrlMock = vi.fn();
+const downloadMock = vi.fn();
 const maybeSingleMock = vi.fn();
 
 // Chainable query builder mock mirroring the subset of the supabase-js
@@ -23,7 +24,7 @@ vi.mock("@/lib/supabase/admin", () => ({
     storage: {
       from: (bucket: string) => {
         expect(bucket).toBe("dish-media");
-        return { createSignedUrl: createSignedUrlMock };
+        return { download: downloadMock };
       },
     },
   }),
@@ -31,20 +32,22 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 describe("GET /media/[...path]", () => {
   beforeEach(() => {
-    createSignedUrlMock.mockReset();
+    downloadMock.mockReset();
     maybeSingleMock.mockReset();
   });
 
-  it("redirects to a short-lived signed URL for a published dish's media", async () => {
-    maybeSingleMock.mockResolvedValue({
-      data: {
-        id: "asset-1",
-        dishes: { id: "dish-1", archived_at: null, menu_versions: { status: "published" } },
-      },
-      error: null,
-    });
-    createSignedUrlMock.mockResolvedValue({
-      data: { signedUrl: "https://storage.example.test/signed/dish.jpg?token=abc" },
+  const publishedAsset = {
+    data: {
+      id: "asset-1",
+      dishes: { id: "dish-1", archived_at: null, menu_versions: { status: "published" } },
+    },
+    error: null,
+  };
+
+  it("streams the bytes with content type, nosniff, cache headers and an ETag", async () => {
+    maybeSingleMock.mockResolvedValue(publishedAsset);
+    downloadMock.mockResolvedValue({
+      data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }),
       error: null,
     });
 
@@ -53,11 +56,52 @@ describe("GET /media/[...path]", () => {
       params: Promise.resolve({ path: ["tenant-1", "dishes", "pizza.jpg"] }),
     });
 
-    expect(createSignedUrlMock).toHaveBeenCalledWith("tenant-1/dishes/pizza.jpg", 60);
-    expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe(
-      "https://storage.example.test/signed/dish.jpg?token=abc",
+    expect(downloadMock).toHaveBeenCalledWith("tenant-1/dishes/pizza.jpg");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/jpeg");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("cache-control")).toBe(
+      "public, max-age=86400, stale-while-revalidate=86400",
     );
+    expect(response.headers.get("etag")).toMatch(/^"[a-f0-9]{32}"$/);
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it("answers a matching If-None-Match with 304 without reading Storage", async () => {
+    maybeSingleMock.mockResolvedValue(publishedAsset);
+    downloadMock.mockResolvedValue({
+      data: new Blob([new Uint8Array([1])], { type: "image/jpeg" }),
+      error: null,
+    });
+    const { GET } = await import("./route");
+    const url = "http://localhost/media/tenant-1/dishes/pizza.jpg";
+    const routeParams = () => ({
+      params: Promise.resolve({ path: ["tenant-1", "dishes", "pizza.jpg"] }),
+    });
+    const first = await GET(new Request(url), routeParams());
+    const etag = first.headers.get("etag")!;
+    downloadMock.mockClear();
+
+    const second = await GET(
+      new Request(url, { headers: { "if-none-match": etag } }),
+      routeParams(),
+    );
+
+    expect(second.status).toBe(304);
+    expect(second.headers.get("etag")).toBe(etag);
+    expect(downloadMock).not.toHaveBeenCalled();
+  });
+
+  it("does not answer 304 for an unauthorized path even with a matching If-None-Match", async () => {
+    maybeSingleMock.mockResolvedValue({ data: null, error: null });
+    const { GET } = await import("./route");
+    const response = await GET(
+      new Request("http://localhost/media/tenant-1/dishes/draft.jpg", {
+        headers: { "if-none-match": "*" },
+      }),
+      { params: Promise.resolve({ path: ["tenant-1", "dishes", "draft.jpg"] }) },
+    );
+    expect(response.status).toBe(404);
   });
 
   it("returns 404 when the storage object does not exist rather than leaking the Storage error", async () => {
@@ -68,7 +112,7 @@ describe("GET /media/[...path]", () => {
       },
       error: null,
     });
-    createSignedUrlMock.mockResolvedValue({
+    downloadMock.mockResolvedValue({
       data: null,
       error: { message: "Object not found" },
     });
@@ -90,7 +134,7 @@ describe("GET /media/[...path]", () => {
     });
 
     expect(response.status).toBe(404);
-    expect(createSignedUrlMock).not.toHaveBeenCalled();
+    expect(downloadMock).not.toHaveBeenCalled();
   });
 
   it("returns 404 for a storage path belonging to another tenant's asset (no matching media_assets row)", async () => {
@@ -105,7 +149,7 @@ describe("GET /media/[...path]", () => {
     );
 
     expect(response.status).toBe(404);
-    expect(createSignedUrlMock).not.toHaveBeenCalled();
+    expect(downloadMock).not.toHaveBeenCalled();
   });
 
   it("returns 404 for a path containing a '..' segment without ever querying Storage", async () => {
@@ -119,6 +163,6 @@ describe("GET /media/[...path]", () => {
 
     expect(response.status).toBe(404);
     expect(maybeSingleMock).not.toHaveBeenCalled();
-    expect(createSignedUrlMock).not.toHaveBeenCalled();
+    expect(downloadMock).not.toHaveBeenCalled();
   });
 });

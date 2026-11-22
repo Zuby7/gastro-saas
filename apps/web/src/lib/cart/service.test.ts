@@ -26,7 +26,7 @@ import {
   resolveTenantIdBySlug,
   updateCartItemQuantity,
 } from "./service";
-import { hashCartToken } from "./token";
+import { sha256Hex } from "@/lib/security/opaque-token";
 
 const cartView = { id: "cart-1", items: [] };
 
@@ -72,7 +72,7 @@ describe("resolveGuestCartContext", () => {
     expect(writeCartTokenCookieMock).not.toHaveBeenCalled();
     expect(rpcMock).toHaveBeenCalledWith("get_or_create_cart", {
       p_tenant_id: "tenant-1",
-      p_cart_token_hash: hashCartToken("raw-token"),
+      p_cart_token_hash: sha256Hex("raw-token"),
     });
   });
 
@@ -90,7 +90,7 @@ describe("resolveGuestCartContext", () => {
     expect(typeof token).toBe("string");
     expect(rpcMock).toHaveBeenCalledWith(
       "get_or_create_cart",
-      expect.objectContaining({ p_cart_token_hash: hashCartToken(token as string) }),
+      expect.objectContaining({ p_cart_token_hash: sha256Hex(token as string) }),
     );
   });
 });

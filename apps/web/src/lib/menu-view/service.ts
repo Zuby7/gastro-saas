@@ -2,7 +2,7 @@ import { createHash, createHmac } from "node:crypto";
 import { getClientIp } from "@/lib/auth/client-ip";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { readMenuViewToken } from "./cookie";
-import { hashMenuViewToken } from "./token";
+import { sha256Hex } from "@/lib/security/opaque-token";
 
 /**
  * Keyed hash of the client IP (issue #164). With `IP_HASH_SECRET` set (a Worker
@@ -46,6 +46,22 @@ function resolveRateLimitBucketHash(ip: string, sessionTokenHash: string): strin
 }
 
 /**
+ * Request-bound inputs of the analytics recorders. A Server Component page
+ * that wants to record inside `after()` must read these BEFORE scheduling it
+ * (`cookies()`/`headers()` are not available inside `after()` callbacks
+ * there) and pass them in; without it the recorders read them themselves.
+ */
+export interface VisitorContext {
+  token: string | null;
+  ip: string;
+}
+
+export async function resolveVisitorContext(tenantSlug: string): Promise<VisitorContext> {
+  const [token, ip] = await Promise.all([readMenuViewToken(tenantSlug), getClientIp()]);
+  return { token, ip };
+}
+
+/**
  * Records one rate-limited, deduplicated `menu_viewed` analytics event for
  * `tenantSlug`, if this browser hasn't already recorded one for this tenant
  * today (see `record_menu_view()`,
@@ -61,9 +77,13 @@ function resolveRateLimitBucketHash(ip: string, sessionTokenHash: string): strin
  * throws: analytics is best-effort and must never break menu rendering for
  * a real visitor.
  */
-export async function recordMenuViewOnce(tenantSlug: string, tenantId: string): Promise<void> {
+export async function recordMenuViewOnce(
+  tenantSlug: string,
+  tenantId: string,
+  visitor?: VisitorContext,
+): Promise<void> {
   try {
-    const token = await readMenuViewToken(tenantSlug);
+    const token = visitor ? visitor.token : await readMenuViewToken(tenantSlug);
     if (!token) {
       // No session cookie for this tenant yet -- minted by
       // apps/web/src/middleware.ts for the base menu route. Nothing to
@@ -71,8 +91,8 @@ export async function recordMenuViewOnce(tenantSlug: string, tenantId: string): 
       return;
     }
 
-    const sessionTokenHash = hashMenuViewToken(token);
-    const ip = await getClientIp();
+    const sessionTokenHash = sha256Hex(token);
+    const ip = visitor ? visitor.ip : await getClientIp();
     const ipHash = resolveRateLimitBucketHash(ip, sessionTokenHash);
     if (ipHash === null) {
       return;
@@ -90,52 +110,6 @@ export async function recordMenuViewOnce(tenantSlug: string, tenantId: string): 
     }
   } catch (error) {
     console.error("[menu-view] recordMenuViewOnce failed", error);
-  }
-}
-
-/**
- * Records one rate-limited, deduplicated `dish_view` analytics event for a
- * single dish, mirroring `recordMenuViewOnce()` exactly (see
- * `record_dish_view()`,
- * supabase/migrations/20260906091000_dish_view_and_add_to_cart_analytics.sql).
- *
- * Reuses the same per-tenant menu-view session cookie as `recordMenuViewOnce`
- * (ticket #67) -- both are "this anonymous browser session on this tenant's
- * public menu today" signals. `tenantId`/`dishId` must already be resolved
- * server-side (never client-supplied without independent verification).
- * Never throws: analytics is best-effort and must never break menu
- * rendering for a real visitor.
- */
-export async function recordDishViewOnce(
-  tenantSlug: string,
-  tenantId: string,
-  dishId: string,
-): Promise<void> {
-  try {
-    const token = await readMenuViewToken(tenantSlug);
-    if (!token) {
-      return;
-    }
-
-    const ip = await getClientIp();
-    const sessionTokenHash = hashMenuViewToken(token);
-    const ipHash = resolveRateLimitBucketHash(ip, sessionTokenHash);
-    if (ipHash === null) {
-      return;
-    }
-    const admin = createSupabaseAdminClient();
-    const { error } = await admin.rpc("record_dish_view", {
-      p_tenant_id: tenantId,
-      p_dish_id: dishId,
-      p_session_token_hash: sessionTokenHash,
-      p_ip_hash: ipHash,
-    });
-
-    if (error) {
-      console.error("[menu-view] record_dish_view failed", error);
-    }
-  } catch (error) {
-    console.error("[menu-view] recordDishViewOnce failed", error);
   }
 }
 
@@ -163,19 +137,20 @@ export async function recordDishViewsOnce(
   tenantSlug: string,
   tenantId: string,
   dishIds: string[],
+  visitor?: VisitorContext,
 ): Promise<void> {
   if (dishIds.length === 0) {
     return;
   }
 
   try {
-    const token = await readMenuViewToken(tenantSlug);
+    const token = visitor ? visitor.token : await readMenuViewToken(tenantSlug);
     if (!token) {
       return;
     }
 
-    const ip = await getClientIp();
-    const sessionTokenHash = hashMenuViewToken(token);
+    const ip = visitor ? visitor.ip : await getClientIp();
+    const sessionTokenHash = sha256Hex(token);
     const ipHash = resolveRateLimitBucketHash(ip, sessionTokenHash);
     if (ipHash === null) {
       return;
@@ -218,7 +193,7 @@ export async function recordAddToCartEventOnce(
     }
 
     const ip = await getClientIp();
-    const sessionTokenHash = hashMenuViewToken(token);
+    const sessionTokenHash = sha256Hex(token);
     const ipHash = resolveRateLimitBucketHash(ip, sessionTokenHash);
     if (ipHash === null) {
       return;

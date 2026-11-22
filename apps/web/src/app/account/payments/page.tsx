@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAccountContext } from "@/lib/auth/account-context";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
-import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { OnboardingButton } from "./onboarding-button";
 
 interface PaymentAccountRow {
@@ -26,16 +25,12 @@ const STATUS_LABEL: Record<PaymentAccountRow["status"], string> = {
  * hard-refuse a non-test-mode secret key.
  */
 export default async function PaymentsPage() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, membership } = await getAccountContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  const membership = await getCurrentMembership(supabase, user.id);
   if (!membership) {
     redirect("/account");
   }
@@ -61,25 +56,30 @@ export default async function PaymentsPage() {
     throw error;
   }
 
-  const { data: account } = await supabase
-    .from("payment_accounts")
-    .select("status, charges_enabled, payouts_enabled, requirements_summary")
-    .eq("tenant_id", membership.tenantId)
-    .maybeSingle<PaymentAccountRow>();
-
-  // payments.connect (issue #95) is a separate, Owner-only permission from
-  // the payments.read that gates this whole page -- a Manager can view
-  // status but must not see a button that would just fail server-side.
-  let canConnect = true;
-  try {
-    await requireTenantPermission(supabase, membership.tenantId, "payments.connect");
-  } catch (error) {
-    if (error instanceof PermissionDeniedError) {
-      canConnect = false;
-    } else {
+  // The account read and the (UX-only) `payments.connect` check are independent.
+  const canConnectPromise = (async () => {
+    // payments.connect (issue #95) is a separate, Owner-only permission from
+    // the payments.read that gates this whole page -- a Manager can view
+    // status but must not see a button that would just fail server-side.
+    try {
+      await requireTenantPermission(supabase, membership.tenantId, "payments.connect");
+      return true;
+    } catch (error) {
+      if (error instanceof PermissionDeniedError) {
+        return false;
+      }
       throw error;
     }
-  }
+  })();
+
+  const [{ data: account }, canConnect] = await Promise.all([
+    supabase
+      .from("payment_accounts")
+      .select("status, charges_enabled, payouts_enabled, requirements_summary")
+      .eq("tenant_id", membership.tenantId)
+      .maybeSingle<PaymentAccountRow>(),
+    canConnectPromise,
+  ]);
 
   return (
     <main className="min-h-screen bg-surface-secondary">

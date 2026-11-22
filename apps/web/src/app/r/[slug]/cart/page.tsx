@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatPrice } from "@/lib/public-menu/format";
-import { getPublicMenu } from "@/lib/public-menu/fetch";
-import { loadCartViewForDisplay } from "./actions";
+import { loadCartViewForDisplay } from "@/lib/cart/display";
+import { getPublicTenantName } from "@/lib/public-menu/fetch";
 import { CartLine } from "./cart-line";
 
 interface CartPageProps {
@@ -11,13 +11,14 @@ interface CartPageProps {
 
 export default async function CartPage({ params }: CartPageProps) {
   const { slug } = await params;
-  const menu = await getPublicMenu(slug);
+  const [tenantName, cart] = await Promise.all([
+    getPublicTenantName(slug),
+    loadCartViewForDisplay(slug),
+  ]);
 
-  if (!menu) {
+  if (!tenantName) {
     notFound();
   }
-
-  const cart = await loadCartViewForDisplay(slug);
 
   return (
     <main className="min-h-screen bg-surface-secondary">
@@ -35,7 +36,7 @@ export default async function CartPage({ params }: CartPageProps) {
             <h1 className="font-display text-3xl font-semibold tracking-tight text-white">
               Warenkorb
             </h1>
-            <p className="mt-1 text-sm text-white/80">{menu.tenant.name}</p>
+            <p className="mt-1 text-sm text-white/80">{tenantName}</p>
           </div>
           <Link
             href={`/r/${slug}`}

@@ -77,7 +77,9 @@ describe("middleware Supabase session refresh", () => {
     refreshedCookies = [{ name: "sb-token", value: "rotated", options: { path: "/" } }];
     const { middleware } = await import("./middleware");
     const request = new NextRequest("http://localhost/r/demo", {
-      headers: { cookie: `gastro_cookie_consent=${serializeConsent(true, new Date())}` },
+      headers: {
+        cookie: `sb-abc-auth-token=old; gastro_cookie_consent=${serializeConsent(true, new Date())}`,
+      },
     });
 
     const response = await middleware(request);
@@ -107,7 +109,10 @@ describe("middleware Supabase session refresh", () => {
     refreshedCookies = [{ name: "sb-token", value: "rotated", options: { path: "/" } }];
     const { middleware } = await import("./middleware");
     const request = new NextRequest("http://localhost/r/demo/cart", {
-      headers: { cookie: "gastro_view_demo=old; gastro_view_other=old2; unrelated=keep" },
+      headers: {
+        cookie:
+          "sb-abc-auth-token=old; gastro_view_demo=old; gastro_view_other=old2; unrelated=keep",
+      },
     });
 
     const response = await middleware(request);
@@ -128,5 +133,63 @@ describe("middleware Supabase session refresh", () => {
     const response = await middleware(request);
 
     expect(response.cookies.get("gastro_view_demo")).toBeUndefined();
+  });
+
+  it.each([
+    "/account",
+    "/account/menu",
+    "/login",
+    "/register",
+    "/invite/abc",
+    "/api/account/privacy/export",
+    "/api/qr",
+  ])("refreshes the session on %s", async (path) => {
+    const { middleware } = await import("./middleware");
+    await middleware(new NextRequest(`http://localhost${path}`));
+    expect(getUserMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["/", "/agb", "/datenschutz", "/accounting", "/r/demo", "/r/demo/cart"])(
+    "does not call getUser() on %s for an anonymous visitor",
+    async (path) => {
+      const { middleware } = await import("./middleware");
+      await middleware(new NextRequest(`http://localhost${path}`));
+      expect(createServerClientMock).not.toHaveBeenCalled();
+      expect(getUserMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still refreshes on the public menu when the visitor already has a Supabase auth cookie", async () => {
+    const { middleware } = await import("./middleware");
+    await middleware(
+      new NextRequest("http://localhost/r/demo", { headers: { cookie: "sb-abc-auth-token=old" } }),
+    );
+    expect(getUserMock).toHaveBeenCalledTimes(1);
+  });
+
+  describe("config.matcher", () => {
+    async function matches(path: string): Promise<boolean> {
+      const { config } = await import("./middleware");
+      return new RegExp(`^${config.matcher[0]}$`).test(path);
+    }
+
+    it.each(["/", "/account", "/r/demo", "/r/demo/cart", "/api/qr", "/login"])(
+      "runs on %s",
+      async (path) => {
+        expect(await matches(path)).toBe(true);
+      },
+    );
+
+    it.each([
+      "/media/tenant/abc.jpg",
+      "/api/webhooks/stripe",
+      "/landing/hero.png",
+      "/_next/static/chunk.js",
+      "/favicon.ico",
+      "/robots.txt",
+      "/logo.svg",
+    ])("skips %s", async (path) => {
+      expect(await matches(path)).toBe(false);
+    });
   });
 });

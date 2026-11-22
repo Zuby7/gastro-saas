@@ -1,8 +1,8 @@
-import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { MENU_VIEW_COOKIE_PREFIX, menuViewCookieName } from "@/lib/menu-view/cookie-name";
 import { CONSENT_COOKIE_NAME, hasStatisticsConsent } from "@/lib/consent/cookie";
+import { createOpaqueToken } from "@/lib/security/opaque-token";
 
 // Matches only the base public menu route (`/r/<slug>`), not its
 // cart/checkout/order-status sub-routes -- ticket #67's menu-view analytics
@@ -20,41 +20,92 @@ const MENU_VIEW_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24; // 24 hours -- short-live
 // independently, which risked the two copies drifting apart and letting
 // distinct slugs collide on the same cookie name (Opus finding, PR #129).
 
+// Routes whose Server Components / route handlers read the Supabase session
+// (verified by grep for createSupabaseServerClient/getUser/getCurrentMembership:
+// account area, login, register, invite acceptance, /api/account/*, /api/qr).
+// Only these pay for the Auth-server round trip of `getUser()`.
+const SESSION_ROUTE_PREFIXES = [
+  "/account",
+  "/login",
+  "/register",
+  "/invite",
+  "/api/account",
+  "/api/qr",
+];
+
+// Public menu routes (`/r/*`) read the session only through
+// `getPublicMenu`'s server client, and only matter for a visitor who already
+// has a Supabase auth cookie (e.g. staff previewing their own menu); anonymous
+// guests, the vast majority, skip the refresh entirely.
+const SUPABASE_AUTH_COOKIE_PATTERN = /^sb-.+-auth-token(\.\d+)?$/;
+
+function pathMatchesPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+export function needsSessionRefresh(pathname: string, hasAuthCookie: boolean): boolean {
+  if (SESSION_ROUTE_PREFIXES.some((prefix) => pathMatchesPrefix(pathname, prefix))) {
+    return true;
+  }
+  return hasAuthCookie && pathMatchesPrefix(pathname, "/r");
+}
+
 /**
- * Refreshes the Supabase session cookie on every request. Required because
- * Server Components can read cookies but cannot write them -- without this,
- * a rotated/refreshed auth token would never make it back into the
- * `httpOnly` cookie, and sessions would silently expire mid-visit. Matches
- * `@supabase/ssr`'s documented Next.js App Router middleware pattern.
+ * Refreshes the Supabase session cookie on the routes that read a session
+ * (see `needsSessionRefresh`). Required because Server Components can read
+ * cookies but cannot write them -- without this, a rotated/refreshed auth
+ * token would never make it back into the `httpOnly` cookie, and sessions
+ * would silently expire mid-visit. Matches `@supabase/ssr`'s documented
+ * Next.js App Router middleware pattern. `/media`, `/api/webhooks`,
+ * `/landing` and static files are excluded by `config.matcher` below.
  */
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          for (const { name, value } of cookiesToSet) {
-            request.cookies.set(name, value);
-          }
-          response = NextResponse.next({ request });
-          for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options);
-          }
+  // `NextResponse.next({ request })` returns a fresh response with no
+  // cookies of its own, so every rebuild must carry over the Set-Cookie
+  // headers already applied to the previous one.
+  const rebuildResponse = (mutateRequest: () => void) => {
+    const previousSetCookies = response.cookies.getAll();
+    mutateRequest();
+    response = NextResponse.next({ request });
+    for (const cookie of previousSetCookies) {
+      response.cookies.set(cookie);
+    }
+  };
+
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some((cookie) => SUPABASE_AUTH_COOKIE_PATTERN.test(cookie.name));
+
+  if (needsSessionRefresh(request.nextUrl.pathname, hasAuthCookie)) {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            rebuildResponse(() => {
+              for (const { name, value } of cookiesToSet) {
+                request.cookies.set(name, value);
+              }
+            });
+            for (const { name, value, options } of cookiesToSet) {
+              response.cookies.set(name, value, options);
+            }
+          },
         },
       },
-    },
-  );
+    );
 
-  // `getUser()` (not `getSession()`) validates the token against the Auth
-  // server rather than trusting the locally-decoded JWT, and as a side
-  // effect refreshes/rotates the session cookie via the `setAll` above.
-  await supabase.auth.getUser();
+    // `getUser()` (not `getSession()`) validates the token against the Auth
+    // server rather than trusting the locally-decoded JWT, and as a side
+    // effect refreshes/rotates the session cookie via the `setAll` above.
+    await supabase.auth.getUser();
+  }
 
   // Ticket #67: mint an opaque, ephemeral, anonymous menu-view session
   // cookie for the base public menu route, if one doesn't already exist --
@@ -78,7 +129,7 @@ export async function middleware(request: NextRequest) {
     const cookieName = menuViewCookieName(tenantSlug);
     if (statisticsConsent) {
       if (!request.cookies.get(cookieName)) {
-        const token = randomBytes(32).toString("base64url");
+        const token = createOpaqueToken();
         const cookieOptions = {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
@@ -88,19 +139,10 @@ export async function middleware(request: NextRequest) {
         };
         // Set on `request` (so this same request's Server Component can read
         // it via `cookies()` -- Server Components see the incoming request's
-        // cookies, not the outgoing response's) *before* rebuilding
-        // `response` from the updated request, exactly mirroring the
-        // Supabase `setAll` callback above. Any Set-Cookie headers the
-        // Supabase callback already applied to the previous `response` are
-        // preserved explicitly (`NextResponse.next({ request })` returns a
-        // fresh response with no cookies of its own) so they aren't lost by
-        // this reassignment.
-        const previousSetCookies = response.cookies.getAll();
-        request.cookies.set(cookieName, token);
-        response = NextResponse.next({ request });
-        for (const cookie of previousSetCookies) {
-          response.cookies.set(cookie);
-        }
+        // cookies, not the outgoing response's) *before* the response is
+        // rebuilt from the updated request; `rebuildResponse` preserves any
+        // Set-Cookie headers the Supabase refresh already applied.
+        rebuildResponse(() => request.cookies.set(cookieName, token));
         response.cookies.set(cookieName, token, cookieOptions);
       }
     }
@@ -116,12 +158,7 @@ export async function middleware(request: NextRequest) {
       if (!existing.name.startsWith(MENU_VIEW_COOKIE_PREFIX)) {
         continue;
       }
-      const previousSetCookies = response.cookies.getAll();
-      request.cookies.delete(existing.name);
-      response = NextResponse.next({ request });
-      for (const cookie of previousSetCookies) {
-        response.cookies.set(cookie);
-      }
+      rebuildResponse(() => request.cookies.delete(existing.name));
       response.cookies.delete(existing.name);
     }
   }
@@ -130,5 +167,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Skips static assets/files, `/media` (dish photos), `/api/webhooks` and
+  // `/landing` entirely: none of them read a session or the consent cookies.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|media(?:/|$)|api/webhooks(?:/|$)|landing(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js|map|txt|xml|woff|woff2|pdf)$).*)",
+  ],
 };

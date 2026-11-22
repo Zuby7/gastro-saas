@@ -1,6 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { readCartToken, writeCartTokenCookie } from "./cookie";
-import { createCartToken, hashCartToken } from "./token";
+import { createOpaqueToken, sha256Hex } from "@/lib/security/opaque-token";
 import type { CartView } from "./types";
 
 /**
@@ -47,11 +47,11 @@ export async function resolveGuestCartContext(tenantSlug: string): Promise<Guest
 
   let token = await readCartToken(tenantSlug);
   if (!token) {
-    token = createCartToken();
+    token = createOpaqueToken();
     await writeCartTokenCookie(tenantSlug, token);
   }
 
-  const cartId = await getOrCreateCartId(tenantId, hashCartToken(token));
+  const cartId = await getOrCreateCartId(tenantId, sha256Hex(token));
   return { tenantId, cartId };
 }
 
