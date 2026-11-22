@@ -92,6 +92,50 @@ async function fetchOrderPaymentSnapshot(
   };
 }
 
+/** Stripe's hard limit for `product_data.description` is 500 characters. */
+const MAX_PRODUCT_DESCRIPTION_LENGTH = 400;
+
+/**
+ * Human-readable label for the single Stripe line item: product name
+ * "Bestellung bei <Restaurantname>" and a one-line item summary as the
+ * description. Purely presentational -- the charged amount always comes from
+ * the order's own guarded `total_cents`. Best effort: if the tenant name or
+ * the items cannot be read, falls back to a generic name rather than
+ * blocking the payment.
+ */
+async function fetchOrderLineItemLabel(
+  tenantId: string,
+  orderId: string,
+): Promise<{ name: string; description?: string }> {
+  try {
+    const admin = createSupabaseAdminClient();
+    const [tenantResult, itemsResult] = await Promise.all([
+      admin.from("tenants").select("name").eq("id", tenantId).maybeSingle<{ name: string }>(),
+      admin
+        .from("order_items")
+        .select("dish_name_snapshot, quantity")
+        .eq("order_id", orderId)
+        .eq("tenant_id", tenantId)
+        .returns<Array<{ dish_name_snapshot: string; quantity: number }>>(),
+    ]);
+
+    const tenantName = tenantResult.data?.name?.trim();
+    const name = tenantName ? `Bestellung bei ${tenantName}` : "Bestellung";
+
+    const summary = (itemsResult.data ?? [])
+      .map((item) => `${item.quantity}× ${item.dish_name_snapshot}`)
+      .join(", ");
+    const description =
+      summary.length > MAX_PRODUCT_DESCRIPTION_LENGTH
+        ? `${summary.slice(0, MAX_PRODUCT_DESCRIPTION_LENGTH - 1)}…`
+        : summary;
+
+    return description ? { name, description } : { name };
+  } catch {
+    return { name: "Bestellung" };
+  }
+}
+
 /**
  * Creates (or idempotently re-returns) a Stripe-hosted Checkout Session for
  * an order that was just created in `awaiting_payment` status, and persists
@@ -118,6 +162,67 @@ async function fetchOrderPaymentSnapshot(
 export async function createCheckoutSessionForOrder(
   input: CreateCheckoutSessionInput,
 ): Promise<CreateCheckoutSessionResult> {
+  return createSessionForAwaitingOrder(input, `checkout-session:${input.orderId}`);
+}
+
+/**
+ * "Erneut bezahlen" after the guest came back from Stripe's cancel URL (or
+ * simply wants to retry): returns the URL of a still-open Checkout Session
+ * of the SAME `awaiting_payment` order if there is one (no duplicate
+ * sessions), otherwise creates a fresh session. The amount is always the
+ * order's own guarded `total_cents`, re-read from the database -- never a
+ * client value. A new session uses its own idempotency key (attempt number
+ * = payments recorded so far), so double-clicks collapse onto one session
+ * while a genuinely new attempt after an expired session gets a new one.
+ * Still never marks anything paid; only the verified webhook does.
+ */
+export async function resumeCheckoutSessionForOrder(
+  input: CreateCheckoutSessionInput,
+): Promise<CreateCheckoutSessionResult> {
+  const order = await fetchOrderPaymentSnapshot(input.tenantId, input.orderId);
+
+  if (order.status !== "awaiting_payment") {
+    throw new Error("This order is not awaiting payment.");
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: previousPayments } = await admin
+    .from("payments")
+    .select("stripe_checkout_session_id, created_at")
+    .eq("order_id", input.orderId)
+    .eq("tenant_id", input.tenantId)
+    .order("created_at", { ascending: false })
+    .returns<Array<{ stripe_checkout_session_id: string; created_at: string }>>();
+
+  const previous = previousPayments ?? [];
+  const latest = previous[0];
+
+  if (latest) {
+    const stripe = createStripeClient();
+    try {
+      const existing = await stripe.checkout.sessions.retrieve(latest.stripe_checkout_session_id);
+      if (existing.status === "open" && existing.url) {
+        return { checkoutUrl: existing.url };
+      }
+    } catch {
+      // Session unreadable (e.g. expired and purged): fall through and
+      // create a new one.
+    }
+  }
+
+  const attempt = previous.length;
+  return createSessionForAwaitingOrder(
+    input,
+    attempt === 0
+      ? `checkout-session:${input.orderId}`
+      : `checkout-session:${input.orderId}:${attempt}`,
+  );
+}
+
+async function createSessionForAwaitingOrder(
+  input: CreateCheckoutSessionInput,
+  idempotencyKey: string,
+): Promise<CreateCheckoutSessionResult> {
   const order = await fetchOrderPaymentSnapshot(input.tenantId, input.orderId);
 
   if (order.status !== "awaiting_payment") {
@@ -125,6 +230,8 @@ export async function createCheckoutSessionForOrder(
   }
 
   const { stripeAccountId } = await fetchChargeReadyAccount(input.tenantId);
+
+  const label = await fetchOrderLineItemLabel(input.tenantId, input.orderId);
 
   const stripe = createStripeClient();
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -139,7 +246,8 @@ export async function createCheckoutSessionForOrder(
           currency: order.currency.toLowerCase(),
           unit_amount: order.totalCents,
           product_data: {
-            name: `Bestellung ${order.orderId}`,
+            name: label.name,
+            ...(label.description ? { description: label.description } : {}),
           },
         },
       },
@@ -183,7 +291,7 @@ export async function createCheckoutSessionForOrder(
   };
 
   const session = await stripe.checkout.sessions.create(sessionParams, {
-    idempotencyKey: `checkout-session:${input.orderId}`,
+    idempotencyKey,
   });
 
   if (!session.url) {

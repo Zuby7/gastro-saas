@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface CategoryNavItem {
   id: string;
@@ -26,6 +26,9 @@ interface CategoryNavProps {
  */
 export function CategoryNav({ categories }: CategoryNavProps) {
   const [activeId, setActiveId] = useState<string>(categories[0]?.id ?? "");
+  // While a click-initiated smooth scroll is running, scroll-spy must not
+  // override the clicked tab with the sections passed on the way.
+  const lockedUntilRef = useRef(0);
 
   useEffect(() => {
     if (categories.length === 0) {
@@ -40,8 +43,28 @@ export function CategoryNav({ categories }: CategoryNavProps) {
       return;
     }
 
+    const lastCategoryId = categories[categories.length - 1]?.id;
+
+    // Page bottom: the last category can be too short to ever reach the
+    // observer's upper band, so it would never win. At the very bottom of
+    // the page the last category is the active one.
+    const onScroll = () => {
+      if (Date.now() < lockedUntilRef.current || !lastCategoryId) {
+        return;
+      }
+      const atBottom =
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      if (atBottom && window.scrollY > 0) {
+        setActiveId(lastCategoryId);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+
     const observer = new IntersectionObserver(
       (entries) => {
+        if (Date.now() < lockedUntilRef.current) {
+          return;
+        }
         const visible = entries.filter((entry) => entry.isIntersecting);
         if (visible.length === 0) {
           return;
@@ -62,7 +85,10 @@ export function CategoryNav({ categories }: CategoryNavProps) {
       observer.observe(section);
     }
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", onScroll);
+    };
   }, [categories]);
 
   return (
@@ -78,7 +104,11 @@ export function CategoryNav({ categories }: CategoryNavProps) {
               key={category.id}
               href={`#category-${category.id}`}
               aria-current={isActive ? "true" : undefined}
-              className={`shrink-0 border-b-2 py-4 text-sm font-medium motion-safe:transition-colors motion-safe:duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600 ${
+              onClick={() => {
+                setActiveId(category.id);
+                lockedUntilRef.current = Date.now() + 1000;
+              }}
+              className={`flex min-h-11 shrink-0 items-center border-b-2 py-4 text-sm font-medium motion-safe:transition-colors motion-safe:duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-600 ${
                 isActive
                   ? "border-accent-foreground text-accent-foreground"
                   : "border-transparent text-foreground-secondary hover:text-foreground"

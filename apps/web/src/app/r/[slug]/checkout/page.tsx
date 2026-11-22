@@ -61,6 +61,32 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
               represent the customer's order.
             */}
             <div className="ticket-edge rounded-t-lg border border-b-0 border-neutral-300 bg-surface px-4 pt-3 shadow-sm">
+              {/* Items come from the server-recalculated cart view loaded above;
+                  nothing here is client-supplied. */}
+              <h2 className="sr-only">Ihre Bestellung</h2>
+              <ul className="mb-3 flex flex-col gap-2 border-b border-neutral-200 pb-3">
+                {cart.items.map((line) => (
+                  <li
+                    key={line.cartItemId}
+                    className="flex items-start justify-between gap-3 text-sm"
+                  >
+                    <div className="min-w-0 break-words">
+                      <p className="font-medium text-foreground">
+                        {line.quantity}× {line.dishName}
+                        {line.variantName ? ` (${line.variantName})` : ""}
+                      </p>
+                      {line.selections.length > 0 ? (
+                        <p className="mt-0.5 text-foreground-secondary">
+                          {line.selections.map((selection) => selection.name).join(", ")}
+                        </p>
+                      ) : null}
+                    </div>
+                    <p className="shrink-0 text-foreground">
+                      {formatPrice(line.lineTotalCents, cart.currency)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
               <div className="flex items-center justify-between">
                 <span className="font-medium text-foreground">Gesamtsumme</span>
                 <span className="font-display text-xl font-semibold text-accent-foreground">

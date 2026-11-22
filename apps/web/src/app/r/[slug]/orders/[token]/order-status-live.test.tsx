@@ -3,6 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OrderStatusLive } from "./order-status-live";
 
 const pollOrderStatusMock = vi.fn();
+const routerRefreshMock = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: routerRefreshMock }),
+}));
 
 vi.mock("./actions", () => ({
   pollOrderStatus: (...args: unknown[]) => pollOrderStatusMock(...args),
@@ -11,6 +16,7 @@ vi.mock("./actions", () => ({
 beforeEach(() => {
   vi.useFakeTimers();
   pollOrderStatusMock.mockReset();
+  routerRefreshMock.mockReset();
 });
 
 afterEach(() => {
@@ -129,5 +135,59 @@ describe("OrderStatusLive", () => {
     });
 
     expect(screen.getByText("Bestellung eingegangen")).toBeInTheDocument();
+  });
+
+  it("polls every 4 s while awaiting_payment, refreshes the page on a status change, then switches to 20 s", async () => {
+    pollOrderStatusMock.mockResolvedValue({ status: "awaiting_payment" });
+    render(
+      <OrderStatusLive
+        tenantSlug="demo"
+        token="raw-token"
+        initialStatus="awaiting_payment"
+        orderId="11112222-3333-4444-5555-666677778888"
+      />,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000);
+    });
+    expect(pollOrderStatusMock).toHaveBeenCalledTimes(1);
+    expect(routerRefreshMock).not.toHaveBeenCalled();
+
+    pollOrderStatusMock.mockResolvedValue({ status: "received" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000);
+    });
+    expect(pollOrderStatusMock).toHaveBeenCalledTimes(2);
+    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+
+    // No longer awaiting_payment: the slower interval applies.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000);
+    });
+    expect(pollOrderStatusMock).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16_000);
+    });
+    expect(pollOrderStatusMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("stops polling after the poll reports a terminal status", async () => {
+    pollOrderStatusMock.mockResolvedValue({ status: "cancelled" });
+    render(
+      <OrderStatusLive
+        tenantSlug="demo"
+        token="raw-token"
+        initialStatus="awaiting_payment"
+        orderId="11112222-3333-4444-5555-666677778888"
+      />,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(pollOrderStatusMock).toHaveBeenCalledTimes(1);
+    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
   });
 });

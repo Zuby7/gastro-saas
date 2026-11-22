@@ -83,7 +83,7 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
 
           <Link
             href={`/r/${slug}/cart`}
-            className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-white/25 bg-white/12 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 self-start rounded-full border border-white/25 bg-white/12 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
           >
             <ShoppingBag className="h-4 w-4" aria-hidden="true" />
             <span>Warenkorb</span>
@@ -131,22 +131,22 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
         Impressum/Datenschutz/AGB pages.
       */}
       <footer className="border-t border-neutral-200 px-5 py-6 sm:px-8">
-        <div className="mx-auto flex max-w-5xl flex-wrap gap-4 text-sm">
+        <div className="mx-auto flex max-w-5xl flex-wrap gap-x-6 text-sm">
           <Link
             href={`/r/${slug}/impressum`}
-            className="font-medium text-link-foreground underline hover:text-brand-700"
+            className="inline-flex min-h-11 items-center font-medium text-link-foreground underline hover:text-brand-700"
           >
             Impressum
           </Link>
           <Link
             href={`/r/${slug}/datenschutz`}
-            className="font-medium text-link-foreground underline hover:text-brand-700"
+            className="inline-flex min-h-11 items-center font-medium text-link-foreground underline hover:text-brand-700"
           >
             Datenschutz
           </Link>
           <Link
             href={`/r/${slug}/agb`}
-            className="font-medium text-link-foreground underline hover:text-brand-700"
+            className="inline-flex min-h-11 items-center font-medium text-link-foreground underline hover:text-brand-700"
           >
             AGB
           </Link>

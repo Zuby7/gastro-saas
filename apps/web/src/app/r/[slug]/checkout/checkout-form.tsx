@@ -159,13 +159,13 @@ export function CheckoutForm({ tenantSlug, checkoutReady }: CheckoutFormProps) {
         `required` HTML attribute.
       */}
       <div className="flex flex-col gap-1">
-        <label className="flex items-start gap-2 text-sm text-foreground">
+        <label className="flex min-h-11 items-start gap-3 py-2 text-sm text-foreground">
           <input
             id="acceptTerms"
             name="acceptTerms"
             type="checkbox"
             required
-            className="mt-0.5 h-4 w-4 accent-brand-600"
+            className="mt-0.5 h-5 w-5 shrink-0 accent-brand-600"
           />
           <span>
             Ich akzeptiere die{" "}

@@ -25,7 +25,7 @@ export function isSimpleDish(dish: PublicMenuDish): boolean {
  * `ADD_BUTTON_INTERACTIVE_CLASSNAME` for that half).
  */
 export const ADD_BUTTON_VISUAL_CLASSNAME =
-  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ember-600 text-neutral-0 transition-colors group-hover:bg-ember-700";
+  "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ember-600 text-neutral-0 transition-colors after:absolute after:-inset-1.5 after:content-[''] group-hover:bg-ember-700";
 
 /**
  * Focus-visible/disabled treatment, meant for the real interactive element
@@ -38,6 +38,7 @@ export const ADD_BUTTON_INTERACTIVE_CLASSNAME =
 
 /**
  * Full look for a real `<button>` trigger (`SimpleAddButton`): visual +
- * interactive treatment combined.
+ * interactive treatment combined. The `after:` pseudo-element grows the hit
+ * area from 32 to 44 px without changing the visual size.
  */
 export const ADD_BUTTON_CLASSNAME = `${ADD_BUTTON_VISUAL_CLASSNAME} ${ADD_BUTTON_INTERACTIVE_CLASSNAME}`;
