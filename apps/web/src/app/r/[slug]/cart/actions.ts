@@ -2,15 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { readCartToken } from "@/lib/cart/cookie";
-import { hashCartToken } from "@/lib/cart/token";
 import {
   addCartItem,
-  getCartView,
-  getOrCreateCartId,
   removeCartItem,
   resolveGuestCartContext,
-  resolveTenantIdBySlug,
   updateCartItemQuantity,
 } from "@/lib/cart/service";
 import type { CartView } from "@/lib/cart/types";
@@ -131,16 +126,4 @@ export async function removeCartItemAction(
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unbekannter Fehler." };
   }
-}
-
-/** Server Component helper: loads the current cart view without mutating it (creates no cart if none exists yet). */
-export async function loadCartViewForDisplay(tenantSlug: string): Promise<CartView | null> {
-  const tenantId = await resolveTenantIdBySlug(tenantSlug);
-  const token = await readCartToken(tenantSlug);
-  if (!tenantId || !token) {
-    return null;
-  }
-
-  const cartId = await getOrCreateCartId(tenantId, hashCartToken(token));
-  return getCartView(cartId, tenantId);
 }

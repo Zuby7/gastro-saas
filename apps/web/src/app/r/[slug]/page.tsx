@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { ShoppingBag } from "lucide-react";
 import { resolveTenantIdBySlug } from "@/lib/cart/service";
-import { recordDishViewsOnce, recordMenuViewOnce } from "@/lib/menu-view/service";
+import { loadCartViewForDisplay } from "@/lib/cart/display";
+import {
+  recordDishViewsOnce,
+  recordMenuViewOnce,
+  resolveVisitorContext,
+} from "@/lib/menu-view/service";
 import { getPublicMenu } from "@/lib/public-menu/fetch";
-import { loadCartViewForDisplay } from "./cart/actions";
 import { CategoryNav } from "./category-nav";
 import { DishCard } from "./dish-card";
 
@@ -14,32 +19,40 @@ interface PublicMenuPageProps {
 
 export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
   const { slug } = await params;
-  const menu = await getPublicMenu(slug);
+
+  // One tenant-id resolution, and the cart read runs in parallel with the
+  // menu fetch instead of after it (previously a 4-step sequential waterfall).
+  // The visitor context (menu-view cookie + client IP) is read here, while
+  // request APIs are still available, because the analytics writes below run
+  // in `after()`.
+  const tenantIdPromise = resolveTenantIdBySlug(slug);
+  const [menu, tenantId, cart, visitor] = await Promise.all([
+    getPublicMenu(slug),
+    tenantIdPromise,
+    tenantIdPromise.then((id) => loadCartViewForDisplay(slug, id)),
+    resolveVisitorContext(slug),
+  ]);
 
   if (!menu) {
     notFound();
   }
 
-  const cart = await loadCartViewForDisplay(slug);
-
-  // Ticket #67: record a rate-limited/deduplicated menu_viewed event for
-  // this tenant+session+day, resolving tenant_id server-side from the slug
-  // (never trusting a client-supplied value, per
-  // docs/security/tenant-isolation.md Layer 0). Best-effort -- never throws,
-  // never blocks rendering on a real failure.
-  const tenantId = await resolveTenantIdBySlug(slug);
+  // Ticket #67 / #120 part B: record the rate-limited, deduplicated
+  // menu_viewed and (one batched RPC) dish_view events after the response is
+  // sent, so the analytics round trips no longer block TTFB. tenant_id is
+  // resolved server-side from the slug and dish ids come from the
+  // already-fetched menu (never client-supplied, docs/security/tenant-isolation.md
+  // Layer 0). Consent gating is unchanged: the menu-view cookie is only ever
+  // minted by middleware after a statistics opt-in, and both recorders do
+  // nothing without it. Best-effort, never throws.
   if (tenantId) {
-    await recordMenuViewOnce(slug, tenantId);
-
-    // Ticket #120 part B: record a rate-limited/deduplicated dish_view event
-    // for every dish shown on this render, resolving both tenant_id and dish
-    // ids server-side from the already-fetched (never client-supplied) menu.
-    // A single batched RPC call (not one call per dish -- see
-    // `recordDishViewsOnce`'s own comment, PR #136 Opus finding: one call
-    // per dish previously took one advisory lock per dish, serializing in
-    // Postgres and blocking TTFB on this SEO-critical page).
     const dishIds = menu.categories.flatMap((category) => category.dishes.map((dish) => dish.id));
-    await recordDishViewsOnce(slug, tenantId, dishIds);
+    after(async () => {
+      await Promise.all([
+        recordMenuViewOnce(slug, tenantId, visitor),
+        recordDishViewsOnce(slug, tenantId, dishIds, visitor),
+      ]);
+    });
   }
 
   return (
@@ -94,14 +107,19 @@ export default async function PublicMenuPage({ params }: PublicMenuPageProps) {
           </p>
         ) : null}
 
-        {menu.categories.map((category) => (
+        {menu.categories.map((category, categoryIndex) => (
           <section key={category.id} id={`category-${category.id}`} className="scroll-mt-20">
             <h2 className="font-display text-[1.375rem] font-semibold tracking-tight text-foreground">
               {category.name}
             </h2>
             <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {category.dishes.map((dish) => (
-                <DishCard key={dish.id} dish={dish} tenantSlug={slug} />
+              {category.dishes.map((dish, dishIndex) => (
+                <DishCard
+                  key={dish.id}
+                  dish={dish}
+                  tenantSlug={slug}
+                  eagerImage={categoryIndex === 0 && dishIndex < 2}
+                />
               ))}
             </div>
           </section>

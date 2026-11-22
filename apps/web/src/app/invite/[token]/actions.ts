@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { hashInvitationToken } from "@/lib/invitations/tokens";
+import { sha256Hex } from "@/lib/security/opaque-token";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface AcceptInvitationFormState {
@@ -27,7 +27,7 @@ export async function acceptInvitationAction(
   }
 
   const { error } = await supabase.rpc("accept_invitation", {
-    p_token_hash: hashInvitationToken(token),
+    p_token_hash: sha256Hex(token),
   });
 
   if (error) {

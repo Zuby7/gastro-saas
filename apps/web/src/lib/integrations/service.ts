@@ -107,22 +107,6 @@ export async function ensureMockIntegrationAccount(
   return mapAccount(data as RawIntegrationAccountRow);
 }
 
-/** Admin integrations overview read. Caller must already hold `integrations.manage`. */
-export async function listIntegrationAccounts(
-  supabase: SupabaseClient,
-  tenantId: string,
-): Promise<IntegrationAccountView[]> {
-  const { data, error } = await supabase.rpc("list_integration_accounts", {
-    p_tenant_id: tenantId,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return ((data ?? []) as RawIntegrationAccountRow[]).map(mapAccount);
-}
-
 /** Admin integrations overview's recent-activity read. Caller must already hold `integrations.manage`. */
 export async function listIntegrationSyncJobs(
   supabase: SupabaseClient,

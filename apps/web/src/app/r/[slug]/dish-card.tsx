@@ -12,6 +12,8 @@ import { DishPlaceholderIcon } from "./dish-visual";
 interface DishCardProps {
   dish: PublicMenuDish;
   tenantSlug: string;
+  /** Above-the-fold cards load their photo eagerly; every other card is lazy. */
+  eagerImage?: boolean;
 }
 
 /**
@@ -55,7 +57,7 @@ function startingPriceLabel(dish: PublicMenuDish): string {
   return `ab ${formatPrice(cents, dish.currency)}`;
 }
 
-export function DishCard({ dish, tenantSlug }: DishCardProps) {
+export function DishCard({ dish, tenantSlug, eagerImage = false }: DishCardProps) {
   return (
     <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-surface shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_20px_rgba(0,0,0,.06)]">
       <div
@@ -69,8 +71,11 @@ export function DishCard({ dish, tenantSlug }: DishCardProps) {
           <img
             src={`/media/${dish.image.path}`}
             alt={dish.image.alt}
+            width={400}
+            height={120}
             className="h-full w-full object-cover"
-            loading="lazy"
+            loading={eagerImage ? "eager" : "lazy"}
+            decoding="async"
           />
         ) : (
           <DishPlaceholderIcon

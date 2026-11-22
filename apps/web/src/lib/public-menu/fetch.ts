@@ -1,7 +1,12 @@
+import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { PublicLegalPage, PublicLegalPageKind, PublicMenu } from "./types";
 
-export async function getPublicMenu(slug: string): Promise<PublicMenu | null> {
+/**
+ * Wrapped in React `cache()` so the page, the layout/metadata and any other
+ * Server Component in the same request share one `get_public_menu` RPC.
+ */
+export const getPublicMenu = cache(async (slug: string): Promise<PublicMenu | null> => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("get_public_menu", { p_tenant_slug: slug });
 
@@ -10,7 +15,18 @@ export async function getPublicMenu(slug: string): Promise<PublicMenu | null> {
   }
 
   return data as PublicMenu;
-}
+});
+
+/**
+ * Narrow read of just the public tenant name, for pages (cart, checkout)
+ * that only show it in the header and must not download the whole menu.
+ * Reuses the existing narrow `get_public_legal_page` RPC (no migration);
+ * returns `null` for an unknown slug so the page can 404.
+ */
+export const getPublicTenantName = cache(async (slug: string): Promise<string | null> => {
+  const page = await getPublicLegalPage(slug, "imprint");
+  return page?.tenantName ?? null;
+});
 
 /**
  * Ticket #41: dedicated narrow public read for the Impressum/Datenschutz

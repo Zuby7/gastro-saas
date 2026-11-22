@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAccountContext } from "@/lib/auth/account-context";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
-import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { getAnalyticsDashboardSummary } from "@/lib/analytics/dashboard-service";
 
 function formatMoney(cents: number, currency: string): string {
@@ -31,16 +30,12 @@ function formatMoney(cents: number, currency: string): string {
  * nicht nur Diagramm").
  */
 export default async function AnalyticsDashboardPage() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, membership } = await getAccountContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  const membership = await getCurrentMembership(supabase, user.id);
   if (!membership) {
     redirect("/account");
   }

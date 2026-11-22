@@ -23,21 +23,10 @@ vi.mock("next/server", () => ({
   after: (callback: () => unknown) => afterMock(callback),
 }));
 
-vi.mock("@/lib/cart/cookie", () => ({
-  readCartToken: vi.fn(),
-}));
-
-vi.mock("@/lib/cart/token", () => ({
-  hashCartToken: vi.fn(),
-}));
-
 vi.mock("@/lib/cart/service", () => ({
   addCartItem: (...args: unknown[]) => addCartItemMock(...args),
-  getCartView: vi.fn(),
-  getOrCreateCartId: vi.fn(),
   removeCartItem: vi.fn(),
   resolveGuestCartContext: (...args: unknown[]) => resolveGuestCartContextMock(...args),
-  resolveTenantIdBySlug: vi.fn(),
   updateCartItemQuantity: vi.fn(),
 }));
 
