@@ -554,6 +554,7 @@ describe("setDishAvailabilityAction", () => {
 
   it("calls set_dish_availability with the parsed availability fields and records an audit event", async () => {
     let auditRow: Record<string, unknown> | undefined;
+    let auditArgs: Record<string, unknown> | undefined;
     fromMock.mockImplementation((table: string) => {
       if (table === "tenant_memberships") return membershipTable();
       if (table === "audit_logs") {
@@ -577,6 +578,10 @@ describe("setDishAvailabilityAction", () => {
         });
         return { data: null, error: null };
       }
+      if (fn === "record_audit_event") {
+        auditArgs = args;
+        return { data: null, error: null };
+      }
       throw new Error(`unexpected rpc: ${fn}`);
     });
 
@@ -589,12 +594,14 @@ describe("setDishAvailabilityAction", () => {
     const result = await setDishAvailabilityAction({}, fd);
 
     expect(result.success).toBeDefined();
-    expect(auditRow).toMatchObject({
-      tenant_id: "tenant-1",
-      action: "dish.marked_sold_out",
-      target_type: "dish",
-      target_id: "dish-1",
+    // Audit rows are written through record_audit_event() (issue #205).
+    expect(auditArgs).toMatchObject({
+      p_tenant_id: "tenant-1",
+      p_action: "dish.marked_sold_out",
+      p_target_type: "dish",
+      p_target_id: "dish-1",
     });
+    expect(auditRow).toBeUndefined();
   });
 
   it("returns an error when set_dish_availability fails", async () => {

@@ -73,37 +73,24 @@ describe.skipIf(!dbAvailable)("audit_logs / analytics_events RLS and immutabilit
     await fixture?.cleanup();
   });
 
-  it("lets a tenant member insert into their own tenant's audit_logs (verified via admin), never the other tenant's via SELECT", async () => {
+  it("writes audit rows via record_audit_event() with actor = auth.uid(), never the other tenant's", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA, tenantB } = fixture;
 
-    // No `returning` here: `authenticated` has no `select` grant on
-    // audit_logs (see below), and Postgres requires `select` privilege to
-    // evaluate a `RETURNING` clause, independent of RLS -- adding one would
-    // make this insert fail on that unrelated grant, not prove anything
-    // about the insert policy itself.
     await queryAsUser(
       admin,
       tenantA.ownerId,
-      `insert into audit_logs (tenant_id, actor_user_id, action, target_type)
-       values ($1, $2, 'dish.updated', 'dish')`,
-      [tenantA.tenantId, tenantA.ownerId],
+      `select record_audit_event($1, 'dish.updated', 'dish', null, '{}'::jsonb)`,
+      [tenantA.tenantId],
     );
 
-    // Verify the row actually landed, via the admin (RLS-bypassing)
-    // connection -- `authenticated` has no `select` grant on audit_logs at
-    // all yet (ticket #6 scope note: audit.read is defined but not
-    // enforced/used anywhere), so a tenant member cannot read even its own
-    // rows back through RLS today.
-    const ownRows = await admin.query(`select tenant_id from audit_logs where tenant_id = $1`, [
-      tenantA.tenantId,
-    ]);
+    const ownRows = await admin.query(
+      `select actor_user_id from audit_logs where tenant_id = $1 and action = 'dish.updated'`,
+      [tenantA.tenantId],
+    );
     expect(ownRows.rows).toHaveLength(1);
+    expect(ownRows.rows[0]?.actor_user_id).toBe(tenantA.ownerId);
 
-    // Confirm that absence of a select grant denies access uniformly --
-    // including any attempt to read the other tenant's rows -- rather than
-    // e.g. only RLS filtering kicking in for cross-tenant reads while
-    // same-tenant reads work.
     await expectCrossTenantDenied({
       client: admin,
       actorUserId: tenantA.ownerId,
@@ -112,20 +99,21 @@ describe.skipIf(!dbAvailable)("audit_logs / analytics_events RLS and immutabilit
     });
   });
 
-  it("denies inserting an audit_logs row into a tenant the user is not a member of", async () => {
+  it("denies record_audit_event() for a tenant the user is not a member of", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA, tenantB } = fixture;
 
-    await expectCrossTenantDenied({
-      client: admin,
-      actorUserId: tenantA.ownerId,
-      sql: `insert into audit_logs (tenant_id, actor_user_id, action, target_type)
-            values ($1, $2, 'hostile.insert', 'dish')`,
-      params: [tenantB.tenantId, tenantA.ownerId],
-    });
+    await expect(
+      queryAsUser(
+        admin,
+        tenantA.ownerId,
+        `select record_audit_event($1, 'hostile.insert', 'dish', null, '{}'::jsonb)`,
+        [tenantB.tenantId],
+      ),
+    ).rejects.toThrow(/Not a member/i);
   });
 
-  it("denies forging another user as actor_user_id, even within the actor's own tenant", async () => {
+  it("denies any direct INSERT into audit_logs for authenticated (forgery closed), including own tenant", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA, tenantB } = fixture;
 
@@ -135,27 +123,25 @@ describe.skipIf(!dbAvailable)("audit_logs / analytics_events RLS and immutabilit
         tenantA.ownerId,
         `insert into audit_logs (tenant_id, actor_user_id, action, target_type)
          values ($1, $2, 'framed.action', 'dish')`,
-        // tenantA's Owner tries to insert a row impersonating tenant B's
-        // Owner (a real, existing user, so the FK is satisfied and only the
-        // actor-forgery RLS check is exercised) as the actor.
         [tenantA.tenantId, tenantB.ownerId],
       ),
-    ).rejects.toThrow(/row-level security|permission denied/i);
+    ).rejects.toThrow(/permission denied|row-level security/i);
 
-    // A null actor_user_id (system-initiated action) is still permitted (no
-    // `returning` -- see the note in the first test in this file).
-    await queryAsUser(
-      admin,
-      tenantA.ownerId,
-      `insert into audit_logs (tenant_id, actor_user_id, action, target_type)
-       values ($1, null, 'system.action', 'dish')`,
+    await expect(
+      queryAsUser(
+        admin,
+        tenantA.ownerId,
+        `insert into audit_logs (tenant_id, actor_user_id, action, target_type)
+         values ($1, $2, 'own.action', 'dish')`,
+        [tenantA.tenantId, tenantA.ownerId],
+      ),
+    ).rejects.toThrow(/permission denied|row-level security/i);
+
+    const rows = await admin.query(
+      `select id from audit_logs where tenant_id = $1 and action in ('framed.action', 'own.action')`,
       [tenantA.tenantId],
     );
-    const systemRows = await admin.query(
-      `select id from audit_logs where tenant_id = $1 and action = 'system.action'`,
-      [tenantA.tenantId],
-    );
-    expect(systemRows.rows).toHaveLength(1);
+    expect(rows.rows).toHaveLength(0);
   });
 
   it("rejects UPDATE, DELETE, and TRUNCATE on audit_logs for `authenticated`", async () => {
@@ -191,16 +177,18 @@ describe.skipIf(!dbAvailable)("audit_logs / analytics_events RLS and immutabilit
     expect(stillThere.rows[0]?.action).toBe("dish.updated");
   });
 
-  it("lets a tenant member insert and read their own tenant's analytics_events, never the other tenant's", async () => {
+  it("denies direct analytics_events INSERT for authenticated, and never lets one tenant read the other's events", async () => {
     fixture = await seedTwoTenantFixture(admin);
     const { tenantA, tenantB } = fixture;
 
-    await queryAsUser(
-      admin,
-      tenantA.ownerId,
-      `insert into analytics_events (tenant_id, event_type) values ($1, 'dish.viewed')`,
-      [tenantA.tenantId],
-    );
+    await expect(
+      queryAsUser(
+        admin,
+        tenantA.ownerId,
+        `insert into analytics_events (tenant_id, event_type) values ($1, 'dish.viewed')`,
+        [tenantA.tenantId],
+      ),
+    ).rejects.toThrow(/permission denied|row-level security/i);
 
     await expectCrossTenantDenied({
       client: admin,
@@ -209,9 +197,7 @@ describe.skipIf(!dbAvailable)("audit_logs / analytics_events RLS and immutabilit
       params: [tenantB.tenantId],
     });
 
-    await queryAsUser(
-      admin,
-      tenantB.ownerId,
+    await admin.query(
       `insert into analytics_events (tenant_id, event_type) values ($1, 'dish.viewed')`,
       [tenantB.tenantId],
     );
@@ -223,10 +209,6 @@ describe.skipIf(!dbAvailable)("audit_logs / analytics_events RLS and immutabilit
       params: [tenantB.tenantId],
     });
   });
-
-  // The three FK-deletion scenarios from Opus review cycle 1 -- run outside
-  // the shared two-tenant fixture (which now purges audit_logs before
-  // deleting tenants in its own cleanup()) so each scenario can assert the
   // *un-purged* real-world behavior directly.
   describe("FK-deletion scenarios (Opus review cycle 1 regression)", () => {
     it("(a) deleting an auth.users row with an audit entry succeeds, nulling actor_user_id", async () => {

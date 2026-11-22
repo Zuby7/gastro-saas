@@ -180,19 +180,27 @@ describe.skipIf(!dbAvailable)("refunds (ticket #26, risk:payment)", () => {
       admin,
       seed.managerId,
       `insert into refunds (tenant_id, payment_id, order_id, amount_cents, currency, reason, actor_user_id, status)
-       values ($1, $2, $3, 700, 'EUR', 'erste Teilerstattung', $4, 'succeeded') returning id`,
+       values ($1, $2, $3, 700, 'EUR', 'erste Teilerstattung', $4, 'pending') returning id`,
       [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId],
     );
     expect(first.rows).toHaveLength(1);
+    await admin.query(`select finalize_refund($1, 'succeeded', $2)`, [
+      first.rows[0]!.id,
+      `re_test_${randomUUID().replace(/-/g, "")}`,
+    ]);
 
     const second = await queryAsUser(
       admin,
       seed.managerId,
       `insert into refunds (tenant_id, payment_id, order_id, amount_cents, currency, reason, actor_user_id, status)
-       values ($1, $2, $3, 1300, 'EUR', 'Rest erstatten', $4, 'succeeded') returning id`,
+       values ($1, $2, $3, 1300, 'EUR', 'Rest erstatten', $4, 'pending') returning id`,
       [fixture.tenantA.tenantId, paymentId, orderId, seed.managerId],
     );
     expect(second.rows).toHaveLength(1);
+    await admin.query(`select finalize_refund($1, 'succeeded', $2)`, [
+      second.rows[0]!.id,
+      `re_test_${randomUUID().replace(/-/g, "")}`,
+    ]);
 
     const total = await admin.query(
       `select coalesce(sum(amount_cents), 0)::int as total from refunds where payment_id = $1 and status = 'succeeded'`,
