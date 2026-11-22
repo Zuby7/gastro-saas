@@ -7,6 +7,39 @@ import { createSupabaseRateLimitStore } from "@/lib/auth/supabase-rate-limit-sto
 import { reserveAndCheckRateLimit } from "@/lib/auth/rate-limit";
 import { getClientIp } from "@/lib/auth/client-ip";
 import { RegisterSchema } from "@/lib/auth/schemas";
+import { padToFloor } from "@/lib/timing/floor";
+
+/**
+ * Issue #204: one message for "new address, confirmation mail sent" and
+ * "address already has an account". It must stay truthful for both, which is
+ * why it is conditional ("Falls ...") rather than a flat "we sent you a mail".
+ */
+const NEUTRAL_REGISTRATION_INFO =
+  "Falls diese E-Mail-Adresse noch nicht registriert ist, haben wir Ihnen einen Bestätigungslink geschickt. Bitte prüfen Sie Ihr Postfach und melden Sie sich nach der Bestätigung an, um Ihr Restaurant anzulegen. Falls Sie bereits ein Konto haben, melden Sie sich bitte direkt an.";
+
+/**
+ * Same mitigation as login's LOGIN_FAILURE_FLOOR_MS (lib/timing/floor.ts):
+ * signUp() does different amounts of work for a new address (password hash,
+ * confirmation mail) than for an existing one, so every non-redirecting
+ * outcome is padded to a common floor. Higher than login's 200 ms because
+ * the new-address path includes handing a mail to the provider.
+ */
+const REGISTER_RESPONSE_FLOOR_MS = 500;
+
+async function neutralOutcome(
+  startedAt: number,
+  rateLimitStore: { markSucceeded: (attemptId: string | null) => Promise<unknown> },
+  attemptId: string | null,
+): Promise<RegisterFormState> {
+  // signUp() itself did not fail, so this is not a failed attempt (Codex
+  // review fix: legitimate confirm-email registrations must not
+  // self-throttle). Applied to the existing-address case as well, otherwise
+  // the rate limit would trip sooner for existing addresses and leak the
+  // very thing the neutral message hides.
+  await rateLimitStore.markSucceeded(attemptId);
+  await padToFloor(startedAt, REGISTER_RESPONSE_FLOOR_MS);
+  return { info: NEUTRAL_REGISTRATION_INFO };
+}
 
 export interface RegisterFormState {
   error?: string;
@@ -28,6 +61,8 @@ export async function registerAction(
   _prevState: RegisterFormState,
   formData: FormData,
 ): Promise<RegisterFormState> {
+  const startedAt = Date.now();
+
   const parsed = RegisterSchema.safeParse({
     tenantName: formData.get("tenantName"),
     tenantSlug: formData.get("tenantSlug"),
@@ -88,54 +123,37 @@ export async function registerAction(
   });
 
   if (signUpError) {
-    // Registration duplicate-email disclosure is accepted UX here (this
-    // ticket's enumeration-safety acceptance criterion targets LOGIN
-    // failures specifically -- see docs/security/threat-model.md
-    // "Enumeration": "no email exists leaks beyond what's necessary for
-    // UX", and telling a user their own email is already registered during
-    // signup is normal, necessary UX).
-    //
-    // Ticket #7 fix cycle 1, item 4: an "already registered" email might
-    // belong to an orphaned auth user (a previous signUp() succeeded but
-    // create_tenant_with_owner() failed, e.g. slug conflict) -- pointing
-    // them at /login rather than a dead end lets the /account fallback
-    // (item 4/5) complete onboarding for that same account.
+    // Issue #204: only the specific "already registered" error (which
+    // Supabase returns when email confirmations are disabled) is folded into
+    // the neutral outcome below. Every other signUp failure stays a generic
+    // error that says nothing about the address.
     const alreadyRegistered = signUpError.message.toLowerCase().includes("already registered");
+    if (alreadyRegistered) {
+      return neutralOutcome(startedAt, rateLimitStore, attemptId);
+    }
 
-    return {
-      error: alreadyRegistered
-        ? "Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an, um Ihr Restaurant anzulegen oder fortzufahren."
-        : "Registrierung nicht möglich. Bitte überprüfen Sie Ihre Eingaben und versuchen Sie es erneut.",
-    };
-  }
-
-  if (signUpData.user && signUpData.user.identities?.length === 0) {
+    await padToFloor(startedAt, REGISTER_RESPONSE_FLOOR_MS);
     return {
       error:
-        "Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an, um Ihr Restaurant anzulegen oder fortzufahren.",
+        "Registrierung nicht möglich. Bitte überprüfen Sie Ihre Eingaben und versuchen Sie es erneut.",
     };
   }
 
-  if (!signUpData.session) {
-    // Ticket #7 fix cycle 1, item 5: with `auth.email.enable_confirmations
-    // = true` (the expected production posture -- local dev currently runs
-    // with it `false`, see supabase/config.toml and
-    // docs/decisions/assumptions.md), signUp() creates the auth.users row
-    // but establishes no session, so create_tenant_with_owner() (which
-    // resolves the owner from auth.uid()) cannot run yet. Tenant creation
-    // is deferred to the user's first confirmed sign-in: loginAction's
-    // redirect to /account lands on a session with zero tenant
-    // memberships, and /account's "create your restaurant" fallback
-    // (item 4) lets them create the tenant then -- this is not a dead end,
-    // just a later step.
-    //
-    // Codex review fix: signUp() itself succeeded here -- this is not a
-    // failed attempt, so it must not count toward the rate limit (otherwise
-    // legitimate confirm-email registrations self-throttle).
-    await rateLimitStore.markSucceeded(attemptId);
-    return {
-      info: "Bitte bestätigen Sie Ihre E-Mail-Adresse über den Link, den wir Ihnen geschickt haben. Melden Sie sich danach an, um Ihr Restaurant anzulegen.",
-    };
+  // With email confirmations enabled (the expected production posture, see
+  // docs/decisions/assumptions.md) Supabase answers a signUp for an existing
+  // address with an obfuscated user that has no identities, and a signUp for
+  // a new address with a user but no session. Both get the exact same
+  // response here, so the form cannot be used to test whether an address has
+  // an account (issue #204, docs/security/threat-model.md "Enumeration").
+  //
+  // For the new-address case tenant creation is deferred to the first
+  // confirmed sign-in (ticket #7 fix cycle 1, item 5): create_tenant_with_owner()
+  // resolves the owner from auth.uid() and there is no session yet. /account's
+  // "create your restaurant" fallback completes onboarding then, and the same
+  // fallback serves an existing account that never got a tenant.
+  const existingAccount = signUpData.user?.identities?.length === 0;
+  if (existingAccount || !signUpData.session) {
+    return neutralOutcome(startedAt, rateLimitStore, attemptId);
   }
 
   const { error: rpcError } = await supabase.rpc("create_tenant_with_owner", {

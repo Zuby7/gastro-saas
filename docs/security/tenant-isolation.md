@@ -36,3 +36,14 @@ Every ticket touching a tenant-scoped table needs a cross-tenant test: create tw
 - Storage objects (media assets) - the bucket stays private; `/media/*` authorizes each path against published, non-archived dishes and streams the bytes server-side. Accepted cache window: after a dish is unpublished or archived, already served photos can remain in public caches for up to 1 day (`max-age`) plus 1 day (`stale-while-revalidate`); image paths are unguessable UUIDs.
 - Analytics aggregates - a bug here is easy to miss because the numbers "look plausible" for the wrong tenant; analytics queries must always filter by tenant first, not last.
 - Integration sync jobs - a shared mock/real provider must never leak one tenant's menu/order data into another tenant's sync payload.
+
+## Hardening after the 2026-11 audit (issue #205)
+
+Migration `20261121090000_db_hardening_audit_2026_11.sql` closes these gaps (each covered by `packages/database/src/db-hardening-audit-2026-11.integration.test.ts`):
+
+- **Function privileges**: `revoke ... from public` does not remove the explicit grants Supabase gives `anon`/`authenticated` on new functions. `anon` may now execute only `get_public_menu` and `get_public_legal_page`; every service_role-only function (checkout, cart, webhook, refund finalization, rate limiting, purge jobs) is explicitly revoked from `anon` and `authenticated`. A generic test fails if any other public function becomes executable. New functions must be added to the test allow-list deliberately.
+- **No direct writes for forged facts**: `audit_logs` and `analytics_events` have no INSERT for `authenticated`; signed-in audit rows go through `record_audit_event()` (actor is always `auth.uid()`, caller must be a tenant member).
+- **Refunds**: the authenticated INSERT policy only admits a `pending` reservation without `stripe_refund_id` and with `actor_user_id = auth.uid()`.
+- **Role escalation**: granting a role (`membership_roles` INSERT) or inviting into a role requires `roles.manage` or that the role's permissions are a subset of the caller's; `owner` additionally always requires `roles.manage`. `accept_invitation` leaves the member with exactly the invited role and rejects accounts that already belong to a tenant.
+- **Menu versions**: app roles can only INSERT drafts, DELETE only drafts, and the editable-version guard checks both OLD and NEW parent.
+- **Manual sales**: `dish_id` must belong to the entry's tenant; `entered_by_user_id` is forced to `auth.uid()` for app roles (also in `commit_sales_import_batch`).

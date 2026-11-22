@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { OrderStatus } from "@gastro-saas/domain";
+import { ORDER_STATUSES, type OrderStatus } from "@gastro-saas/domain";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
@@ -60,6 +61,17 @@ export async function pollTenantOrders(
   return listTenantOrdersForDashboard(supabase, { tenantId: membership.tenantId, limit });
 }
 
+// Server actions are plain HTTP endpoints: the TypeScript parameter types
+// below are not enforced at runtime, so both arguments are validated here
+// before anything reaches the database (issue #204).
+const TransitionOrderStatusSchema = z.object({
+  orderId: z.string().uuid(),
+  toStatus: z.enum(ORDER_STATUSES),
+});
+
+const TRANSITION_FAILED_MESSAGE =
+  "Der Bestellstatus konnte nicht geändert werden. Bitte versuchen Sie es erneut.";
+
 export interface TransitionOrderStatusActionResult {
   error?: string;
   status?: OrderStatus;
@@ -79,9 +91,18 @@ export interface TransitionOrderStatusActionResult {
  * which tenant's board it's viewing.
  */
 export async function transitionOrderStatusAction(
-  orderId: string,
-  toStatus: OrderStatus,
+  rawOrderId: string,
+  rawToStatus: OrderStatus,
 ): Promise<TransitionOrderStatusActionResult> {
+  const parsed = TransitionOrderStatusSchema.safeParse({
+    orderId: rawOrderId,
+    toStatus: rawToStatus,
+  });
+  if (!parsed.success) {
+    return { error: TRANSITION_FAILED_MESSAGE };
+  }
+  const { orderId, toStatus } = parsed.data;
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -134,14 +155,14 @@ export async function transitionOrderStatusAction(
     revalidatePath("/account/orders");
     return { status };
   } catch (error) {
+    // Both domain errors carry only their fixed German default message
+    // (status-service.ts never forwards database error text into them).
     if (error instanceof InvalidOrderStatusTransitionError) {
       return { error: error.message };
     }
     if (error instanceof OrderNotFoundError) {
       return { error: error.message };
     }
-    return {
-      error: "Der Bestellstatus konnte nicht geändert werden. Bitte versuchen Sie es erneut.",
-    };
+    return { error: TRANSITION_FAILED_MESSAGE };
   }
 }

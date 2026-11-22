@@ -40,7 +40,12 @@ export async function GET() {
   }
 
   try {
-    await requireTenantPermission(supabase, membership.tenantId, "tenant.settings.write");
+    // Issue #204: the export contains the tenant's complete data set
+    // (team, orders with customer details, payments), so it needs the same
+    // Owner-only permission as a data deletion request, not merely the
+    // settings permission that Managers hold too. export_tenant_data()
+    // additionally re-checks `tenant.settings.write` inside the database.
+    await requireTenantPermission(supabase, membership.tenantId, "tenant.data.delete");
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return new NextResponse("Forbidden", { status: 403 });

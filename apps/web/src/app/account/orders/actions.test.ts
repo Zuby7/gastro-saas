@@ -275,6 +275,44 @@ describe("pollTenantOrders", () => {
 // sufficient, even though the board's UI never actually renders a cancel
 // button here (UI hiding is never authorization).
 describe("transitionOrderStatusAction", () => {
+  const ORDER_ID = "3f1c2b6e-8a4d-4c1e-9b7a-2d5e6f7a8b9c";
+
+  // Issue #204 (audit 2026-11): server action arguments are untyped at
+  // runtime and must be validated before any database access.
+  it.each([
+    ["a non-uuid order id", "order-1", "accepted"],
+    ["an empty order id", "", "accepted"],
+    ["an unknown status", "3f1c2b6e-8a4d-4c1e-9b7a-2d5e6f7a8b9c", "refunded"],
+    ["a non-string status", "3f1c2b6e-8a4d-4c1e-9b7a-2d5e6f7a8b9c", { $ne: null }],
+  ])(
+    "rejects %s with the default message before touching auth or the database",
+    async (_n, id, status) => {
+      const { transitionOrderStatusAction } = await import("./actions");
+      const result = await transitionOrderStatusAction(id as string, status as never);
+
+      expect(result.error).toBe(
+        "Der Bestellstatus konnte nicht geändert werden. Bitte versuchen Sie es erneut.",
+      );
+      expect(getUserMock).not.toHaveBeenCalled();
+      expect(rpcMock).not.toHaveBeenCalled();
+      expect(transitionOrderStatusMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns the default German message, never raw database error text, when the transition fails unexpectedly", async () => {
+    transitionOrderStatusMock.mockRejectedValueOnce(
+      new Error('insert or update on table "order_status_events" violates foreign key constraint'),
+    );
+
+    const { transitionOrderStatusAction } = await import("./actions");
+    const result = await transitionOrderStatusAction(ORDER_ID, "accepted");
+
+    expect(result.error).toBe(
+      "Der Bestellstatus konnte nicht geändert werden. Bitte versuchen Sie es erneut.",
+    );
+    expect(result.error).not.toContain("order_status_events");
+  });
+
   it("requires orders.cancel (in addition to orders.manage) when transitioning to 'cancelled'", async () => {
     const requestedPermissions: string[] = [];
     rpcMock.mockImplementation(async (fn: string, args: { p_permission_key: string }) => {
@@ -289,7 +327,7 @@ describe("transitionOrderStatusAction", () => {
     });
 
     const { transitionOrderStatusAction } = await import("./actions");
-    const result = await transitionOrderStatusAction("order-1", "cancelled");
+    const result = await transitionOrderStatusAction(ORDER_ID, "cancelled");
 
     expect(requestedPermissions).toEqual(["orders.manage", "orders.cancel"]);
     expect(result.error).toBeDefined();
@@ -307,13 +345,13 @@ describe("transitionOrderStatusAction", () => {
     });
 
     const { transitionOrderStatusAction } = await import("./actions");
-    const result = await transitionOrderStatusAction("order-1", "accepted");
+    const result = await transitionOrderStatusAction(ORDER_ID, "accepted");
 
     expect(requestedPermissions).toEqual(["orders.manage"]);
     expect(result.status).toBe("accepted");
     expect(transitionOrderStatusMock).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ orderId: "order-1", toStatus: "accepted" }),
+      expect.objectContaining({ orderId: ORDER_ID, toStatus: "accepted" }),
     );
   });
 
@@ -321,12 +359,12 @@ describe("transitionOrderStatusAction", () => {
     transitionOrderStatusMock.mockResolvedValue("cancelled");
 
     const { transitionOrderStatusAction } = await import("./actions");
-    const result = await transitionOrderStatusAction("order-1", "cancelled");
+    const result = await transitionOrderStatusAction(ORDER_ID, "cancelled");
 
     expect(result.status).toBe("cancelled");
     expect(transitionOrderStatusMock).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ orderId: "order-1", toStatus: "cancelled" }),
+      expect.objectContaining({ orderId: ORDER_ID, toStatus: "cancelled" }),
     );
   });
 });

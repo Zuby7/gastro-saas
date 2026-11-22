@@ -54,7 +54,9 @@ export async function transitionOrderStatus(
   if (error) {
     const message = error.message ?? "";
     if (message.toLowerCase().includes("invalid order status transition")) {
-      throw new InvalidOrderStatusTransitionError(message);
+      // Issue #204: never forward the raw database error text; the class
+      // default is the user-facing German message.
+      throw new InvalidOrderStatusTransitionError();
     }
     if (message.toLowerCase().includes("order not found")) {
       throw new OrderNotFoundError();

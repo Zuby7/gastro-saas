@@ -35,6 +35,13 @@ export async function acceptInvitationAction(
     if (message.includes("expired")) {
       return { error: "Diese Einladung ist abgelaufen." };
     }
+    // Must be checked before the generic "already" branch below.
+    if (message.includes("already belongs to a tenant")) {
+      return {
+        error:
+          "Dieses Konto gehört bereits zu einem Restaurant. Bitte melden Sie sich mit einer anderen E-Mail-Adresse an.",
+      };
+    }
     if (message.includes("already")) {
       return { error: "Diese Einladung wurde bereits verwendet." };
     }

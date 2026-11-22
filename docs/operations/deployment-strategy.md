@@ -123,3 +123,29 @@ Runbook:
 - Verify runs: `select jobname, status, return_message, start_time from cron.job_run_details order by start_time desc limit 10;` - check after the first night and occasionally; a `failed` status means rows are not being purged.
 - Rotating `IP_HASH_SECRET` resets rate-limit buckets and can double-count views inside the 1-day dedup window; no data migration needed.
 - Until this is verified in production, privacy texts keep saying "vorgesehen" (see `docs/legal/cookie-inventory.md`).
+
+## Apply migration 2026-11 on the hosted project (issue #205)
+
+The hosted Supabase project is not migrated automatically. Recommended order:
+
+1. Deploy the app FIRST. `recordMenuAdminAuditEvent()` calls `record_audit_event()` and falls back to the former direct `audit_logs` insert while the RPC does not exist yet (PostgREST `PGRST202` / Postgres `42883`), so audit logging keeps working in both states.
+2. Run `supabase/migrations/20261121090000_db_hardening_audit_2026_11.sql` once, as a single batch, in the Supabase SQL Editor. The file is additive and idempotent; its header contains the rollback note.
+3. Record the migration so a later `supabase db push` does not re-apply it:
+
+```sql
+insert into supabase_migrations.schema_migrations (version, name)
+values ('20261121090000', 'db_hardening_audit_2026_11')
+on conflict (version) do nothing;
+```
+
+(The table has the columns `version text primary key`, `statements text[]`, `name text`; `statements` may stay null.)
+
+Note for PR #201 (Mollie): its migration `20260910090000` sorts before `20261121090000`. It must get a later timestamp before it is merged, otherwise `db push` would see an unapplied migration older than the latest applied one.
+
+Verification after running (only the two public guest RPCs may be listed, expected `get_public_legal_page` and `get_public_menu`):
+
+```sql
+select proname from pg_proc where pronamespace='public'::regnamespace and has_function_privilege('anon', oid, 'execute') order by 1;
+```
+
+After the migration the transitional fallback in `apps/web/src/lib/audit/record-menu-admin-audit-event.ts` is never reached (direct INSERT into `audit_logs` is denied for `authenticated`); it can be removed in a later cleanup once the hosted project is migrated. `export_tenant_data()` is now Owner-only (`tenant.data.delete`), matching the export route.
