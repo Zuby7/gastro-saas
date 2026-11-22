@@ -409,6 +409,10 @@ create trigger menu_versions_force_draft_on_insert
 
 -- (b) DELETE only for drafts (published/archived versions are history and
 -- are referenced by the live menu).
+-- apply_basic_tenant_policies() created the original policy under the
+-- schema-qualified name "public.menu_versions_delete_write" (regclass::text),
+-- so that exact name must be dropped, not just the unqualified one.
+drop policy if exists "public.menu_versions_delete_write" on menu_versions;
 drop policy if exists menu_versions_delete_write on menu_versions;
 create policy menu_versions_delete_write
   on menu_versions

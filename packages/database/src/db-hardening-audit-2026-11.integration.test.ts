@@ -417,10 +417,7 @@ describe.skipIf(!dbAvailable)("database hardening after audit 2026-11 (issue #20
         `delete from menu_versions where id = $1 returning id`,
         [published.menuVersionId],
       );
-      const policies = await admin.query(
-        `select policyname, cmd, qual from pg_policies where tablename = 'menu_versions'`,
-      );
-      expect(deniedPublished.rows, JSON.stringify(policies.rows)).toHaveLength(0);
+      expect(deniedPublished.rows).toHaveLength(0);
 
       await expectCrossTenantDenied({
         client: admin,

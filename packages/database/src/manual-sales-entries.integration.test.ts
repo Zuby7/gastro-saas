@@ -225,7 +225,9 @@ describe.skipIf(!dbAvailable)("manual_sales_entries (ticket #58)", () => {
     // The guard trigger (issue #205) now rejects such a row outright, so it
     // is disabled for this one insert to keep exercising the RPC's own
     // defense in depth.
-    await admin.query(`alter table manual_sales_entries disable trigger manual_sales_entries_guard`);
+    await admin.query(
+      `alter table manual_sales_entries disable trigger manual_sales_entries_guard`,
+    );
     try {
       await admin.query(
         `insert into manual_sales_entries (tenant_id, dish_id, quantity, sale_date) values ($1, $2, 4, '2026-09-01')`,
