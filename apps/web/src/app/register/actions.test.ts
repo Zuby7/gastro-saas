@@ -30,6 +30,12 @@ vi.mock("@/lib/auth/supabase-rate-limit-store", () => ({
   }),
 }));
 
+const padToFloorMock = vi.fn(async (..._args: unknown[]) => {});
+
+vi.mock("@/lib/timing/floor", () => ({
+  padToFloor: (...args: unknown[]) => padToFloorMock(...args),
+}));
+
 vi.mock("@/lib/auth/client-ip", () => ({
   getClientIp: async () => "203.0.113.20",
 }));
@@ -129,22 +135,84 @@ describe("registerAction", () => {
     const result = await registerAction({}, validFormData());
 
     expect(result.error).toBeUndefined();
-    expect(result.info).toContain("bestätigen");
+    expect(result.info).toContain("Bestätigungslink");
+    expect(result.info).toContain("Postfach");
     expect(rpcMock).not.toHaveBeenCalled();
+    expect(markSucceededMock).toHaveBeenCalledWith("attempt-1");
   });
 
-  it("points an already-registered email at /login instead of a dead end (item 4: orphaned-auth-user recovery)", async () => {
-    signUpMock.mockResolvedValueOnce({
+  // Issue #204 (audit 2026-11): the form must not reveal whether an address
+  // already has an account.
+  describe("enumeration safety (issue #204)", () => {
+    async function outcomeFor(signUpResult: unknown) {
+      vi.clearAllMocks();
+      reserveAttemptMock.mockResolvedValue({
+        attemptId: "attempt-1",
+        ipCount: 1,
+        ipEmailCount: 1,
+      });
+      signUpMock.mockResolvedValueOnce(signUpResult);
+      const { registerAction } = await import("./actions");
+      const result = await registerAction({}, validFormData());
+      return {
+        result,
+        markSucceededCalls: markSucceededMock.mock.calls.length,
+        padCalls: padToFloorMock.mock.calls.map((call) => call[1]),
+        rpcCalls: rpcMock.mock.calls.length,
+      };
+    }
+
+    const newAddress = {
+      data: { session: null, user: { id: "user-1", identities: [{ id: "1" }] } },
+      error: null,
+    };
+    // Supabase's obfuscated response for an existing address when email
+    // confirmations are enabled.
+    const existingObfuscated = {
+      data: { session: null, user: { id: "fake-id", identities: [] } },
+      error: null,
+    };
+    // Supabase's response for an existing address when confirmations are off.
+    const existingError = {
       data: { session: null, user: null },
       error: { message: "User already registered" },
+    };
+
+    it("returns the identical outcome for a new and an already-registered address", async () => {
+      const fresh = await outcomeFor(newAddress);
+      const obfuscated = await outcomeFor(existingObfuscated);
+      const errored = await outcomeFor(existingError);
+
+      expect(fresh.result.info).toBeDefined();
+      expect(fresh.result.error).toBeUndefined();
+      expect(obfuscated).toEqual(fresh);
+      expect(errored).toEqual(fresh);
     });
 
-    const { registerAction } = await import("./actions");
-    const result = await registerAction({}, validFormData());
+    it("never says that the address is already registered", async () => {
+      for (const response of [existingObfuscated, existingError]) {
+        const { result } = await outcomeFor(response);
+        expect(JSON.stringify(result)).not.toContain("bereits registriert");
+        expect(result.info).toContain("melden Sie sich bitte direkt an");
+      }
+    });
 
-    expect(result.error).toContain("bereits registriert");
-    expect(result.error).toContain("melden Sie sich an");
-    expect(rpcMock).not.toHaveBeenCalled();
+    it("pads the neutral outcome to the response floor, measured from the start of the request", async () => {
+      const { padCalls } = await outcomeFor(existingObfuscated);
+      expect(padCalls).toEqual([500]);
+      expect(padToFloorMock.mock.calls[0]?.[0]).toEqual(expect.any(Number));
+    });
+
+    it("keeps other signUp failures a generic error, padded to the same floor", async () => {
+      const { result, padCalls, markSucceededCalls } = await outcomeFor({
+        data: { session: null, user: null },
+        error: { message: "Password should be at least 12 characters" },
+      });
+      expect(result.error).toContain("Registrierung nicht möglich");
+      expect(result.info).toBeUndefined();
+      expect(padCalls).toEqual([500]);
+      expect(markSucceededCalls).toBe(0);
+    });
   });
 
   it("reports a slug conflict distinctly and does not lose the created account", async () => {

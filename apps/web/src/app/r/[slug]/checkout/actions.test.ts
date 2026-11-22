@@ -167,7 +167,7 @@ describe("checkoutAction", () => {
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
-  it("blocks further checkout attempts once the per-IP window is exhausted by prior *successful* checkouts", async () => {
+  it("blocks further checkout attempts once the per-cart window is exhausted by prior *successful* checkouts", async () => {
     // Simulate the rate-limit store's real behavior: because markSucceeded()
     // is never called for the checkout scope, each successful attempt keeps
     // counting toward ipCount on every subsequent reserveAttempt() call --
@@ -186,14 +186,40 @@ describe("checkoutAction", () => {
     expect(createOrderFromCartMock).not.toHaveBeenCalled();
   });
 
-  // Opus review finding on PR #101/#106: reserveAndCheckRateLimit's default
-  // IP-only threshold multiplier (ticket #62, scoped to login/invite only)
-  // must NOT silently widen the checkout scope's IP-only threshold. ipCount:
-  // 11 exceeds maxAttempts (10) but would NOT exceed an implicit 4x-widened
-  // threshold (40) -- if checkout's maxIpAttempts weren't explicitly pinned
-  // to 10, this attempt would wrongly be allowed through.
-  it("blocks a checkout once the IP-only count exceeds its own (unwidened) threshold, even for a different cart", async () => {
+  // Issue #204 (audit 2026-11): every guest on a restaurant's Wi-Fi shares
+  // one public IP. The IP-only bucket must not refuse the eleventh order of
+  // the hour from the whole dining room; only the (ip, cart) bucket is tight.
+  it("does not block a different cart when the shared IP already placed more than 10 orders this hour", async () => {
     reserveAttemptMock.mockResolvedValue({ attemptId: "attempt-11", ipCount: 11, ipEmailCount: 1 });
+
+    const { checkoutAction } = await import("./actions");
+
+    await expect(checkoutAction("demo", {}, validFormData())).rejects.toThrow("NEXT_REDIRECT:");
+    expect(createOrderFromCartMock).toHaveBeenCalledOnce();
+  });
+
+  it("still allows the 120th checkout of the hour from one shared IP", async () => {
+    reserveAttemptMock.mockResolvedValue({
+      attemptId: "attempt-120",
+      ipCount: 120,
+      ipEmailCount: 1,
+    });
+
+    const { checkoutAction } = await import("./actions");
+
+    await expect(checkoutAction("demo", {}, validFormData())).rejects.toThrow("NEXT_REDIRECT:");
+    expect(createOrderFromCartMock).toHaveBeenCalledOnce();
+  });
+
+  // The IP-only bucket is explicit (120), not reserveAndCheckRateLimit's
+  // default multiplier, and still a hard backstop against one source
+  // cycling through many carts (Opus review finding on PR #101/#106).
+  it("blocks a checkout once the IP-only count exceeds its own threshold, even for a fresh cart", async () => {
+    reserveAttemptMock.mockResolvedValue({
+      attemptId: "attempt-121",
+      ipCount: 121,
+      ipEmailCount: 1,
+    });
 
     const { checkoutAction } = await import("./actions");
     const result = await checkoutAction("demo", {}, validFormData());
@@ -202,7 +228,22 @@ describe("checkoutAction", () => {
     expect(createOrderFromCartMock).not.toHaveBeenCalled();
   });
 
-  it("does not block a checkout still within the per-IP window", async () => {
+  it("keeps the (ip, cart) bucket tight: the 11th attempt for the same cart is blocked even on a quiet IP", async () => {
+    reserveAttemptMock.mockResolvedValue({
+      attemptId: "attempt-11",
+      ipCount: 11,
+      ipEmailCount: 11,
+    });
+
+    const { checkoutAction } = await import("./actions");
+    const result = await checkoutAction("demo", {}, validFormData());
+
+    expect(result.error).toContain("Zu viele Bestellversuche");
+    expect(createOrderFromCartMock).not.toHaveBeenCalled();
+    expect(isTenantChargeReadyMock).not.toHaveBeenCalled();
+  });
+
+  it("does not block a checkout still within both windows", async () => {
     reserveAttemptMock.mockResolvedValue({ attemptId: "attempt-9", ipCount: 9, ipEmailCount: 9 });
 
     const { checkoutAction } = await import("./actions");

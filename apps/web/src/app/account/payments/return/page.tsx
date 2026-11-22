@@ -45,9 +45,12 @@ export default async function PaymentsReturnPage() {
     .from("payment_accounts")
     .select("stripe_account_id, status")
     .eq("tenant_id", membership.tenantId)
-    .maybeSingle<{ stripe_account_id: string; status: string }>();
+    .maybeSingle<{ stripe_account_id: string | null; status: string }>();
 
-  if (existing) {
+  // Issue #204: a row can exist before a Stripe account id was ever attached
+  // to it. Calling Retrieve Account with `null` would crash this page, so
+  // there is simply nothing to sync yet in that case.
+  if (existing?.stripe_account_id) {
     const stripe = createStripeClient();
     const account = await retrieveAccount(stripe, existing.stripe_account_id);
     const snapshot = summarizeAccount(account);

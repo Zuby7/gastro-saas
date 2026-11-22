@@ -12,9 +12,9 @@ export async function sendInvitationEmail(input: SendInvitationEmailInput): Prom
     // Opus batch review (epic-3-5-batch, medium): never log the raw
     // single-use invite token/URL -- logging it here would let anyone with
     // log access accept the invitation without ever receiving the email.
-    console.info("[invitations] RESEND_API_KEY missing; invite generated (not sent)", {
-      to: input.to,
-    });
+    // Issue #204: the invitee's address is personal data and stays out of
+    // the logs as well.
+    console.info("[invitations] RESEND_API_KEY missing; invite generated (not sent)");
     return;
   }
 

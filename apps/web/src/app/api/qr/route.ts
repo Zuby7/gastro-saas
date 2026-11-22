@@ -1,7 +1,16 @@
 import { buildTenantQrUrl } from "@gastro-saas/domain";
 import QRCode from "qrcode";
 import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+// Issue #204: the table label ends up inside the generated QR target URL, so
+// it is bounded and restricted to a plain label charset (letters incl.
+// umlauts, digits, space, dot, underscore, hyphen).
+const TableParamSchema = z
+  .string()
+  .max(32)
+  .regex(/^[\p{L}\p{N} ._-]*$/u);
 
 export async function GET(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
@@ -14,7 +23,12 @@ export async function GET(request: NextRequest) {
   }
 
   const slug = request.nextUrl.searchParams.get("slug") ?? "";
-  const table = request.nextUrl.searchParams.get("table");
+  const rawTable = request.nextUrl.searchParams.get("table");
+  const parsedTable = TableParamSchema.nullable().safeParse(rawTable);
+  if (!parsedTable.success) {
+    return new NextResponse("Invalid table", { status: 400 });
+  }
+  const table = parsedTable.data;
   const pickup = request.nextUrl.searchParams.get("pickup") === "1";
 
   const { data: membership } = await supabase

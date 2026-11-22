@@ -135,3 +135,7 @@ Datenschutzerklärung.
 ## Not yet assessed (flag for `/security-gate` before each relevant ticket)
 
 Dispute/chargeback handling, formal penetration testing, GDPR Article 30 records of processing, data processing agreements with each vendor in the service register.
+
+## HTTP security headers (issue #204)
+
+`next.config.ts` sends HSTS, nosniff, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy and a pragmatic CSP (`frame-ancestors 'none'`). The CSP still allows inline scripts/styles required by Next.js. Follow-up: strict nonce-based CSP.

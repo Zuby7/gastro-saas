@@ -120,6 +120,9 @@ export const ManualSaleEntrySchema = z.object({
 
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+// Issue #204: alt text is rendered on the public menu; a short description
+// is all it is meant to hold.
+export const MAX_ALT_TEXT_LENGTH = 250;
 
 export const IMAGE_EXTENSION_BY_MIME: Record<(typeof ALLOWED_IMAGE_TYPES)[number], string> = {
   "image/jpeg": "jpg",

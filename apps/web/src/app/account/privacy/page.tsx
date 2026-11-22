@@ -106,19 +106,24 @@ export default async function PrivacyPage() {
           </Link>
         </div>
 
-        <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">Tenant-Datenexport</h2>
-          <p className="text-sm text-foreground">
-            Exportiert die wesentlichen Tenant-Daten (Profil, Öffnungszeiten, Team, Speisekarte,
-            Bestellungen, Zahlungen) als JSON-Datei.
-          </p>
-          <a
-            href="/api/account/privacy/export"
-            className="w-fit rounded-md border border-neutral-300 px-4 py-2 font-medium text-foreground hover:bg-surface-muted"
-          >
-            Daten exportieren
-          </a>
-        </section>
+        {/* Issue #204: the export endpoint is Owner-only (same permission as
+            deletion requests), so the link is hidden for everyone else. The
+            route itself enforces this; hiding is only to avoid a dead link. */}
+        {canRequestDeletion ? (
+          <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground">Tenant-Datenexport</h2>
+            <p className="text-sm text-foreground">
+              Exportiert die wesentlichen Tenant-Daten (Profil, Öffnungszeiten, Team, Speisekarte,
+              Bestellungen, Zahlungen) als JSON-Datei.
+            </p>
+            <a
+              href="/api/account/privacy/export"
+              className="w-fit rounded-md border border-neutral-300 px-4 py-2 font-medium text-foreground hover:bg-surface-muted"
+            >
+              Daten exportieren
+            </a>
+          </section>
+        ) : null}
 
         <RetentionSettingsForm
           initialRetentionDays={retentionSettings?.analytics_events_retention_days ?? 365}

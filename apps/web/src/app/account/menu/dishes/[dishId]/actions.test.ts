@@ -288,6 +288,20 @@ describe("uploadDishImageAction", () => {
     expect(storageUploadMock).not.toHaveBeenCalled();
   });
 
+  it("rejects an over-long alt text before any permission check or storage access (issue #204)", async () => {
+    allowPermission();
+    const fd = new FormData();
+    fd.set("dishId", "dish-1");
+    fd.set("altText", "a".repeat(251));
+    fd.set("file", fakeFile("dish.jpg", "image/jpeg", makeValidJpegBytes()));
+
+    const { uploadDishImageAction } = await import("./actions");
+    const result = await uploadDishImageAction({}, fd);
+
+    expect(result.error).toMatch(/Alt-Text darf höchstens 250 Zeichen/);
+    expect(storageUploadMock).not.toHaveBeenCalled();
+  });
+
   it("uploads to a tenant-scoped path and attaches the media asset when valid", async () => {
     allowPermission();
     storageUploadMock.mockResolvedValue({ error: null });
