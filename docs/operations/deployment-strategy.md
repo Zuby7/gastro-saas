@@ -149,3 +149,18 @@ select proname from pg_proc where pronamespace='public'::regnamespace and has_fu
 ```
 
 After the migration the transitional fallback in `apps/web/src/lib/audit/record-menu-admin-audit-event.ts` is never reached (direct INSERT into `audit_logs` is denied for `authenticated`); it can be removed in a later cleanup once the hosted project is migrated. `export_tenant_data()` is now Owner-only (`tenant.data.delete`), matching the export route.
+
+## State on main 2026-11-22
+
+Summary of what `main` contains versus what is known to be applied on the hosted systems. Facts that could not be verified from the repository are marked as such.
+
+**Code on `main` (not automatically deployed; no CD pipeline exists):** cookie consent v2 (#162, #163, #166), purge schedule migration and HMAC-salted IP hashes (#164), receipt (#153), online-first checkout (#152), new landing page (#196), audit hardening: security headers and webhook error handling (#204, PR #207) and database hardening (#205, PR #206). The last Worker deployment recorded in these docs is the 2026-10-09 verification (version `41fdbbc1`). Whether a later deploy happened is **unverified**: check with `wrangler deployments list` before assuming the live Worker contains the #204 changes. Open PRs: #201 (PayPal via Mollie, not on `main`) and #208 (performance cleanup).
+
+**Manual steps still required on the hosted Supabase project (SQL Editor, never automatic):**
+
+1. `20261121090000_db_hardening_audit_2026_11.sql` (#205). Apply AFTER deploying the app: the audit helper `recordMenuAdminAuditEvent()` falls back to the old direct insert while `record_audit_event()` does not exist. Run the whole file as one batch, then insert the version into `supabase_migrations.schema_migrations` (SQL in "Apply migration 2026-11" above) and run the anon-privilege verification query.
+2. pg_cron schedule from `20260906170000_schedule_analytics_attempt_purge.sql` (#164, issue still open with `status:blocked-on-external`). Treated as **still pending**, not verified: check `select jobname, schedule from cron.job;`. Prerequisite order: `IP_HASH_SECRET` Worker secret, deploy, then the SQL.
+3. Any migration between `20260820090000` and the latest that is missing on the hosted project: compare the repo's `supabase/migrations` list with `supabase_migrations.schema_migrations` (the table can be read in the SQL Editor, not via REST).
+4. PR #201 (Mollie): its migration `20260910090000` sorts before `20261121090000` and must be renamed to a later timestamp before merge; its Worker secrets and the ADR-0004 setup are applied only after that PR is merged and deployed.
+
+**Still open operationally:** CD pipeline for the Worker, Sentry (#89), migration-drift check in `/release-check`, Accounts v2 evaluation, `CLOUDFLARE_API_TOKEN` rotation, static CSP still contains `unsafe-inline` (nonce follow-up, see [code-health.md](../development/code-health.md)).

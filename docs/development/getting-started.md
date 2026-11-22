@@ -35,6 +35,7 @@ Source of truth: `.env.example` (never commit real values; `.env*` is hook-block
 | `IP_HASH_SECRET`                | server only, Worker secret | Key for the HMAC of visitor IPs used by menu analytics (issue #164). Optional in dev/test; in production its absence disables all menu-view/dish-view/add-to-cart recording (only a `console.warn`)                                                |
 | `RESEND_API_KEY`                | server only, Worker secret | Transactional email (staff invitations, order confirmation). If unset, sending is skipped with a log line                                                                                                                                          |
 | `RESEND_FROM_EMAIL`             | server only                | From address; defaults to Resend's sandbox address                                                                                                                                                                                                 |
+| `PLAYWRIGHT_BASE_URL`           | tooling only               | Optional base URL for Playwright e2e (default `http://127.0.0.1:3000`); not in `.env.example`                                                                                                                                                      |
 | `NEXT_PUBLIC_APP_URL`           | public                     | Public base URL without trailing slash. Used for Stripe success/cancel/return URLs, invite links and QR codes. Defaults to `http://localhost:3000` when unset. On Cloudflare it is a plain `vars` entry in `apps/web/wrangler.jsonc`, not a secret |
 
 If `NEXT_PUBLIC_APP_URL` is unset on a deployed Worker, Stripe redirects back to `localhost` (see [troubleshooting](../operations/troubleshooting.md)).
@@ -76,6 +77,7 @@ Notes:
 - Integration tests exercise migrations, RLS policies and RPCs against a real database and are what CI's "Migration Validation" job runs after `supabase start`. Every ticket touching a tenant-scoped table needs a cross-tenant test (two seeded tenants, see `packages/testing`).
 - e2e is local-only today: `apps/web/e2e/login.spec.ts` covers register -> logout -> login. It is not a CI gate. The Stripe payment path is verified manually against Stripe test mode (see the runbook).
 - Coverage floor: `apps/web/vitest.config.mts` fails `test:coverage` below statements 74 / branches 59 / functions 80 / lines 75 (about 2 points below the measured baseline in [test-strategy.md](../testing/test-strategy.md)). It is only enforced with `--coverage`; plain `pnpm test` and CI are unaffected. Raise the thresholds when the baseline improves.
+- `apps/web/src/no-long-dashes.test.ts` is part of the unit suite: it fails on any em dash (U+2014) or en dash (U+2013) in the repo's text files. Use a hyphen, comma or colon.
 - Before pushing, also run `pnpm lint`, `pnpm typecheck`, `pnpm build` and `pnpm format:check`; CI runs all of them (plus a secret scan) and they are required status checks.
 
 ## Useful local commands

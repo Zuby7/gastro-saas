@@ -4,7 +4,7 @@ Multi-tenant SaaS platform for independent gastronomy businesses (cafés, pizzer
 
 > Internal working name. No public brand name has been chosen yet.
 
-## Status (2026-10-09)
+## Status (2026-11-22)
 
 Epics 1-12 and large parts of the compliance, deployment and quality epics are implemented and deployed in **Stripe test mode only** to a Cloudflare Worker (`https://gastro-saas-web.gastro-saas-web.workers.dev`). Implemented today:
 
@@ -14,7 +14,9 @@ Epics 1-12 and large parts of the compliance, deployment and quality epics are i
 - Staff order dashboard, kitchen workflow, sold-out control, refunds.
 - Analytics (dashboard, top/low performers, trends, extras, manual sales and Excel/CSV import), ratings with moderation, privacy export/deletion requests, legal pages and cookie consent, mock integration provider.
 
-Production Stripe activation, a custom domain, Sentry (#89) and a CD pipeline for the Worker are **not** done; see `docs/operations/deployment-strategy.md` for the open follow-ups and `docs/decisions/assumptions.md` for what was decided without asking.
+Since 2026-10: cookie consent v2 (dialog, versioning, privacy table), receipt, a new landing page, scheduled purge of hashed visitor IPs (#164, needs a manual SQL step on the hosted project), and the 2026-11 audit hardening (security headers, webhook error handling, DB policies; #204, #205). PayPal via Mollie (#195) is an open PR and not on `main`; Stripe does not offer PayPal with Connect (#193).
+
+Production Stripe activation, a custom domain, Sentry (#89) and a CD pipeline for the Worker are **not** done; the hosted database must be migrated by hand (see the 2026-11-22 state in `docs/operations/deployment-strategy.md`); see `docs/operations/deployment-strategy.md` for the open follow-ups and `docs/decisions/assumptions.md` for what was decided without asking.
 
 ## Stack (see ADR-0001 for reasoning)
 
@@ -78,6 +80,8 @@ Start with `docs/README.md` (index of everything). Most useful entry points:
 - Routes and modules: `docs/development/routes-and-modules.md`
 - Contribution flow: `docs/development/contributing-workflow.md`
 - Stripe test mode: `docs/operations/runbook-stripe-test-mode.md`; problems we hit: `docs/operations/troubleshooting.md`
+- Known tech debt and how to measure it: `docs/development/code-health.md`
+- Restaurant owner guide (plain language): `docs/onboarding/onboarding-fuer-gastronomen.md`
 - Non-negotiable rules: `CLAUDE.md`, `docs/security/tenant-isolation.md`, `.claude/rules/`
 
 ## License

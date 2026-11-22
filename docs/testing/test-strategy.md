@@ -52,6 +52,30 @@ As of 2026-08-01 (backfilled per-ticket Opus review of ticket #3), `main`'s bran
 
 Any new required CI job must be added to branch protection via the GitHub API (`gh api -X PUT repos/<owner>/<repo>/branches/main/protection`) in the same PR that introduces it - a job that isn't required doesn't actually gate anything.
 
+## Measuring the current state (do not hard-code counts here)
+
+Counts go stale within days, so measure them:
+
+```bash
+git ls-files | grep -cE '\.test\.tsx?
+
+Measured with `pnpm --filter @gastro-saas/web test:coverage` (`@vitest/coverage-v8`, free): **apps/web statements 76.5 %, branches 61.6 %, functions 82.5 %, lines 77.0 %** (previous measurement on current `main` before the payment/order coverage ticket: 73.7 % / 58.2 % / 81.4 % / 74.2 %; the original 2026-10-09 figure of 57.4 / 42.6 / 58.8 / 57.8 predates the test additions in #170/#171). This excludes the database/RLS/RPC integration tests in `packages/database` (run against a real local Supabase in CI) and the Playwright e2e specs. The remaining gap is mostly Server Components/pages and Supabase-backed services that are covered by integration tests instead of unit tests. Payment/order files now covered: `lib/cart/service.ts`, `lib/orders/service.ts`, `lib/payments/webhook-service.ts` (~99 % lines), `lib/payments/service.ts`, `lib/orders/dashboard-service.ts`, `app/account/payments/{page,refresh,return}`, `middleware.ts`.
+
+**Coverage floor:** `apps/web/vitest.config.mts` sets `test.coverage.thresholds` (statements 74, branches 59, functions 80, lines 75 -- about 2 points below the measured totals). It is only evaluated when running with `--coverage` (`pnpm test:coverage`); plain `pnpm test` and the CI test job are unaffected. Raise the thresholds when the baseline improves. Re-measure before each release (`/release-check`) and record the numbers here.
+                 # all Vitest files (unit + integration + a11y)
+git ls-files | grep -cE '\.integration\.test\.ts
+
+Measured with `pnpm --filter @gastro-saas/web test:coverage` (`@vitest/coverage-v8`, free): **apps/web statements 76.5 %, branches 61.6 %, functions 82.5 %, lines 77.0 %** (previous measurement on current `main` before the payment/order coverage ticket: 73.7 % / 58.2 % / 81.4 % / 74.2 %; the original 2026-10-09 figure of 57.4 / 42.6 / 58.8 / 57.8 predates the test additions in #170/#171). This excludes the database/RLS/RPC integration tests in `packages/database` (run against a real local Supabase in CI) and the Playwright e2e specs. The remaining gap is mostly Server Components/pages and Supabase-backed services that are covered by integration tests instead of unit tests. Payment/order files now covered: `lib/cart/service.ts`, `lib/orders/service.ts`, `lib/payments/webhook-service.ts` (~99 % lines), `lib/payments/service.ts`, `lib/orders/dashboard-service.ts`, `app/account/payments/{page,refresh,return}`, `middleware.ts`.
+
+**Coverage floor:** `apps/web/vitest.config.mts` sets `test.coverage.thresholds` (statements 74, branches 59, functions 80, lines 75 -- about 2 points below the measured totals). It is only evaluated when running with `--coverage` (`pnpm test:coverage`); plain `pnpm test` and the CI test job are unaffected. Raise the thresholds when the baseline improves. Re-measure before each release (`/release-check`) and record the numbers here.
+       # integration files (need local Supabase)
+git ls-files | grep -cE 'a11y\.test'                      # axe-based accessibility unit tests
+pnpm test                                                # total tests: read the Vitest summary
+pnpm --filter @gastro-saas/web test:coverage             # coverage vs. the floor
+```
+
+Guard tests worth knowing: `apps/web/src/no-long-dashes.test.ts` (no U+2013/U+2014 in any text file). Playwright is still a single local spec (`apps/web/e2e/login.spec.ts`) and not a CI gate. The 2026-11 audit work (#204, #205) added DB integration tests for the new policies and unit tests for the webhook error paths; the performance cleanup (#203) brings its own tests with PR #208.
+
 ## Coverage baseline (2026-10-09)
 
 Measured with `pnpm --filter @gastro-saas/web test:coverage` (`@vitest/coverage-v8`, free): **apps/web statements 76.5 %, branches 61.6 %, functions 82.5 %, lines 77.0 %** (previous measurement on current `main` before the payment/order coverage ticket: 73.7 % / 58.2 % / 81.4 % / 74.2 %; the original 2026-10-09 figure of 57.4 / 42.6 / 58.8 / 57.8 predates the test additions in #170/#171). This excludes the database/RLS/RPC integration tests in `packages/database` (run against a real local Supabase in CI) and the Playwright e2e specs. The remaining gap is mostly Server Components/pages and Supabase-backed services that are covered by integration tests instead of unit tests. Payment/order files now covered: `lib/cart/service.ts`, `lib/orders/service.ts`, `lib/payments/webhook-service.ts` (~99 % lines), `lib/payments/service.ts`, `lib/orders/dashboard-service.ts`, `app/account/payments/{page,refresh,return}`, `middleware.ts`.

@@ -10,6 +10,7 @@
 | [development/architecture-overview.md](development/architecture-overview.md) | Request flow, tenant isolation model, RLS/RPC pattern, Workers constraints, payments, cookies, analytics |
 | [development/routes-and-modules.md](development/routes-and-modules.md)       | Every route with purpose/auth, and a map of `apps/web/src/lib` and `packages/*`                          |
 | [development/contributing-workflow.md](development/contributing-workflow.md) | Ticket, branch, PR, CI, review and merge policy                                                          |
+| [development/code-health.md](development/code-health.md)                     | Known tech debt with ticket links and how to measure it                                                  |
 
 ## Architecture and data
 
@@ -26,7 +27,7 @@
 | Document                                                                     | What it covers                                                                        |
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | [security/tenant-isolation.md](security/tenant-isolation.md)                 | The three isolation layers (guest paths, app authorization, RLS) and test requirement |
-| [security/threat-model.md](security/threat-model.md)                         | Threats, mitigations, accepted risks                                                  |
+| [security/threat-model.md](security/threat-model.md)                         | Threats, mitigations, 2026-11 audit findings, open risks                              |
 | [legal/cookie-inventory.md](legal/cookie-inventory.md)                       | Cookie inventory, consent mechanism, maintenance rule (German, not legal advice)      |
 | [legal/rechtsgrundlagen-uebersicht.md](legal/rechtsgrundlagen-uebersicht.md) | Overview of legal bases (German, not legal advice)                                    |
 | [testing/test-strategy.md](testing/test-strategy.md)                         | Test pyramid, CI gate order, required status checks, coverage baseline and floor      |
@@ -42,13 +43,15 @@
 
 ## Product, platform, decisions, tickets
 
-| Document                                                     | What it covers                                                           |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| [product/product-vision.md](product/product-vision.md)       | Vision and target users                                                  |
-| [product/mvp-scope.md](product/mvp-scope.md)                 | MVP scope                                                                |
-| [product/non-goals.md](product/non-goals.md)                 | What is deliberately not built                                           |
-| [platform/service-register.md](platform/service-register.md) | External services, free-tier limits, license policy                      |
-| [decisions/assumptions.md](decisions/assumptions.md)         | Decisions made without asking, user-directed decisions, residual risks   |
-| [tickets/README.md](tickets/README.md)                       | Local mirror of the GitHub Issues backlog (epics, milestones, numbering) |
+| Document                                                                               | What it covers                                                           |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [product/product-vision.md](product/product-vision.md)                                 | Vision and target users                                                  |
+| [product/mvp-scope.md](product/mvp-scope.md)                                           | MVP scope                                                                |
+| [product/non-goals.md](product/non-goals.md)                                           | What is deliberately not built                                           |
+| [platform/service-register.md](platform/service-register.md)                           | External services, free-tier limits, license policy                      |
+| [decisions/assumptions.md](decisions/assumptions.md)                                   | Decisions made without asking, user-directed decisions, residual risks   |
+| [tickets/README.md](tickets/README.md)                                                 | Local mirror of the GitHub Issues backlog (epics, milestones, numbering) |
+| [onboarding/onboarding-fuer-gastronomen.md](onboarding/onboarding-fuer-gastronomen.md) | Plain-language guide for restaurant owners (German, with screenshots)    |
+| [design/landing-assets.md](design/landing-assets.md)                                   | Assets and sources used by the marketing landing page                    |
 
 Rules that apply to code live outside `docs/`: `CLAUDE.md` (invariants) and `.claude/rules/*.md` (auth, backend-api, database-migrations, deployment, frontend, integrations, payments, security, tenant-isolation, testing, analytics).
