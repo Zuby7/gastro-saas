@@ -41,9 +41,9 @@ vi.mock("@/lib/invitations/email", () => ({
   sendInvitationEmail: (...args: unknown[]) => sendInvitationEmailMock(...args),
 }));
 
-vi.mock("@/lib/invitations/tokens", () => ({
-  createInvitationToken: () => "raw-token",
-  hashInvitationToken: () => "a".repeat(64),
+vi.mock("@/lib/security/opaque-token", () => ({
+  createOpaqueToken: () => "raw-token",
+  sha256Hex: () => "a".repeat(64),
 }));
 
 function membershipQueryBuilder(result: {

@@ -53,7 +53,6 @@ describe("IP hash salting (#164)", () => {
     vi.resetModules();
     const svc = await import("./service");
     await svc.recordMenuViewOnce("some-tenant", TENANT);
-    await svc.recordDishViewOnce("some-tenant", TENANT, DISH);
     await svc.recordDishViewsOnce("some-tenant", TENANT, [DISH]);
     await svc.recordAddToCartEventOnce("some-tenant", TENANT, DISH);
 

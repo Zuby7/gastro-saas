@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatPrice } from "@/lib/public-menu/format";
-import { getPublicMenu } from "@/lib/public-menu/fetch";
-import { loadCartViewForDisplay } from "../cart/actions";
+import { loadCartViewForDisplay } from "@/lib/cart/display";
+import { getPublicTenantName } from "@/lib/public-menu/fetch";
 import { CheckoutForm } from "./checkout-form";
 
 interface CheckoutPageProps {
@@ -11,13 +11,15 @@ interface CheckoutPageProps {
 
 export default async function CheckoutPage({ params }: CheckoutPageProps) {
   const { slug } = await params;
-  const menu = await getPublicMenu(slug);
+  const [tenantName, cart] = await Promise.all([
+    getPublicTenantName(slug),
+    loadCartViewForDisplay(slug),
+  ]);
 
-  if (!menu) {
+  if (!tenantName) {
     notFound();
   }
 
-  const cart = await loadCartViewForDisplay(slug);
   const checkoutReady = Boolean(cart?.checkoutReady);
 
   return (
@@ -30,7 +32,7 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
           <div>
             <h1 className="font-display text-3xl font-semibold tracking-tight text-white">Kasse</h1>
-            <p className="mt-1 text-sm text-white/80">{menu.tenant.name}</p>
+            <p className="mt-1 text-sm text-white/80">{tenantName}</p>
           </div>
           <Link
             href={`/r/${slug}/cart`}

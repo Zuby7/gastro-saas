@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAccountContext } from "@/lib/auth/account-context";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
-import { getCurrentMembership } from "@/lib/tenant/current-membership";
 import { getOrCreateDraftMenuVersionId } from "@/lib/menu/current-draft";
 import { CategoryForm } from "./category-form";
 import { CategoryRow } from "./category-row";
@@ -32,16 +31,12 @@ interface DishRecord {
  * (`/account/menu/dishes/[dishId]`) linked from each dish row.
  */
 export default async function MenuPage() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, membership } = await getAccountContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  const membership = await getCurrentMembership(supabase, user.id);
   if (!membership) {
     redirect("/account");
   }
@@ -69,21 +64,22 @@ export default async function MenuPage() {
 
   const draftId = await getOrCreateDraftMenuVersionId(supabase, membership.tenantId);
 
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("id, name, sort_order")
-    .eq("menu_version_id", draftId)
-    .is("archived_at", null)
-    .order("sort_order")
-    .returns<CategoryRecord[]>();
-
-  const { data: dishes } = await supabase
-    .from("dishes")
-    .select("id, category_id, name, price_cents, allergen_reviewed")
-    .eq("menu_version_id", draftId)
-    .is("archived_at", null)
-    .order("name")
-    .returns<DishRecord[]>();
+  const [{ data: categories }, { data: dishes }] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id, name, sort_order")
+      .eq("menu_version_id", draftId)
+      .is("archived_at", null)
+      .order("sort_order")
+      .returns<CategoryRecord[]>(),
+    supabase
+      .from("dishes")
+      .select("id, category_id, name, price_cents, allergen_reviewed")
+      .eq("menu_version_id", draftId)
+      .is("archived_at", null)
+      .order("name")
+      .returns<DishRecord[]>(),
+  ]);
 
   const dishesByCategory = new Map<string, DishRecord[]>();
   for (const dish of dishes ?? []) {

@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { CreateTenantSchema, InviteMemberSchema } from "@/lib/auth/schemas";
 import { sendInvitationEmail } from "@/lib/invitations/email";
-import { createInvitationToken, hashInvitationToken } from "@/lib/invitations/tokens";
+import { createOpaqueToken, sha256Hex } from "@/lib/security/opaque-token";
 import { PermissionDeniedError, requireTenantPermission } from "@/lib/auth/permissions";
 import { createSupabaseRateLimitStore } from "@/lib/auth/supabase-rate-limit-store";
 import { reserveAndCheckRateLimit } from "@/lib/auth/rate-limit";
@@ -189,8 +189,8 @@ export async function inviteMemberAction(
     };
   }
 
-  const token = createInvitationToken();
-  const tokenHash = hashInvitationToken(token);
+  const token = createOpaqueToken();
+  const tokenHash = sha256Hex(token);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
