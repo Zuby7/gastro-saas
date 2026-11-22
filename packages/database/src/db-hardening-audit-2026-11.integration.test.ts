@@ -245,7 +245,7 @@ describe.skipIf(!dbAvailable)("database hardening after audit 2026-11 (issue #20
         queryAsUser(admin, managerId, insertSql("pending", "re_fake123", "$4"), params),
       ).rejects.toThrow(/row-level security|permission denied/i);
       await expect(
-          queryAsUser(admin, managerId, insertSql("pending", null, "$4"), [
+        queryAsUser(admin, managerId, insertSql("pending", null, "$4"), [
           f.tenantA.tenantId,
           paymentId,
           orderId,
