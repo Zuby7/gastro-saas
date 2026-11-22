@@ -35,7 +35,7 @@ Scope: multi-tenant gastronomy SaaS handling menu data, orders, payments (via St
 
 ## Datenschutz: Aufbewahrung, Export, Löschung
 
-Ticket #36. Tenant-scoped, Owner/`tenant.settings.write`-gated data export
+Ticket #36. Tenant-scoped, Owner-only (`tenant.data.delete`, tightened in #205) data export
 (`export_tenant_data()`, `apps/web/src/app/api/account/privacy/export/route.ts`)
 and an Owner-only (`tenant.data.delete`) deletion-request workflow
 (`process_tenant_data_deletion_request()`,
@@ -136,6 +136,33 @@ Datenschutzerklärung.
 
 Dispute/chargeback handling, formal penetration testing, GDPR Article 30 records of processing, data processing agreements with each vendor in the service register.
 
-## HTTP security headers (issue #204)
+## Security and database audit 2026-11 (issues #204, #205)
 
-`next.config.ts` sends HSTS, nosniff, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy and a pragmatic CSP (`frame-ancestors 'none'`). The CSP still allows inline scripts/styles required by Next.js. Follow-up: strict nonce-based CSP.
+Verified findings of the 2026-11 audit and what fixed them. Tickets: [#204](../tickets/50-epic15-sicherheits-haertung-audit-2026-11.md) (app, PR #207) and [#205](../tickets/51-epic15-datenbank-haertung-audit-2026-11.md) (database, PR #206, migration `20261121090000_db_hardening_audit_2026_11.sql`).
+
+| Finding                                                                                                      | Fix                                                                                                                                                                                                                                             | Ticket |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| No HTTP security headers                                                                                     | `next.config.ts`: HSTS, nosniff, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy, CSP with `frame-ancestors 'none'`, `form-action` allow-list, `poweredByHeader: false`; `public/_headers` for static assets                          | #204   |
+| Token URLs (`/r/:slug/orders/*`, `/invite/*`) leak via Referer and get indexed                               | `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex, nofollow` on those paths                                                                                                                                                             | #204   |
+| Payment webhook treated transient DB errors as "not found", marked the event processed, Stripe never retried | Database errors now throw (route answers 5xx, event stays claimable); `null` only for a truly missing row; `flagPaymentForReview` checks the update result; Connect return page guards `stripe_account_id = null`                               | #204   |
+| Registration revealed whether an email is already registered                                                 | Same neutral result for existing and new addresses, same minimum response time as login                                                                                                                                                         | #204   |
+| Checkout IP limit (10/hour) could block a whole restaurant behind shared Wi-Fi                               | IP limit raised, narrow limit per (IP, cart) kept                                                                                                                                                                                               | #204   |
+| Unvalidated inputs (order status action, QR `table`, image `altText`), invitee email in logs                 | zod validation, 400 on bad `table`, length cap, email no longer logged                                                                                                                                                                          | #204   |
+| Role escalation: a user with `users.manage` could grant a role stronger than their own                       | `membership_roles` INSERT and `create_invitation` require the granted role's permissions to be a subset of the caller's (or `roles.manage`); Owner stays protected; `accept_invitation` grants exactly the invited role, one tenant per account | #205   |
+| Audit and analytics forging: any member could insert arbitrary `audit_logs` / `analytics_events` rows        | Direct INSERT revoked for `authenticated`; audit rows written via `record_audit_event()` (actor always `auth.uid()`, caller must be a tenant member)                                                                                            | #205   |
+| `refunds` INSERT policy allowed pre-finalised rows with a fake Stripe refund id and arbitrary actor          | INSERT limited to a pending reservation by the caller; finalisation is `service_role` only (`finalize_refund()`)                                                                                                                                | #205   |
+| Data export reachable with `tenant.settings.write`                                                           | `export_tenant_data()` and the export route are Owner-only (`tenant.data.delete`)                                                                                                                                                               | #205   |
+| `menu_versions` / `manual_sales_entries` integrity gaps; broad function EXECUTE grants                       | Forced draft on insert, DELETE only for drafts; dish/tenant match trigger and forced `entered_by_user_id`; anon may execute only `get_public_legal_page` and `get_public_menu`                                                                  | #205   |
+
+Operational rollout of the migration: [deployment-strategy.md](../operations/deployment-strategy.md) ("State on main 2026-11-22").
+
+### Open risks after the audit (not fixed or not verified)
+
+- **CSP is not strict.** Scripts and styles still allow `'unsafe-inline'` because of Next.js bootstrap scripts; a nonce-based CSP is a follow-up (see [code-health.md](../development/code-health.md)). Impact: reduced XSS defence in depth, not an open XSS.
+- **Webhook residue (#209).** `markOrderCancelledForPaymentFailure` only logs a failed insert into `order_status_events` and ignores a failed `payments` update, so the event counts as processed. Also unverified: whether `stripe_checkout_session_id` and `stripe_payment_intent_id` are unique; a `maybeSingle()` with several matches now throws permanently and Stripe retries until the endpoint is disabled.
+- **Registration enumeration residue (#209).** The 500 ms padding may be shorter than the confirmation-mail send for new accounts (timing channel), and the mail rate limit is a second channel. Both are documented, not closed. Whether `enable_confirmations` is active on the hosted Supabase project is **unverified**; if it is off, enumeration stays possible.
+- **Cart creation has no per-IP rate limit (#210).** Needs a migration extending the allowed scopes of `auth_rate_limit_attempts`.
+- **Hashed visitor IPs are not purged on the hosted project until the pg_cron SQL is run (#164).** Privacy texts still say "vorgesehen".
+- **Hosted DB migration state is unverified.** Until `20261121090000` is applied, the DB policies fixed in #205 (role escalation, audit forging, refunds INSERT) are still the old ones in production.
+- **Mollie (#195, #200, PR #201) is not reviewed or merged.** Open issue: an open Mollie payment can stay payable after the timeout sweep cancels the order (#200); the webhook flags a late payment for manual review but does not prevent it.
+- **Not assessed:** MFA for Owner/Manager (accepted risk, see assumptions), dispute handling, penetration test, GDPR Article 30 records.

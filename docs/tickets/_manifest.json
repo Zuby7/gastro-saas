@@ -352,5 +352,94 @@
     ],
     "milestone": 13,
     "issue": 162
+  },
+  {
+    "file": "docs/tickets/45-epic14-paypal-stripe-connect-pruefung.md",
+    "title": "PayPal im Checkout: Stripe-Connect-Freischaltung und Umstellung ohne on_behalf_of prüfen (ADR-0002)",
+    "labels": [
+      "type:research",
+      "area:payments",
+      "priority:medium",
+      "risk:payment",
+      "phase:post-mvp"
+    ],
+    "milestone": 14,
+    "issue": 193
+  },
+  {
+    "file": "docs/tickets/46-epic14-paypal-ueber-mollie-connect.md",
+    "title": "PayPal über Mollie Connect (Plattform-Modell, Händler = Restaurant)",
+    "labels": [
+      "type:feature",
+      "area:payments",
+      "priority:high",
+      "risk:security",
+      "risk:payment",
+      "phase:mvp"
+    ],
+    "milestone": 14,
+    "issue": 195
+  },
+  {
+    "file": "docs/tickets/47-epic5-neue-landing-page-modern-saas.md",
+    "title": "Neue Landing Page im Modern-SaaS-Stil mit Farbverläufen und Holo-Effekten",
+    "labels": [
+      "type:feature",
+      "area:frontend",
+      "priority:medium",
+      "risk:accessibility",
+      "phase:mvp"
+    ],
+    "milestone": 5,
+    "issue": 196
+  },
+  {
+    "file": "docs/tickets/48-epic14-mollie-zahlung-bei-timeout-abbrechen.md",
+    "title": "Mollie-Zahlung abbrechen, wenn der Timeout-Sweep die Bestellung storniert",
+    "labels": ["type:bug", "area:payments", "risk:payment"],
+    "milestone": 14,
+    "issue": 200
+  },
+  {
+    "file": "docs/tickets/49-epic15-ladezeiten-und-aufraeumen-audit-2026-11.md",
+    "title": "Ladezeiten und Aufräumen nach Audit 2026-11 (Bild-Auslieferung, Menü-Wasserfall, Middleware, toter Code)",
+    "labels": ["type:refactor", "area:frontend", "priority:high"],
+    "milestone": 15,
+    "issue": 203
+  },
+  {
+    "file": "docs/tickets/50-epic15-sicherheits-haertung-audit-2026-11.md",
+    "title": "Sicherheits-Härtung nach Audit 2026-11 (Header, Webhook-Fehlerbehandlung, Enumeration, Limits)",
+    "labels": ["type:security", "area:auth", "priority:high", "risk:security", "risk:payment"],
+    "milestone": 15,
+    "issue": 204
+  },
+  {
+    "file": "docs/tickets/51-epic15-datenbank-haertung-audit-2026-11.md",
+    "title": "Datenbank-Härtung nach Audit 2026-11 (Policies, Rollen-Eskalation, Indizes, Bestell-/Entwurfs-Fehler)",
+    "labels": [
+      "type:security",
+      "area:database",
+      "priority:high",
+      "risk:security",
+      "risk:migration",
+      "risk:privacy"
+    ],
+    "milestone": 15,
+    "issue": 205
+  },
+  {
+    "file": "docs/tickets/52-epic14-webhook-restfehler-und-registrierungs-restkanaele.md",
+    "title": "Webhook-Restfehler: Fehler bei Stornierung nach Zahlungsfehlschlag werden verschluckt; Registrierungs-Restkanäle dokumentieren",
+    "labels": ["type:bug", "area:payments", "priority:medium", "risk:payment"],
+    "milestone": 14,
+    "issue": 209
+  },
+  {
+    "file": "docs/tickets/53-epic15-rate-limit-gast-warenkoerbe.md",
+    "title": "Rate-Limit für das Anlegen von Gast-Warenkörben (neuer Scope per Migration)",
+    "labels": ["type:security", "area:ordering", "priority:medium", "risk:security"],
+    "milestone": 15,
+    "issue": 210
   }
 ]

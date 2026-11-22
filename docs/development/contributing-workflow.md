@@ -8,6 +8,7 @@ Authoritative rules: root `CLAUDE.md`. This page is the practical walk-through. 
 - **Issue titles and bodies are German** (explicit user instruction). Everything else (code, identifiers, docs, commit messages) is English. Chat with the owner is German.
 - The local mirror in `docs/tickets/` is a content record; if scope changes, update the GitHub Issue and re-sync the file, not the other way around.
 - Tickets labelled `risk:security`, `risk:payment`, `risk:migration` or `risk:privacy` (or anything touching payments, auth or tenant migrations) get extra scrutiny, see section 4.
+- Every PR needs a linked issue (`Closes #<n>`), including small fixes and docs-only changes. Work that was merged without one had to be backfilled with retroactive tickets on 2026-11-22 (#211 to #225); do not repeat that.
 - One ticket is one focused PR. No unrelated refactoring, no speculative abstractions.
 
 ## 2. Branch
@@ -40,6 +41,7 @@ Definition of Done (details: [test-strategy.md](../testing/test-strategy.md)): r
 
 - Open a PR against `main` using `.github/pull_request_template.md` (German headings): issue reference (`Closes #<n>`), summary, acceptance-criteria checklist, migration and rollback notes, security / tenant-isolation / analytics impact, test evidence, Opus verdict.
 - CI runs on every PR and on pushes to `main`. Required status checks on `main`: `Format Check`, `Lint`, `Typecheck`, `Unit Tests`, `Build`, `Secret Scan` (all `.github/workflows/ci.yml`) and `Migration Validation` (`migration-check.yml`: `supabase start`, `supabase db lint`, DB integration tests, cross-tenant harness test). The branch must be up to date with `main` (`strict`), and admins are not exempt.
+- The unit suite includes a typography guard (`apps/web/src/no-long-dashes.test.ts`): no U+2013/U+2014 anywhere in the repo's text files.
 - E2E (Playwright) is local-only and not a CI gate yet; the dependency scan is not implemented yet ([test-strategy.md](../testing/test-strategy.md)).
 - A new required CI job must be added to branch protection in the same PR, otherwise it gates nothing.
 
@@ -55,7 +57,7 @@ Definition of Done (details: [test-strategy.md](../testing/test-strategy.md)): r
 - **No PR merges until its epic's Opus batch review returned `APPROVED`.** Under the standing user authorization, once that verdict exists the PRs of that epic may be merged without asking again; without it, nothing merges, including trivial CI/docs PRs ([ship-ticket skill](../../.claude/skills/ship-ticket/SKILL.md)).
 - If `main` advanced, update your branch and let CI re-run (see [troubleshooting.md](../operations/troubleshooting.md), "PR is behind main").
 - Merging does not deploy: no pipeline runs `deploy:cf`. Staging/production promotion is manual, and production deploys, production migrations, domain purchases, paid signups and Stripe live activation always need explicit human approval ([deployment-strategy.md](../operations/deployment-strategy.md), `.claude/rules/deployment.md`).
-- Migrations are not applied to the hosted Supabase project by merging; apply them manually before deploying code that depends on them.
+- Migrations are not applied to the hosted Supabase project by merging; apply them manually. Default order: migration first, then deploy code that depends on it. Exception: when the app code has a documented fallback for the missing DB object (the 2026-11 hardening migration, see [deployment-strategy.md](../operations/deployment-strategy.md)), deploy first. Record applied versions in `supabase_migrations.schema_migrations`.
 
 ## 7. Non-negotiables (from CLAUDE.md)
 

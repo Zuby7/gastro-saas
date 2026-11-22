@@ -8,7 +8,7 @@ Multi-tenant gastronomy SaaS (working name `gastro-saas`). Full product spec liv
 - `docs/` - single source of truth for product, architecture, security, data model, operations, decisions. Update the authoritative doc when a decision changes; don't create a second conflicting doc.
 - `docs/tickets/` - local mirror of the GitHub Issues backlog.
 
-## Standard commands (once the app is scaffolded)
+## Standard commands
 
 `pnpm install` · `pnpm dev` · `pnpm lint` · `pnpm typecheck` · `pnpm test` · `pnpm test:e2e` · `pnpm build`
 

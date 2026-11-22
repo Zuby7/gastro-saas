@@ -38,7 +38,7 @@ stripe listen --events checkout.session.completed,checkout.session.expired,payme
 stripe listen --events account.updated --forward-to localhost:3000/api/webhooks/stripe-connect
 ```
 
-Both routes verify the signature against the raw body and deduplicate by event id (`payment_webhook_events`, `claim_payment_webhook_event()`); duplicates return 200 with `duplicate: true`.
+Both routes verify the signature against the raw body and deduplicate by event id (`payment_webhook_events`, `claim_payment_webhook_event()`); duplicates return 200 with `duplicate: true`. A transient database error during processing makes the route answer 5xx and leaves the event claimable again, so Stripe retries it (since #204); only a genuinely missing order/payment row is treated as "not found" and acknowledged.
 
 ## 4. Public URL
 
@@ -64,7 +64,7 @@ Any future expiry, any CVC, any postcode:
 | `4000 0000 0000 0002` | Declined                          |
 | `4000 0025 0000 3155` | Requires 3D Secure authentication |
 
-> **PayPal is not available** for Connect payments in this setup (checked 2026-10-09 against the Stripe test account). Stripe answers a Checkout Session with PayPal + Connect with `Your Stripe account currently does not support Connect payments with PayPal` (platform eligibility, https://docs.stripe.com/payments/paypal#connect), and PayPal + `on_behalf_of` with `on_behalf_of cannot be used with the paypal payment method`. PayPal works only on the platform account itself. Enabling it would need a Stripe eligibility approval and dropping `on_behalf_of` (changes the merchant of record), see issue #193. The checkout therefore advertises only card, Klarna and other methods Stripe offers dynamically (Apple Pay, Link, Amazon Pay, bank methods).
+> **PayPal is not available** for Connect payments in this setup (checked 2026-10-09 against the Stripe test account). Stripe answers a Checkout Session with PayPal + Connect with `Your Stripe account currently does not support Connect payments with PayPal` (platform eligibility, https://docs.stripe.com/payments/paypal#connect), and PayPal + `on_behalf_of` with `on_behalf_of cannot be used with the paypal payment method`. PayPal works only on the platform account itself. Enabling it would need a Stripe eligibility approval and dropping `on_behalf_of` (changes the merchant of record), see issue #193. PayPal through Mollie Connect (restaurant is the merchant, no Stripe involvement) is tracked in #195 (open PR #201, not on `main`). The checkout therefore advertises only card, Klarna and other methods Stripe offers dynamically (Apple Pay, Link, Amazon Pay, bank methods).
 
 ## 7. Verify the payment path (manual end-to-end check)
 
@@ -76,7 +76,7 @@ There is no automated Stripe e2e test (Playwright covers only register/login). V
 4. The receipt link (`/beleg`) appears for the paid order.
 5. In the database: `payments.status = 'paid'`, `orders.status = 'received'`, one row in `payment_webhook_events` with `processed_at` set. In the staff dashboard `/account/orders` the order shows up.
 6. Refund check: as a role with `payments.refund`, refund the order from `/account/orders/<id>`; `refunds.status` becomes `succeeded`.
-7. Negative checks worth doing after changes to payment code: decline card (order stays `awaiting_payment`, then cancelled by the timeout sweep after 30 minutes), replay a webhook with the Dashboard "resend" (returns `duplicate: true`), send a request with a bad signature (400).
+7. Negative checks worth doing after changes to payment code: decline card (order stays `awaiting_payment`, then cancelled by the timeout sweep after 30 minutes), replay a webhook with the Dashboard "resend" (returns `duplicate: true`), send a request with a bad signature (400). Delivery log shows 5xx for an event: Stripe retries automatically; check the Worker logs for the database error before replaying manually.
 
 If step 3 never completes, see [troubleshooting.md](troubleshooting.md) (wrong webhook secret, endpoint not reachable, localhost redirect).
 

@@ -116,6 +116,14 @@ Full detail: `docs/operations/deployment-strategy.md`'s "Real Supabase project w
 - **Migrations/seed data: explicitly BLOCKED, not attempted around.** `supabase link` requires a Supabase CLI account access token (`supabase login`/`SUPABASE_ACCESS_TOKEN`) before it will even ask for the project DB password - neither credential exists in this repo. Per the user's explicit instruction, this was reported as a blocker rather than guessed/worked around. No production data exists yet, so the `trattoria-da-mario` live-menu-page check could not be completed either.
 - **Credential rotation** for `CLOUDFLARE_API_TOKEN` (flagged in the previous pass, see below) remains explicitly deferred by the user for this pass - not revisited here.
 
+## Status 2026-11-22: decisions made without asking since the last update
+
+- **Retroactive tickets.** Merged PRs without an issue (#150, #151, #154, #161, #170 to #172, #187 to #190, #194, #197, #199, #202) got closed, German-language backfill issues #211 to #225 attached under their epic parents, so the backlog matches `main`. PRs before 2026-09-12 without issue (e.g. #141 to #149) were not backfilled.
+- **PayPal.** Stripe cannot offer PayPal with Connect or `on_behalf_of` (#193, exact error messages in the Stripe runbook). The chosen direction is PayPal through Mollie Connect with the restaurant as merchant (#195, ADR-0004 in PR #201); it is not on `main` and nothing on `main` advertises PayPal.
+- **Audit 2026-11.** Security and database hardening (#204, #205) was done on the owner's instruction without per-finding questions; unverified items are listed as open risks in `docs/security/threat-model.md`. The `record_audit_event()` fallback in app code is transitional and may be removed once the hosted DB is migrated.
+- **Static CSP keeps `'unsafe-inline'`** for scripts and styles because Next.js inlines bootstrap scripts; a nonce-based CSP is deferred (see `docs/development/code-health.md`).
+- **Status (2026-11-22):** a hosted Supabase project, a Cloudflare Worker and a Stripe test-mode platform exist; Sentry (#89), PostHog and Better Stack are still not integrated; a real Resend key on the Worker is unverified.
+
 ## Explicitly not decided yet (needs the user or a later ticket)
 
 - (Status 2026-10-09: a hosted Supabase project, a Cloudflare Worker and a Stripe test-mode platform exist; Resend is integrated in code but a real Worker key is not documented here; Sentry (#89), PostHog and Better Stack are not integrated.) Further real Stripe/Supabase/Resend/Sentry/PostHog/Better Stack account creation - these need the user's own email/identity and, for Stripe, banking details for payouts.

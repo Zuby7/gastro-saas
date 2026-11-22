@@ -41,6 +41,17 @@ Real problems hit while building and deploying this project, as symptom -> cause
 - **Cause**: `NEXT_PUBLIC_APP_URL` was unset on the Worker; `lib/payments/service.ts`, `app/account/payments/actions.ts` and `app/account/actions.ts` fall back to localhost (issue #157).
 - **Fix**: it is a plain `vars` entry in `apps/web/wrangler.jsonc`; set it to the real public base URL (no trailing slash) and redeploy. When the domain changes, update it and the Stripe webhook endpoints together.
 
+### Browser blocks a request or redirect (Content-Security-Policy)
+
+- **Symptom**: console shows "Refused to ... because it violates the following Content Security Policy directive", e.g. a redirect to Stripe after a form post, or an image/connection to a new host.
+- **Cause**: since #204 `apps/web/next.config.ts` sends a CSP. `form-action` allows only `'self'`, `checkout.stripe.com` and `connect.stripe.com`; `img-src`/`connect-src` allow `'self'` plus the Supabase origin derived from `NEXT_PUBLIC_SUPABASE_URL`.
+- **Fix**: add the new origin to the matching directive in `buildContentSecurityPolicy()`, nothing broader. Inline scripts/styles are still allowed (nonce CSP is a follow-up, see [code-health.md](../development/code-health.md)).
+
+### Staff action fails with a missing function (`PGRST202` / `42883`) after deploying the 2026-11 code
+
+- **Cause**: the hosted project has not received `20261121090000_db_hardening_audit_2026_11.sql` yet. Audit logging falls back to the old direct insert, but other new behaviour (role-escalation check, `record_audit_event()`) needs the migration.
+- **Fix**: run the migration as described in deployment-strategy.md ("Apply migration 2026-11") and register the version.
+
 ### Menu/dish view statistics silently stop
 
 - **Cause**: `IP_HASH_SECRET` is not set as a Worker secret in production; all `record_*` analytics calls are skipped with only a `console.warn`.
@@ -71,7 +82,7 @@ Real problems hit while building and deploying this project, as symptom -> cause
 
 ### Payment succeeds at Stripe but the order stays `awaiting_payment`
 
-- **Check**: the webhook never arrived or was rejected. Verify the payment-events endpoint exists and points at the live URL, that `STRIPE_WEBHOOK_SECRET` is the secret of **that** endpoint (not the Connect one), and the delivery log in the Dashboard (400 means a signature problem; 500 means processing failed and Stripe will retry). If `payments.status = 'flagged_for_review'`, an amount, tenant or after-cancellation mismatch was detected on purpose: investigate, never force-mark paid.
+- **Check**: the webhook never arrived or was rejected. Verify the payment-events endpoint exists and points at the live URL, that `STRIPE_WEBHOOK_SECRET` is the secret of **that** endpoint (not the Connect one), and the delivery log in the Dashboard (400 means a signature problem; 500 means processing failed and Stripe will retry). A repeating 500 for the same event id means a database error or a `maybeSingle()` that matched several rows (see open risk in the threat model, #209). If `payments.status = 'flagged_for_review'`, an amount, tenant or after-cancellation mismatch was detected on purpose: investigate, never force-mark paid.
 
 ## Git, CI and Windows
 

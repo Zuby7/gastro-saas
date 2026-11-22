@@ -1,0 +1,1 @@
+Sicherheits- und Robustheitsbefunde aus dem Datenbank-Audit 2026-11: Refund-INSERT-Policy, Rollen-Eskalation, accept_invitation, Forge-Policies auf audit_logs/analytics_events, menu_versions, manual_sales_entries, service_role-only Funktionen, Bestell-Index pro Warenkorb, build_cart_view-Reihenfolge, leerer Entwurf nach Veröffentlichung, fehlende Indizes.
