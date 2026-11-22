@@ -45,6 +45,20 @@ interface PaymentRecord {
   status: string;
 }
 
+/**
+ * Issue #204: a failed lookup (database unreachable, timeout, ...) is NOT the
+ * same as "no such row". Treating it as "not found" made the handler return
+ * normally, the route marked the event processed, and Stripe never retried,
+ * leaving a paid order stuck in `awaiting_payment`. Every lookup therefore
+ * throws on `error` (the route answers 5xx and leaves the event reclaimable)
+ * and returns `null` only for a row that genuinely does not exist.
+ */
+function lookupError(table: string, error: { message?: string }): Error {
+  return new Error(
+    `[payments-webhook] ${table} lookup failed: ${error.message ?? "unknown error"}`,
+  );
+}
+
 async function fetchOrder(admin: SupabaseClient, orderId: string): Promise<OrderRecord | null> {
   const { data, error } = await admin
     .from("orders")
@@ -58,7 +72,10 @@ async function fetchOrder(admin: SupabaseClient, orderId: string): Promise<Order
       currency: string;
     }>();
 
-  if (error || !data) {
+  if (error) {
+    throw lookupError("orders", error);
+  }
+  if (!data) {
     return null;
   }
 
@@ -107,7 +124,10 @@ async function fetchPaymentByCheckoutSessionId(
     .eq("stripe_checkout_session_id", stripeCheckoutSessionId)
     .maybeSingle();
 
-  if (error || !data) {
+  if (error) {
+    throw lookupError("payments", error);
+  }
+  if (!data) {
     return null;
   }
 
@@ -126,7 +146,10 @@ async function fetchPaymentByPaymentIntentId(
     .eq("stripe_payment_intent_id", stripePaymentIntentId)
     .maybeSingle();
 
-  if (error || !data) {
+  if (error) {
+    throw lookupError("payments", error);
+  }
+  if (!data) {
     return null;
   }
 
@@ -137,11 +160,17 @@ async function fetchTenantStripeAccountId(
   admin: SupabaseClient,
   tenantId: string,
 ): Promise<string | null> {
-  const { data } = await admin
+  const { data, error } = await admin
     .from("payment_accounts")
     .select("stripe_account_id")
     .eq("tenant_id", tenantId)
     .maybeSingle<{ stripe_account_id: string }>();
+
+  // A failed lookup must not be read as "tenant has no account": that would
+  // silently skip the connected-account cross-check below.
+  if (error) {
+    throw lookupError("payment_accounts", error);
+  }
 
   return data?.stripe_account_id ?? null;
 }
@@ -203,7 +232,19 @@ async function flagPaymentForReview(
     | "payment_after_order_cancelled_flagged",
   metadata: Record<string, unknown>,
 ): Promise<void> {
-  await admin.from("payments").update({ status: "flagged_for_review" }).eq("id", payment.id);
+  const { error: flagError } = await admin
+    .from("payments")
+    .update({ status: "flagged_for_review" })
+    .eq("id", payment.id);
+
+  // If the flag itself could not be written, the event must stay
+  // reclaimable: acknowledging it would lose the only trace that this
+  // payment needs manual review.
+  if (flagError) {
+    throw new Error(
+      `[payments-webhook] failed to flag payment ${payment.id} for review: ${flagError.message}`,
+    );
+  }
 
   await recordOrderAuditEvent(admin, {
     tenantId: payment.tenantId,

@@ -43,7 +43,7 @@ vi.mock("@/lib/stripe/connect", () => ({
 
 function setup(options: {
   membership?: { tenant_id: string; role: string } | null;
-  existing?: { stripe_account_id: string; status: string } | null;
+  existing?: { stripe_account_id: string | null; status: string } | null;
   permissionError?: "denied" | "unexpected" | null;
 }) {
   const membership =
@@ -125,6 +125,15 @@ describe("PaymentsReturnPage", () => {
     expect(html).toContain('href="/account/payments"');
     expect(retrieveAccountMock).not.toHaveBeenCalled();
     expect(adminRpcMock).not.toHaveBeenCalled();
+  });
+
+  it("renders without calling Stripe when the row has no stripe_account_id yet (issue #204)", async () => {
+    setup({ existing: { stripe_account_id: null, status: "not_connected" } });
+    const html = await render();
+    expect(html).toContain("Stripe-Onboarding abgeschlossen");
+    expect(retrieveAccountMock).not.toHaveBeenCalled();
+    expect(adminRpcMock).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalled();
   });
 
   it("re-fetches the account from Stripe and applies the snapshot via the admin RPC, auditing a status change", async () => {

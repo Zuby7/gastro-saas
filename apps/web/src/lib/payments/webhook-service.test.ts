@@ -79,7 +79,7 @@ function makeAdmin() {
             eq: () => ({
               maybeSingle: async () => ({
                 data: state.order,
-                error: state.order ? null : { message: "not found" },
+                error: null,
               }),
             }),
           }),
@@ -90,15 +90,13 @@ function makeAdmin() {
           select: () => ({
             eq: (column: string, value: string) => ({
               maybeSingle: async () => {
-                if (!state.payment) return { data: null, error: { message: "not found" } };
+                if (!state.payment) return { data: null, error: null };
                 const match =
                   (column === "stripe_checkout_session_id" &&
                     state.payment.stripe_checkout_session_id === value) ||
                   (column === "stripe_payment_intent_id" &&
                     state.payment.stripe_payment_intent_id === value);
-                return match
-                  ? { data: state.payment, error: null }
-                  : { data: null, error: { message: "not found" } };
+                return match ? { data: state.payment, error: null } : { data: null, error: null };
               },
             }),
           }),

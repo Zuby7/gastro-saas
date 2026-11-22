@@ -3,6 +3,7 @@
 import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 
 import { uploadDishImageAction, type DishActionState } from "./actions";
+import { MAX_ALT_TEXT_LENGTH } from "./schemas";
 
 const initialState: DishActionState = {};
 
@@ -76,6 +77,7 @@ export function ImageUploadForm({
             id="dish-image-alt"
             name="altText"
             required
+            maxLength={MAX_ALT_TEXT_LENGTH}
             defaultValue={currentAltText ?? ""}
             className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
           />

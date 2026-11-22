@@ -25,6 +25,9 @@ interface Scenario {
   tenantStripeAccountId: string | null;
   rpcResult: { data: boolean | null; error: { message: string } | null };
   eventInsertError: { message: string } | null;
+  /** Issue #204: simulated transient DB failures, keyed by table name. */
+  lookupErrors: Partial<Record<"orders" | "payments" | "payment_accounts", { message: string }>>;
+  paymentUpdateError: { message: string } | null;
 }
 
 let scenario: Scenario;
@@ -55,6 +58,8 @@ function reset() {
     tenantStripeAccountId: "acct_123",
     rpcResult: { data: true, error: null },
     eventInsertError: null,
+    lookupErrors: {},
+    paymentUpdateError: null,
   };
   paymentUpdates.length = 0;
   eventInserts.length = 0;
@@ -70,9 +75,9 @@ function makeAdmin() {
             select: () => ({
               eq: () => ({
                 maybeSingle: async () =>
-                  scenario.order
-                    ? { data: scenario.order, error: null }
-                    : { data: null, error: { message: "nf" } },
+                  scenario.lookupErrors.orders
+                    ? { data: null, error: scenario.lookupErrors.orders }
+                    : { data: scenario.order, error: null },
               }),
             }),
           };
@@ -81,25 +86,29 @@ function makeAdmin() {
             select: () => ({
               eq: () => ({
                 maybeSingle: async () =>
-                  scenario.payment
-                    ? { data: scenario.payment, error: null }
-                    : { data: null, error: null },
+                  scenario.lookupErrors.payments
+                    ? { data: null, error: scenario.lookupErrors.payments }
+                    : { data: scenario.payment, error: null },
               }),
             }),
             update: (payload: unknown) => {
               paymentUpdates.push(payload);
-              return { eq: async () => ({ error: null }) };
+              return { eq: async () => ({ error: scenario.paymentUpdateError }) };
             },
           };
         case "payment_accounts":
           return {
             select: () => ({
               eq: () => ({
-                maybeSingle: async () => ({
-                  data: scenario.tenantStripeAccountId
-                    ? { stripe_account_id: scenario.tenantStripeAccountId }
-                    : null,
-                }),
+                maybeSingle: async () =>
+                  scenario.lookupErrors.payment_accounts
+                    ? { data: null, error: scenario.lookupErrors.payment_accounts }
+                    : {
+                        data: scenario.tenantStripeAccountId
+                          ? { stripe_account_id: scenario.tenantStripeAccountId }
+                          : null,
+                        error: null,
+                      },
               }),
             }),
           };
@@ -413,4 +422,70 @@ describe("unhandled event types", () => {
       expect(paymentUpdates).toHaveLength(0);
     },
   );
+});
+
+// Issue #204 (audit 2026-11): a transient database failure during a lookup
+// must never be mistaken for "row not found". The handler has to throw so
+// the route answers 5xx, leaves `processed_at` null, and Stripe retries.
+describe("transient database errors are not treated as 'not found' (issue #204)", () => {
+  const dbError = { message: "connection terminated unexpectedly" };
+
+  it.each([
+    ["checkout.session.completed", () => completed()],
+    ["checkout.session.expired", () => expired()],
+    ["payment_intent.payment_failed", () => failed()],
+  ])("%s: throws when the payments lookup fails", async (_name, makeEvent) => {
+    scenario.lookupErrors.payments = dbError;
+    await expect(handle(makeEvent())).rejects.toThrow(/payments lookup failed/);
+    expect(rpcCalls).toHaveLength(0);
+    expect(paymentUpdates).toHaveLength(0);
+    expect(eventInserts).toHaveLength(0);
+  });
+
+  it.each([
+    ["checkout.session.completed", () => completed()],
+    ["checkout.session.expired", () => expired()],
+    ["payment_intent.payment_failed", () => failed()],
+  ])("%s: throws when the orders lookup fails", async (_name, makeEvent) => {
+    scenario.lookupErrors.orders = dbError;
+    await expect(handle(makeEvent())).rejects.toThrow(/orders lookup failed/);
+    expect(rpcCalls).toHaveLength(0);
+    expect(paymentUpdates).toHaveLength(0);
+    expect(eventInserts).toHaveLength(0);
+  });
+
+  it("throws when the payment_accounts lookup fails instead of skipping the account cross-check", async () => {
+    scenario.lookupErrors.payment_accounts = dbError;
+    // The tenant's real current account differs from the payment's: if the
+    // failed lookup were read as "no account", this mismatch would go
+    // unnoticed and the order would be marked paid.
+    scenario.tenantStripeAccountId = "acct_rotated";
+    await expect(handle(completed())).rejects.toThrow(/payment_accounts lookup failed/);
+    expect(rpcCalls).toHaveLength(0);
+    expect(auditActions()).toEqual([]);
+  });
+
+  it("throws when flagging a payment for review cannot be written, and records no audit event", async () => {
+    scenario.paymentUpdateError = dbError;
+    await expect(handle(completed({ amount_total: 1 }))).rejects.toThrow(/failed to flag payment/);
+    expect(auditActions()).toEqual([]);
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it("a genuinely missing row (no error) is still acknowledged without throwing", async () => {
+    scenario.payment = null;
+    await expect(handle(completed())).resolves.toBeUndefined();
+    reset();
+    scenario.order = null;
+    await expect(handle(completed())).resolves.toBeUndefined();
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it("the retried delivery succeeds once the database is reachable again", async () => {
+    scenario.lookupErrors.payments = dbError;
+    await expect(handle(completed())).rejects.toThrow();
+    scenario.lookupErrors = {};
+    await expect(handle(completed())).resolves.toBeUndefined();
+    expect(rpcCalls.map((call) => call.fn)).toEqual(["mark_order_received_and_paid"]);
+  });
 });

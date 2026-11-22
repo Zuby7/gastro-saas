@@ -19,6 +19,7 @@ import {
   DishBasicsSchema,
   LookupNameSchema,
   ManualSaleEntrySchema,
+  MAX_ALT_TEXT_LENGTH,
   MAX_IMAGE_SIZE_BYTES,
   OptionGroupSchema,
   OptionSchema,
@@ -647,6 +648,10 @@ export async function uploadDishImageAction(
 
   if (!dishId || !altText) {
     return { error: "Bitte geben Sie einen Alt-Text an und wählen Sie eine Datei." };
+  }
+
+  if (altText.length > MAX_ALT_TEXT_LENGTH) {
+    return { error: `Der Alt-Text darf höchstens ${MAX_ALT_TEXT_LENGTH} Zeichen lang sein.` };
   }
 
   if (!(file instanceof File) || file.size === 0) {

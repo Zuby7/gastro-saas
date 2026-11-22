@@ -14,6 +14,11 @@ import { createCheckoutSessionForOrder, isTenantChargeReady } from "@/lib/paymen
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { CheckoutSchema } from "./schemas";
 
+/** Per (ip, cart) pair and hour: one guest's own orders. */
+const CHECKOUT_MAX_ATTEMPTS_PER_CART = 10;
+/** Per IP and hour: every guest behind one shared connection combined. */
+const CHECKOUT_MAX_ATTEMPTS_PER_IP = 120;
+
 export interface CheckoutFormState {
   error?: string;
 }
@@ -73,12 +78,16 @@ export async function checkoutAction(
     // unlimited real orders as long as each one succeeds. Every checkout
     // attempt therefore counts, success or failure.
     //
-    // 10 attempts/hour per IP (and per (ip, cart) pair) is generous enough
-    // for a real guest's normal use (at most a handful of orders per visit)
-    // while still bounding automated abuse to a small, easily-noticed volume
-    // per hour -- unlike the login scope's much lower threshold, which is
-    // tuned for credential-guessing rather than "how many genuine orders
-    // could one person place."
+    // Two deliberately different thresholds (issue #204, audit 2026-11):
+    //
+    // - (ip, cart): CHECKOUT_MAX_ATTEMPTS_PER_CART per hour. One cart is one
+    //   guest, and a real guest places at most a handful of orders per
+    //   visit, so this bucket stays tight.
+    // - ip only: CHECKOUT_MAX_ATTEMPTS_PER_IP per hour. All guests on a
+    //   restaurant's own Wi-Fi share one public IP; the previous value of 10
+    //   meant the eleventh order of the hour from the whole dining room was
+    //   refused. The IP-only bucket is now only a backstop against one
+    //   source cycling through many carts, sized for a busy service.
     const admin = createSupabaseAdminClient();
     const rateLimitStore = createSupabaseRateLimitStore(admin);
     const ip = await getClientIp();
@@ -86,14 +95,11 @@ export async function checkoutAction(
       scope: "checkout",
       ip,
       email: cartId,
-      maxAttempts: 10,
-      // Explicit and deliberately equal to maxAttempts (no widening) -- Opus
-      // review finding on PR #101: ticket #62's shared-IP/CGNAT concern was
-      // scoped to the login lockout only. Relying on
-      // reserveAndCheckRateLimit's default multiplier here would have
-      // silently loosened this scope's IP-only threshold too, which was
-      // never part of that ticket.
-      maxIpAttempts: 10,
+      maxAttempts: CHECKOUT_MAX_ATTEMPTS_PER_CART,
+      // Always explicit, never reserveAndCheckRateLimit's default multiplier
+      // (Opus review finding on PR #101): this scope's IP-only threshold is
+      // its own decision, see the comment above.
+      maxIpAttempts: CHECKOUT_MAX_ATTEMPTS_PER_IP,
       windowSeconds: 60 * 60,
     });
 
