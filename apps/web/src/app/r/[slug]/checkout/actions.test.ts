@@ -7,6 +7,8 @@ const recordOrderAuditEventMock = vi.fn();
 const writeOrderAccessTokenCookieMock = vi.fn();
 const isTenantChargeReadyMock = vi.fn();
 const createCheckoutSessionForOrderMock = vi.fn();
+const isTenantPaypalAvailableMock = vi.fn();
+const createMolliePaymentForOrderMock = vi.fn();
 const redirectMock = vi.fn((target: string) => {
   // Next's real redirect() signals control flow via a thrown, special
   // NEXT_REDIRECT error that Next's own machinery catches further up the
@@ -66,6 +68,14 @@ vi.mock("@/lib/payments/service", () => ({
   createCheckoutSessionForOrder: (...args: unknown[]) => createCheckoutSessionForOrderMock(...args),
 }));
 
+vi.mock("@/lib/mollie/tokens", () => ({
+  isTenantPaypalAvailable: (...args: unknown[]) => isTenantPaypalAvailableMock(...args),
+}));
+
+vi.mock("@/lib/payments/mollie-service", () => ({
+  createMolliePaymentForOrder: (...args: unknown[]) => createMolliePaymentForOrderMock(...args),
+}));
+
 vi.mock("next/cache", () => ({
   revalidatePath: () => {},
 }));
@@ -97,6 +107,75 @@ beforeEach(() => {
   isTenantChargeReadyMock.mockResolvedValue(true);
   createCheckoutSessionForOrderMock.mockResolvedValue({
     checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_123",
+  });
+  isTenantPaypalAvailableMock.mockResolvedValue(true);
+  createMolliePaymentForOrderMock.mockResolvedValue({
+    checkoutUrl: "https://www.mollie.com/checkout/select-method/abc",
+  });
+});
+
+describe("checkoutAction payment method (issue #195)", () => {
+  it("redirects to the Mollie checkout for paypal, without touching Stripe", async () => {
+    const fd = validFormData();
+    fd.set("paymentMethod", "paypal");
+    const { checkoutAction } = await import("./actions");
+
+    await expect(checkoutAction("demo", {}, fd)).rejects.toThrow("NEXT_REDIRECT:");
+    expect(redirectMock).toHaveBeenCalledWith("https://www.mollie.com/checkout/select-method/abc");
+    expect(createMolliePaymentForOrderMock).toHaveBeenCalledWith({
+      tenantId: "tenant-1",
+      tenantSlug: "demo",
+      orderId: "order-1",
+      guestAccessToken: "raw-token",
+    });
+    expect(createCheckoutSessionForOrderMock).not.toHaveBeenCalled();
+    expect(isTenantChargeReadyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects paypal server-side, before creating an order, when the tenant has no usable Mollie connection", async () => {
+    isTenantPaypalAvailableMock.mockResolvedValue(false);
+    const fd = validFormData();
+    fd.set("paymentMethod", "paypal");
+    const { checkoutAction } = await import("./actions");
+
+    const result = await checkoutAction("demo", {}, fd);
+    expect(result.error).toContain("PayPal ist für dieses Restaurant derzeit nicht verfügbar");
+    expect(createOrderFromCartMock).not.toHaveBeenCalled();
+    expect(createMolliePaymentForOrderMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown payment method value", async () => {
+    const fd = validFormData();
+    fd.set("paymentMethod", "bitcoin");
+    const { checkoutAction } = await import("./actions");
+
+    const result = await checkoutAction("demo", {}, fd);
+    expect(result.error).toBe("Bitte wählen Sie eine gültige Zahlungsart.");
+    expect(createOrderFromCartMock).not.toHaveBeenCalled();
+  });
+
+  it("defaults to Stripe when no paymentMethod field is submitted, and for explicit 'stripe'", async () => {
+    const { checkoutAction } = await import("./actions");
+    await expect(checkoutAction("demo", {}, validFormData())).rejects.toThrow("NEXT_REDIRECT:");
+    expect(createCheckoutSessionForOrderMock).toHaveBeenCalledOnce();
+
+    const fd = validFormData();
+    fd.set("paymentMethod", "stripe");
+    await expect(checkoutAction("demo", {}, fd)).rejects.toThrow("NEXT_REDIRECT:");
+    expect(createMolliePaymentForOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a generic error (no internal detail) when Mollie payment creation fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    createMolliePaymentForOrderMock.mockRejectedValue(new Error("Bearer access_secret rejected"));
+    const fd = validFormData();
+    fd.set("paymentMethod", "paypal");
+    const { checkoutAction } = await import("./actions");
+
+    const result = await checkoutAction("demo", {}, fd);
+    expect(result.error).not.toContain("access_secret");
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 });
 

@@ -101,3 +101,32 @@ describe("CheckoutForm accessibility", () => {
     expect(agbLink).toHaveAttribute("href", "/r/demo/agb");
   });
 });
+
+describe("CheckoutForm payment method (issue #195)", () => {
+  it("does not render the payment method choice when PayPal is not available", () => {
+    render(<CheckoutForm tenantSlug="demo" checkoutReady />);
+    expect(screen.queryByRole("group", { name: "Zahlungsart" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "PayPal" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[name="paymentMethod"]')).toBeNull();
+  });
+
+  it("renders a labeled radio group with Stripe as the default when PayPal is available", () => {
+    render(<CheckoutForm tenantSlug="demo" checkoutReady paypalAvailable />);
+
+    expect(screen.getByRole("group", { name: "Zahlungsart" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: "Karte, Klarna, Apple Pay und weitere" }),
+    ).toBeChecked();
+    expect(screen.getByRole("radio", { name: "PayPal" })).not.toBeChecked();
+  });
+
+  it("switches to PayPal and submits the chosen value", () => {
+    render(<CheckoutForm tenantSlug="demo" checkoutReady paypalAvailable />);
+
+    fireEvent.click(screen.getByRole("radio", { name: "PayPal" }));
+    expect(screen.getByRole("radio", { name: "PayPal" })).toBeChecked();
+    const form = document.querySelector("form")!;
+    expect(new FormData(form).get("paymentMethod")).toBe("paypal");
+    expect(screen.getByText(/Sichere Zahlung über PayPal/)).toBeInTheDocument();
+  });
+});

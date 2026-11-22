@@ -57,6 +57,8 @@ Ticket #21 (Epic 6) implements the order state machine and guest checkout on top
 
 Implemented (Epic 7): `payment_accounts` (Connect status `pending`/`restricted`/`enabled`), `payments` (`pending`/`paid`/`failed`/`cancelled`/`flagged_for_review`, one row per Checkout Session), `refunds` (`pending`/`succeeded`/`failed`/`unconfirmed`, reserved before the Stripe call, finalized service-role only) and `payment_webhook_events` (Stripe event-id dedup). Flow and state machine: `docs/development/architecture-overview.md`; setup: `docs/operations/runbook-stripe-test-mode.md`.
 
+Issue #195 (PayPal via Mollie, ADR-0004) adds `tenant_mollie_accounts` (encrypted OAuth tokens, service-role only) and a second provider on `payments` (`provider` stripe/mollie, `mollie_payment_id`). Naming caveat: for Mollie payments the provider refund id (`re_...`) is stored in `refunds.stripe_refund_id`; the column name is historical, the owning `payments.provider` says which API issued it.
+
 ## Analytics
 
 `analytics_events`, `daily_analytics_aggregates`.

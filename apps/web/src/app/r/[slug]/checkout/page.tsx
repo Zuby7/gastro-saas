@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatPrice } from "@/lib/public-menu/format";
 import { getPublicMenu } from "@/lib/public-menu/fetch";
+import { resolveTenantIdBySlug } from "@/lib/cart/service";
+import { isTenantPaypalAvailable } from "@/lib/mollie/tokens";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadCartViewForDisplay } from "../cart/actions";
 import { CheckoutForm } from "./checkout-form";
 
@@ -19,6 +22,19 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
 
   const cart = await loadCartViewForDisplay(slug);
   const checkoutReady = Boolean(cart?.checkoutReady);
+
+  // Issue #195: offer PayPal only when the server sees a connected Mollie
+  // account with PayPal enabled. This only controls what is rendered; the
+  // checkout action re-validates the choice server-side.
+  let paypalAvailable = false;
+  try {
+    const tenantId = await resolveTenantIdBySlug(slug);
+    paypalAvailable = tenantId
+      ? await isTenantPaypalAvailable(createSupabaseAdminClient(), tenantId)
+      : false;
+  } catch {
+    paypalAvailable = false;
+  }
 
   return (
     <main className="min-h-screen bg-surface-secondary">
@@ -67,7 +83,11 @@ export default async function CheckoutPage({ params }: CheckoutPageProps) {
               </div>
             </div>
 
-            <CheckoutForm tenantSlug={slug} checkoutReady={checkoutReady} />
+            <CheckoutForm
+              tenantSlug={slug}
+              checkoutReady={checkoutReady}
+              paypalAvailable={paypalAvailable}
+            />
           </>
         )}
       </div>

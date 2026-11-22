@@ -5,6 +5,7 @@ import { formatOrderTimestamp } from "@/lib/orders/format";
 import { getOrderStatusByToken } from "@/lib/orders/service";
 import { hashOrderAccessToken } from "@/lib/orders/token";
 import { isOrderPaidStatus } from "@/lib/orders/receipt";
+import { getPaidPaymentMethodLabel } from "@/lib/payments/payment-method-label";
 import { PrintButton } from "./print-button";
 
 interface ReceiptPageProps {
@@ -73,6 +74,7 @@ export default async function ReceiptPage({ params }: ReceiptPageProps) {
   // The payment webhook moves the order to `received`; its first history
   // entry is therefore the payment confirmation time (no extra RPC field).
   const paidEntry = order.statusHistory.find((entry) => entry.status === "received");
+  const paymentMethodLabel = await getPaidPaymentMethodLabel(order.orderId);
 
   return (
     <main className="min-h-screen bg-surface-secondary print:bg-surface">
@@ -106,7 +108,9 @@ export default async function ReceiptPage({ params }: ReceiptPageProps) {
               <dt className="text-foreground-secondary">Bestellart</dt>
               <dd className="text-foreground">{fulfillmentLabel}</dd>
               <dt className="text-foreground-secondary">Zahlung</dt>
-              <dd className="text-foreground">Online bezahlt</dd>
+              <dd className="text-foreground">
+                Online bezahlt{paymentMethodLabel ? ` (${paymentMethodLabel})` : ""}
+              </dd>
               {paidEntry ? (
                 <>
                   <dt className="text-foreground-secondary">Bezahlt am</dt>

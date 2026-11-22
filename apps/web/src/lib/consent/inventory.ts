@@ -46,6 +46,14 @@ export const COOKIE_INVENTORY: readonly CookieInventoryEntry[] = [
     category: "necessary",
   },
   {
+    name: "gastro_mollie_oauth_nonce",
+    purpose:
+      "Sicherheits-Cookie beim Verbinden von PayPal über Mollie (nur für angemeldete Inhaber): schützt den Rücksprung von Mollie vor Fremdaufrufen. Enthält eine zufällige Zeichenfolge und wird nach dem Rücksprung gelöscht.",
+    duration: "10 Minuten",
+    provider: "Diese Website (Erstanbieter)",
+    category: "necessary",
+  },
+  {
     name: "gastro_view_<slug>",
     purpose:
       "Enthält eine zufällige Kennung, um Speisekarten-Aufrufe, Gericht-Ansichten und „In den Warenkorb“-Aktionen je Besuch nur einmal zu zählen. Dabei wird ein Hash Ihrer IP-Adresse zur Missbrauchsabwehr (Ratenbegrenzung) und Mehrfachzählung verarbeitet.",
@@ -64,7 +72,11 @@ export const STATISTICS_COOKIES = COOKIE_INVENTORY.filter((c) => c.category === 
  * session and the consent cookie (only present if the visitor decided on a
  * restaurant page, it is scoped to `/`). No cart/order/statistics cookies.
  */
-const PLATFORM_COOKIE_NAMES: readonly string[] = ["sb-*", "gastro_cookie_consent"];
+const PLATFORM_COOKIE_NAMES: readonly string[] = [
+  "sb-*",
+  "gastro_cookie_consent",
+  "gastro_mollie_oauth_nonce",
+];
 export const PLATFORM_COOKIES = COOKIE_INVENTORY.filter((c) =>
   PLATFORM_COOKIE_NAMES.includes(c.name),
 );

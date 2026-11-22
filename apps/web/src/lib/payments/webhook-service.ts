@@ -25,7 +25,7 @@ import { sendOrderConfirmationEmail } from "@/lib/notifications/order-confirmati
  * return a 5xx and let Stripe legitimately retry.
  */
 
-interface OrderRecord {
+export interface OrderRecord {
   id: string;
   tenantId: string;
   status: string;
@@ -33,19 +33,22 @@ interface OrderRecord {
   currency: string;
 }
 
-interface PaymentRecord {
+export interface PaymentRecord {
   id: string;
   tenantId: string;
   orderId: string;
-  stripeCheckoutSessionId: string;
+  stripeCheckoutSessionId: string | null;
   stripePaymentIntentId: string | null;
-  stripeAccountId: string;
+  stripeAccountId: string | null;
   amountCents: number;
   currency: string;
   status: string;
 }
 
-async function fetchOrder(admin: SupabaseClient, orderId: string): Promise<OrderRecord | null> {
+export async function fetchOrder(
+  admin: SupabaseClient,
+  orderId: string,
+): Promise<OrderRecord | null> {
   const { data, error } = await admin
     .from("orders")
     .select("id, tenant_id, status, total_cents, currency")
@@ -75,9 +78,9 @@ function mapPaymentRow(data: {
   id: string;
   tenant_id: string;
   order_id: string;
-  stripe_checkout_session_id: string;
+  stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
-  stripe_account_id: string;
+  stripe_account_id: string | null;
   amount_cents: number;
   currency: string;
   status: string;
@@ -194,7 +197,7 @@ function tenantIdentityIsConsistent(params: {
   return true;
 }
 
-async function flagPaymentForReview(
+export async function flagPaymentForReview(
   admin: SupabaseClient,
   payment: PaymentRecord,
   action:
@@ -214,7 +217,7 @@ async function flagPaymentForReview(
   });
 }
 
-async function markOrderReceived(
+export async function markOrderReceived(
   admin: SupabaseClient,
   params: {
     order: OrderRecord;
@@ -222,9 +225,12 @@ async function markOrderReceived(
     stripeEventId: string;
     stripePaymentIntentId: string | null;
     customerEmail: string | null;
+    /** Provider-specific audit metadata (Mollie, issue #195); defaults to the Stripe shape. */
+    auditMetadata?: Record<string, unknown>;
   },
 ): Promise<void> {
-  const { order, payment, stripeEventId, stripePaymentIntentId, customerEmail } = params;
+  const { order, payment, stripeEventId, stripePaymentIntentId, customerEmail, auditMetadata } =
+    params;
 
   // Issue #90: the order's received transition and the payment's paid
   // transition happen atomically in one RPC call, not as two separate
@@ -265,7 +271,10 @@ async function markOrderReceived(
     action: "payment_confirmed",
     targetType: "order",
     targetId: order.id,
-    metadata: { stripeEventId, stripeCheckoutSessionId: payment.stripeCheckoutSessionId },
+    metadata: auditMetadata ?? {
+      stripeEventId,
+      stripeCheckoutSessionId: payment.stripeCheckoutSessionId,
+    },
   });
 
   // Ticket #40: fire the order-confirmation email only AFTER the order's
@@ -290,16 +299,17 @@ async function markOrderReceived(
   }
 }
 
-async function markOrderCancelledForPaymentFailure(
+export async function markOrderCancelledForPaymentFailure(
   admin: SupabaseClient,
   params: {
     order: OrderRecord;
     payment: PaymentRecord;
     stripeEventId: string;
     reason: "payment_failed" | "checkout_session_expired";
+    auditMetadata?: Record<string, unknown>;
   },
 ): Promise<void> {
-  const { order, payment, stripeEventId, reason } = params;
+  const { order, payment, stripeEventId, reason, auditMetadata } = params;
 
   const { error: eventError } = await admin.from("order_status_events").insert({
     tenant_id: order.tenantId,
@@ -327,7 +337,7 @@ async function markOrderCancelledForPaymentFailure(
     action: reason === "checkout_session_expired" ? "payment_session_expired" : "payment_failed",
     targetType: "order",
     targetId: order.id,
-    metadata: { stripeEventId },
+    metadata: auditMetadata ?? { stripeEventId },
   });
 }
 

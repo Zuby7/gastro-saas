@@ -28,12 +28,23 @@ const acceptTerms = z.string().refine((value) => value === "on", {
   message: "Bitte akzeptieren Sie die AGB und die Datenschutzerklärung, um zu bestellen.",
 });
 
+// Issue #195: payment method chosen at checkout. Validated server-side against
+// this allow-list; "paypal" is additionally only honoured when the tenant has a
+// connected Mollie account with PayPal enabled (checked in the action).
+export const PAYMENT_METHODS = ["stripe", "paypal"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+const paymentMethod = z.enum(PAYMENT_METHODS, {
+  message: "Bitte wählen Sie eine gültige Zahlungsart.",
+});
+
 export const CheckoutSchema = z.discriminatedUnion("fulfillmentType", [
   z.object({
     fulfillmentType: z.literal("pickup"),
     customerName,
     customerNote,
     acceptTerms,
+    paymentMethod,
     customerPhone: z
       .string()
       .trim()
@@ -46,6 +57,7 @@ export const CheckoutSchema = z.discriminatedUnion("fulfillmentType", [
     customerName,
     customerNote,
     acceptTerms,
+    paymentMethod,
     tableIdentifier: z
       .string()
       .trim()

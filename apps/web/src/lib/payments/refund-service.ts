@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { createStripeClient } from "@/lib/stripe/client";
+import { MollieApiError, createMollieRefund } from "@/lib/mollie/client";
+import { MollieNotConnectedError, getMollieAccessForTenant } from "@/lib/mollie/tokens";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { recordMenuAdminAuditEvent } from "@/lib/audit/record-menu-admin-audit-event";
 
@@ -216,6 +218,9 @@ interface PaymentRow {
   amount_cents: number;
   currency: string;
   status: string;
+  /** Issue #195: 'stripe' (default) or 'mollie'. */
+  provider?: string;
+  mollie_payment_id?: string | null;
 }
 
 interface RefundRow {
@@ -368,7 +373,9 @@ export async function issueRefundForOrder(
 
   const { data: payment } = await supabase
     .from("payments")
-    .select("id, tenant_id, order_id, stripe_payment_intent_id, amount_cents, currency, status")
+    .select(
+      "id, tenant_id, order_id, stripe_payment_intent_id, amount_cents, currency, status, provider, mollie_payment_id",
+    )
     .eq("tenant_id", input.tenantId)
     .eq("order_id", input.orderId)
     .eq("status", "paid")
@@ -376,9 +383,12 @@ export async function issueRefundForOrder(
     .limit(1)
     .maybeSingle<PaymentRow>();
 
-  if (!payment || !payment.stripe_payment_intent_id) {
+  const isMollie = payment?.provider === "mollie";
+
+  if (!payment || (isMollie ? !payment.mollie_payment_id : !payment.stripe_payment_intent_id)) {
     throw new PaymentNotRefundableError();
   }
+  const providerName = isMollie ? "Mollie" : "Stripe";
 
   const { data: existingRefunds } = await supabase
     .from("refunds")
@@ -403,6 +413,25 @@ export async function issueRefundForOrder(
 
   if (alreadyReservedCents + input.amountCents > payment.amount_cents) {
     throw new RefundExceedsRemainingAmountError();
+  }
+
+  // Issue #195: resolve the restaurant's Mollie token BEFORE reserving the
+  // refund, so a missing/expired connection fails cleanly without leaving a
+  // reserved row behind.
+  let mollieAccessToken: string | null = null;
+  if (isMollie) {
+    try {
+      mollieAccessToken = (
+        await getMollieAccessForTenant(createSupabaseAdminClient(), input.tenantId)
+      ).accessToken;
+    } catch (error) {
+      if (error instanceof MollieNotConnectedError) {
+        throw new Error(
+          "Die Mollie-Verbindung dieses Restaurants ist nicht aktiv. Bitte unter Zahlungen erneut verbinden, bevor eine PayPal-Zahlung erstattet wird.",
+        );
+      }
+      throw error;
+    }
   }
 
   const { data: reservedRefund, error: insertError } = await supabase
@@ -443,24 +472,46 @@ export async function issueRefundForOrder(
     throw new Error("Die Rückerstattung konnte nicht angelegt werden.");
   }
 
-  const stripe = createStripeClient();
+  const stripe = isMollie ? null : createStripeClient();
 
   try {
-    const stripeRefund = await stripe.refunds.create(
-      {
-        payment_intent: payment.stripe_payment_intent_id,
-        amount: input.amountCents,
-        reason: "requested_by_customer",
-        // ADR-0002 destination charge: claw back the connected account's
-        // transferred funds too, not just the platform account's balance.
-        reverse_transfer: true,
-        metadata: {
-          refund_id: reservedRefund.id,
-          reason: input.reason,
+    // Both providers return an object with the provider's refund id ('re_...'),
+    // stored in `refunds.stripe_refund_id` (see the Mollie migration header).
+    let stripeRefund: { id: string };
+    if (isMollie) {
+      // Issue #195: refund on the restaurant's own Mollie payment, with its
+      // own OAuth token. The reserved row's id is the idempotency key.
+      const mollieRefund = await createMollieRefund(
+        mollieAccessToken as string,
+        payment.mollie_payment_id as string,
+        {
+          amountCents: input.amountCents,
+          description: input.reason.slice(0, 140),
+          idempotencyKey: `refund:${reservedRefund.id}`,
         },
-      },
-      { idempotencyKey: `refund:${reservedRefund.id}` },
-    );
+      );
+      if (mollieRefund.status === "failed" || mollieRefund.status === "canceled") {
+        // Mollie synchronously reports the refund as failed or canceled: known not done.
+        throw new MollieApiError("Mollie refund failed.", 422);
+      }
+      stripeRefund = { id: mollieRefund.id };
+    } else {
+      stripeRefund = await (stripe as Stripe).refunds.create(
+        {
+          payment_intent: payment.stripe_payment_intent_id as string,
+          amount: input.amountCents,
+          reason: "requested_by_customer",
+          // ADR-0002 destination charge: claw back the connected account's
+          // transferred funds too, not just the platform account's balance.
+          reverse_transfer: true,
+          metadata: {
+            refund_id: reservedRefund.id,
+            reason: input.reason,
+          },
+        },
+        { idempotencyKey: `refund:${reservedRefund.id}` },
+      );
+    }
 
     const admin = createSupabaseAdminClient();
     const { error: finalizeError } = await admin.rpc("finalize_refund", {
@@ -511,7 +562,9 @@ export async function issueRefundForOrder(
     // could double-refund at Stripe -- it's marked `unconfirmed` instead,
     // which still counts against the remaining refundable amount and
     // requires manual reconciliation.
-    const definitive = isDefinitiveStripeFailure(error);
+    const definitive = isMollie
+      ? error instanceof MollieApiError && error.isDefinitive
+      : isDefinitiveStripeFailure(error);
     const finalStatus = definitive ? "failed" : "unconfirmed";
 
     const admin = createSupabaseAdminClient();
@@ -549,11 +602,11 @@ export async function issueRefundForOrder(
     });
 
     if (definitive) {
-      throw new Error("Die Rückerstattung konnte bei Stripe nicht durchgeführt werden.");
+      throw new Error(`Die Rückerstattung konnte bei ${providerName} nicht durchgeführt werden.`);
     }
 
     throw new Error(
-      "Die Rückerstattung bei Stripe konnte nicht bestätigt werden. Bitte den Stripe-Status manuell prüfen, bevor erneut versucht wird.",
+      `Die Rückerstattung bei ${providerName} konnte nicht bestätigt werden. Bitte den ${providerName}-Status manuell prüfen, bevor erneut versucht wird.`,
     );
   }
 }
