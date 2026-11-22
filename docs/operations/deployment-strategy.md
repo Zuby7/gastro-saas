@@ -123,3 +123,15 @@ Runbook:
 - Verify runs: `select jobname, status, return_message, start_time from cron.job_run_details order by start_time desc limit 10;` - check after the first night and occasionally; a `failed` status means rows are not being purged.
 - Rotating `IP_HASH_SECRET` resets rate-limit buckets and can double-count views inside the 1-day dedup window; no data migration needed.
 - Until this is verified in production, privacy texts keep saying "vorgesehen" (see `docs/legal/cookie-inventory.md`).
+
+## Apply migration 2026-11 on the hosted project (issue #205)
+
+The hosted Supabase project is not migrated automatically. Run `supabase/migrations/20261121090000_db_hardening_audit_2026_11.sql` in the Supabase SQL Editor BEFORE deploying app code that depends on it (audit rows written through `record_audit_event()`, re-scoped order index, clone-on-draft). The file is additive and idempotent, so re-running it is safe; its header contains the rollback note.
+
+Verification after running (only the two public guest RPCs may be listed, expected `get_public_legal_page` and `get_public_menu`):
+
+```sql
+select proname from pg_proc where pronamespace='public'::regnamespace and has_function_privilege('anon', oid, 'execute') order by 1;
+```
+
+Follow-up required in app code (not part of this migration): `apps/web/src/lib/audit/record-menu-admin-audit-event.ts` inserts into `audit_logs` with the signed-in user session; that direct INSERT is now denied, so it must switch to `supabase.rpc("record_audit_event", ...)`. Until then those audit writes fail (they are fire-and-forget, mutations keep working, audit rows are lost).

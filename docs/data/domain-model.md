@@ -88,3 +88,10 @@ Ticket #58 (Epic 9 follow-up) adds `manual_sales_entries` -- a brand-new, struct
 - **Order immutability**: `order_items`/`order_item_selections` store a purchase-time snapshot (name, price, tax, variant, extras) independent of the live `dishes`/`dish_variants` rows, so later menu edits never rewrite history -- implemented by ticket #21, see the "Ordering" section above and `supabase/migrations/20260804090000_orders_state_machine_and_checkout.sql`.
 - **Soft delete over hard delete**: menu entities that participate in historical orders are archived, not deleted, to preserve order integrity.
 - **Public data**: the public menu/restaurant-profile read path goes through deliberately scoped public queries - no table is broadly world-readable by default.
+
+## Changes from the 2026-11 database audit (issue #205)
+
+- `orders_one_active_per_cart_idx` now enforces at most one `awaiting_payment` order per cart (previously one non-cancelled order per cart ever, which blocked a second order from the same guest cart after the first was paid).
+- `build_cart_view` returns lines ordered by `created_at, id`.
+- `create_initial_draft_menu_version` clones the published version instead of creating an empty draft; a completely empty draft is replaced by a clone when a published version exists.
+- New helper functions `record_audit_event()` and `caller_covers_role_permissions()`; new indexes on `dishes(category_id, menu_version_id, media_asset_id)`, `dish_variants(dish_id)`, `options(option_group_id)`, `orders(tenant_id, created_at desc)`.
