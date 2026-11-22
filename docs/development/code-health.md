@@ -1,6 +1,6 @@
 # Code health (living page)
 
-Known tech debt with ticket links and commands to measure it. Update this page in the same PR that adds, pays off or re-measures an item. Last measured: 2026-11-22 on `main` at `b0f85c4`.
+Known tech debt with ticket links and commands to measure it. Update this page in the same PR that adds, pays off or re-measures an item. Last measured: 2026-11-22 on `main` at `8be75cd`.
 
 ## Oversized files
 
@@ -23,6 +23,7 @@ Rule of thumb: above roughly 400 lines, split by concern when you next touch the
 
 ## Rate limits and abuse
 
+- Guest flow bugs from the 2026-11 bug hunt (cart, payment cancel, service): #227.
 - Cart creation has no per-IP limit: #210 (needs a migration for a new `auth_rate_limit_attempts` scope).
 - Mollie payments can stay open after the timeout sweep cancels an order: #200. Mollie as a whole: #195 (PR #201 open).
 
@@ -42,8 +43,8 @@ Measure on the hosted project: `select jobname, schedule from cron.job;` and `se
 Measure:
 
 ```bash
-git grep -h "auth.getUser()" -- apps/web/src ':!*.test.*' | wc -l    # 43 call sites on 2026-11-22
-git grep -l "auth.getUser()" -- apps/web/src ':!*.test.*' | wc -l    # 34 files
+git grep -h "auth.getUser()" -- apps/web/src ':!*.test.*' | wc -l    # 40 call sites on 2026-11-22
+git grep -l "auth.getUser()" -- apps/web/src ':!*.test.*' | wc -l    # 31 files
 ```
 
 ## Security headers
