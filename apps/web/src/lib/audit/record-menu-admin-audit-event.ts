@@ -16,11 +16,11 @@ import { assertSafeAuditMetadata } from "@gastro-saas/domain";
  * `apps/web/src/lib/audit/login-audit.ts`) or a service-role client (more
  * privilege than this call site needs). These server actions already hold
  * an authenticated, RLS-scoped Supabase client for the acting user -- the
- * `audit_logs_insert_member` RLS policy
- * (`supabase/migrations/20260801050000_audit_log_and_analytics_events_skeleton.sql`)
- * already permits a tenant member to insert an audit row for their own
- * tenant with themselves as the actor, so a plain `.from("audit_logs").insert()`
- * through that same session client is the least-privilege option here.
+ * direct INSERT into `audit_logs` is denied for `authenticated` since issue
+ * #205 (migration `20261121090000`); the row is written through the SECURITY
+ * DEFINER RPC `record_audit_event()` (actor is always auth.uid(), caller must
+ * be a tenant member). Until that migration is applied the helper falls back
+ * to the former direct insert so the app can be deployed first.
  * This helper still reuses `assertSafeAuditMetadata()` (the same
  * secret-/payment-shape guard `recordAuditEvent()` uses) so metadata is
  * validated identically either way.
@@ -45,6 +45,21 @@ export async function recordMenuAdminAuditEvent(
       assertSafeAuditMetadata(input.metadata);
     }
 
+    const rpcError = await tryRecordViaRpc(supabase, input);
+
+    if (rpcError === null) {
+      return;
+    }
+
+    if (!isRpcMissingError(rpcError)) {
+      console.error("[audit] failed to record audit event", input.action, rpcError);
+      return;
+    }
+
+    // Transitional fallback (issue #205): record_audit_event() does not
+    // exist yet on a database that has not applied migration
+    // 20261121090000, where the old direct INSERT policy is still in place.
+    // Once that migration is applied the RPC path above always succeeds.
     const { error } = await supabase.from("audit_logs").insert({
       tenant_id: input.tenantId,
       actor_user_id: input.actorUserId,
@@ -60,4 +75,39 @@ export async function recordMenuAdminAuditEvent(
   } catch (error) {
     console.error("[audit] failed to record audit event", input.action, error);
   }
+}
+
+interface RpcErrorLike {
+  code?: string;
+  message?: string;
+}
+
+/** Returns null on success, otherwise the error (a thrown error becomes an error-like value). */
+async function tryRecordViaRpc(
+  supabase: SupabaseClient,
+  input: {
+    tenantId: string;
+    action: string;
+    targetType: string;
+    targetId?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<RpcErrorLike | null> {
+  try {
+    const { error } = await supabase.rpc("record_audit_event", {
+      p_tenant_id: input.tenantId,
+      p_action: input.action,
+      p_target_type: input.targetType,
+      p_target_id: input.targetId ?? null,
+      p_metadata: input.metadata ?? {},
+    });
+    return error ?? null;
+  } catch (error) {
+    return { message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** PGRST202 = PostgREST cannot find the function; 42883 = Postgres undefined_function. */
+function isRpcMissingError(error: RpcErrorLike): boolean {
+  return error.code === "PGRST202" || error.code === "42883";
 }
