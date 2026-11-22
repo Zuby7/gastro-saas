@@ -32,7 +32,9 @@ const dbAvailable = await probeDatabase();
 
 if (!dbAvailable) {
   if (isCiEnvironment) {
-    throw new Error(`[db-hardening-audit-2026-11.integration.test] no reachable Postgres at ${DB_URL}.`);
+    throw new Error(
+      `[db-hardening-audit-2026-11.integration.test] no reachable Postgres at ${DB_URL}.`,
+    );
   }
   console.warn(
     `[db-hardening-audit-2026-11.integration.test] Skipping: no reachable Postgres at ${DB_URL}.`,
@@ -203,10 +205,15 @@ describe.skipIf(!dbAvailable)("database hardening after audit 2026-11 (issue #20
     return m.rows[0]!.id;
   }
 
+  let roleCounter = 0;
   async function customRole(tenantId: string, permissions: string[]): Promise<string> {
+    roleCounter += 1;
+    // roles.key allows lowercase letters and dashes only.
+    const letters = "abcdefghij";
+    const roleKey = `custom-${letters[roleCounter % 10]}${letters[Math.floor(roleCounter / 10) % 10]}`;
     const role = await admin.query<{ id: string }>(
       `insert into roles (tenant_id, key, name, description) values ($1, $2, 'Custom', 'test') returning id`,
-      [tenantId, `custom-${randomUUID().slice(0, 8)}`],
+      [tenantId, roleKey],
     );
     for (const permission of permissions) {
       await admin.query(`insert into role_permissions (role_id, permission_key) values ($1, $2)`, [
@@ -238,7 +245,12 @@ describe.skipIf(!dbAvailable)("database hardening after audit 2026-11 (issue #20
         queryAsUser(admin, managerId, insertSql("pending", "re_fake123", "$4"), params),
       ).rejects.toThrow(/row-level security|permission denied/i);
       await expect(
-        queryAsUser(admin, managerId, insertSql("pending", null, "$5"), [...params, f.tenantA.ownerId]),
+          queryAsUser(admin, managerId, insertSql("pending", null, "$4"), [
+          f.tenantA.tenantId,
+          paymentId,
+          orderId,
+          f.tenantA.ownerId,
+        ]),
       ).rejects.toThrow(/row-level security|permission denied/i);
 
       await queryAsUser(admin, managerId, insertSql("pending", null, "$4"), params);
@@ -405,7 +417,10 @@ describe.skipIf(!dbAvailable)("database hardening after audit 2026-11 (issue #20
         `delete from menu_versions where id = $1 returning id`,
         [published.menuVersionId],
       );
-      expect(deniedPublished.rows).toHaveLength(0);
+      const policies = await admin.query(
+        `select policyname, cmd, qual from pg_policies where tablename = 'menu_versions'`,
+      );
+      expect(deniedPublished.rows, JSON.stringify(policies.rows)).toHaveLength(0);
 
       await expectCrossTenantDenied({
         client: admin,
