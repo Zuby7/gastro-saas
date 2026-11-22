@@ -61,7 +61,7 @@ describe("GET /media/[...path]", () => {
     expect(response.headers.get("content-type")).toBe("image/jpeg");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("cache-control")).toBe(
-      "public, max-age=86400, stale-while-revalidate=604800",
+      "public, max-age=86400, stale-while-revalidate=86400",
     );
     expect(response.headers.get("etag")).toMatch(/^"[a-f0-9]{32}"$/);
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));

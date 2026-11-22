@@ -38,7 +38,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
  * trade-off for these public menu photos.
  */
 
-const CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=604800";
+const CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=86400";
 const ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function notFound() {
@@ -96,6 +96,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ path
   const { data: blob, error } = await admin.storage.from("dish-media").download(storagePath);
 
   if (error || !blob) {
+    console.error("[media] storage download failed", error?.message ?? "no data");
     return notFound();
   }
 

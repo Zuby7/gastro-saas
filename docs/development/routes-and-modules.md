@@ -4,19 +4,19 @@ Verified against `apps/web/src/app/**/page.tsx` and `route.ts` on 2026-10-09. Mu
 
 ## Public routes (no login)
 
-| Route                                         | Purpose                                                                                  | Auth / access                                                   |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `/`                                           | Landing page                                                                             | public                                                          |
-| `/login`, `/register`                         | Staff login and owner registration (creates tenant via RPC; rate-limited)                | public                                                          |
-| `/invite/[token]`                             | Accept a staff invitation                                                                | invitation token (hash checked in DB)                           |
-| `/agb`, `/datenschutz`                        | Platform terms and privacy policy (`/datenschutz#cookies` has the cookie table)          | public                                                          |
-| `/r/[slug]`                                   | Public menu of one restaurant (`get_public_menu`), dish detail, cookie banner            | public; tenant from slug                                        |
-| `/r/[slug]/cart`                              | Guest cart with server-calculated totals                                                 | cart cookie `gastro_cart_<slug>`                                |
-| `/r/[slug]/checkout`                          | Online-first checkout form, creates order, redirects to Stripe Checkout                  | cart cookie; rate-limited                                       |
-| `/r/[slug]/orders/[token]`                    | Order status (live polling), rating form after completion                                | order token, slug must match the order's tenant                 |
-| `/r/[slug]/orders/[token]/beleg`              | Digital receipt (paid statuses only)                                                     | order token, same lookup as above                               |
-| `/r/[slug]/impressum`, `/agb`, `/datenschutz` | Restaurant-owned legal pages (tenant content, edited under `/account/profile`)           | public                                                          |
-| `/media/[...path]`                            | Redirects to a short-lived signed URL for a dish photo of a published, non-archived dish | public; path authorized against `media_assets` + published menu |
+| Route                                         | Purpose                                                                                                                                                                          | Auth / access                                                   |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `/`                                           | Landing page                                                                                                                                                                     | public                                                          |
+| `/login`, `/register`                         | Staff login and owner registration (creates tenant via RPC; rate-limited)                                                                                                        | public                                                          |
+| `/invite/[token]`                             | Accept a staff invitation                                                                                                                                                        | invitation token (hash checked in DB)                           |
+| `/agb`, `/datenschutz`                        | Platform terms and privacy policy (`/datenschutz#cookies` has the cookie table)                                                                                                  | public                                                          |
+| `/r/[slug]`                                   | Public menu of one restaurant (`get_public_menu`), dish detail, cookie banner                                                                                                    | public; tenant from slug                                        |
+| `/r/[slug]/cart`                              | Guest cart with server-calculated totals                                                                                                                                         | cart cookie `gastro_cart_<slug>`                                |
+| `/r/[slug]/checkout`                          | Online-first checkout form, creates order, redirects to Stripe Checkout                                                                                                          | cart cookie; rate-limited                                       |
+| `/r/[slug]/orders/[token]`                    | Order status (live polling), rating form after completion                                                                                                                        | order token, slug must match the order's tenant                 |
+| `/r/[slug]/orders/[token]/beleg`              | Digital receipt (paid statuses only)                                                                                                                                             | order token, same lookup as above                               |
+| `/r/[slug]/impressum`, `/agb`, `/datenschutz` | Restaurant-owned legal pages (tenant content, edited under `/account/profile`)                                                                                                   | public                                                          |
+| `/media/[...path]`                            | Streams the bytes of a dish photo of a published, non-archived dish (`public, max-age=86400, stale-while-revalidate=86400` + ETag; 304 only after authorization; no signed URLs) | public; path authorized against `media_assets` + published menu |
 
 ## Account routes (staff, signed in)
 
@@ -48,7 +48,7 @@ Roles map to permission sets in the database (Owner, Manager, Kitchen, Service, 
 | `/api/qr`                      | GET    | PNG QR code for the caller's own tenant (`slug`, optional `table`, `pickup`)                                                          | session required (401 otherwise); tenant from membership    |
 | `/api/account/privacy/export`  | GET    | Tenant data export                                                                                                                    | session + `tenant.settings.write`; audit-logged             |
 
-Middleware (`apps/web/src/middleware.ts`) runs on all paths except `_next/static`, `_next/image` and `favicon.ico`.
+Middleware (`apps/web/src/middleware.ts`) runs on all paths except `_next/static`, `_next/image`, `favicon.ico`, `/media`, `/api/webhooks`, `/landing` and static file extensions (images, css, js, fonts, txt, xml, pdf). It refreshes the Supabase session (`getUser()`) only on `/account`, `/login`, `/register`, `/invite`, `/api/account` and `/api/qr`, and on `/r/*` only when an `sb-*-auth-token` cookie exists; the menu-view consent cookie logic for `/r/*` is unchanged.
 
 ## Module map: `apps/web/src/lib`
 

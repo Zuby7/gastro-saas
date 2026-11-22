@@ -33,6 +33,6 @@ Every ticket touching a tenant-scoped table needs a cross-tenant test: create tw
 ## Known risk areas
 
 - Insecure direct object references (guessable/sequential order or dish IDs used without a membership check).
-- Storage objects (media assets) - signed URLs / storage RLS must scope to the owning tenant's path, never a globally-readable bucket.
+- Storage objects (media assets) - the bucket stays private; `/media/*` authorizes each path against published, non-archived dishes and streams the bytes server-side. Accepted cache window: after a dish is unpublished or archived, already served photos can remain in public caches for up to 1 day (`max-age`) plus 1 day (`stale-while-revalidate`); image paths are unguessable UUIDs.
 - Analytics aggregates - a bug here is easy to miss because the numbers "look plausible" for the wrong tenant; analytics queries must always filter by tenant first, not last.
 - Integration sync jobs - a shared mock/real provider must never leak one tenant's menu/order data into another tenant's sync payload.
