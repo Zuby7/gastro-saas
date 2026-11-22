@@ -917,3 +917,164 @@ begin
   end loop;
 end;
 $$;
+
+-- ----------------------------------------------------------------------------
+-- 12. export_tenant_data: Owner-only (tenant.data.delete), same as the web route.
+-- ----------------------------------------------------------------------------
+-- The function returns team e-mails, guest PII (names, phone numbers) and
+-- payments. It was gated on tenant.settings.write (Manager), so a Manager
+-- could call the RPC directly even though the app route requires
+-- tenant.data.delete. Body identical to 20260819110000 except the permission.
+create or replace function export_tenant_data(p_tenant_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+stable
+as $$
+declare
+  v_result jsonb;
+begin
+  perform public.require_tenant_permission(p_tenant_id, 'tenant.data.delete');
+
+  select jsonb_build_object(
+    'exportedAt', now(),
+    'tenantId', p_tenant_id,
+    'tenant', (
+      select jsonb_build_object('id', t.id, 'name', t.name, 'slug', t.slug, 'createdAt', t.created_at)
+        from public.tenants t
+       where t.id = p_tenant_id
+    ),
+    'restaurantProfile', (
+      select to_jsonb(rp) - 'tenant_id'
+        from public.restaurant_profiles rp
+       where rp.tenant_id = p_tenant_id
+    ),
+    'openingHours', (
+      select coalesce(jsonb_agg(to_jsonb(oh) - 'tenant_id' order by oh.weekday), '[]'::jsonb)
+        from public.opening_hours oh
+       where oh.tenant_id = p_tenant_id
+    ),
+    'team', (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'userId', tm.user_id,
+            'email', u.email,
+            'role', tm.role,
+            'memberSince', tm.created_at
+          )
+        ),
+        '[]'::jsonb
+      )
+        from public.tenant_memberships tm
+        join auth.users u on u.id = tm.user_id
+       where tm.tenant_id = p_tenant_id
+    ),
+    'menu', (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', d.id,
+            'name', d.name,
+            'description', d.description,
+            'priceCents', d.price_cents,
+            'currency', d.currency,
+            'archivedAt', d.archived_at
+          )
+        ),
+        '[]'::jsonb
+      )
+        from public.dishes d
+       where d.tenant_id = p_tenant_id
+    ),
+    'orders', (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', o.id,
+            'status', o.status,
+            'fulfillmentType', o.fulfillment_type,
+            'customerName', o.customer_name,
+            'customerPhone', o.customer_phone,
+            'tableIdentifier', o.table_identifier,
+            'customerNote', o.customer_note,
+            'totalCents', o.total_cents,
+            'currency', o.currency,
+            'createdAt', o.created_at,
+            'items', (
+              select coalesce(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'dishName', oi.dish_name_snapshot,
+                    'variantName', oi.variant_name_snapshot,
+                    'quantity', oi.quantity,
+                    'unitPriceCents', oi.unit_price_cents_snapshot,
+                    'currency', oi.currency
+                  )
+                ),
+                '[]'::jsonb
+              )
+                from public.order_items oi
+               where oi.order_id = o.id
+            )
+          )
+          order by o.created_at desc
+        ),
+        '[]'::jsonb
+      )
+        from public.orders o
+       where o.tenant_id = p_tenant_id
+    ),
+    'payments', (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'orderId', p.order_id,
+            'status', p.status,
+            'amountCents', p.amount_cents,
+            'currency', p.currency,
+            'createdAt', p.created_at
+          )
+          order by p.created_at desc
+        ),
+        '[]'::jsonb
+      )
+        from public.payments p
+       where p.tenant_id = p_tenant_id
+    ),
+    'retentionSettings', (
+      select jsonb_build_object('analyticsEventsRetentionDays', prs.analytics_events_retention_days)
+        from public.privacy_retention_settings prs
+       where prs.tenant_id = p_tenant_id
+    ),
+    'deletionRequests', (
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', ddr.id,
+            'status', ddr.status,
+            'requestedAt', ddr.requested_at,
+            'processedAt', ddr.processed_at,
+            'retainedOrdersCount', ddr.retained_orders_count,
+            'anonymizedOrdersCount', ddr.anonymized_orders_count,
+            'analyticsEventsPurgedCount', ddr.analytics_events_purged_count
+          )
+          order by ddr.requested_at desc
+        ),
+        '[]'::jsonb
+      )
+        from public.data_deletion_requests ddr
+       where ddr.tenant_id = p_tenant_id
+    )
+  ) into v_result;
+
+  return v_result;
+end;
+$$;
+
+comment on function export_tenant_data(uuid) is
+  'Assembles the tenant''s own operational data (profile, opening hours, team, basic menu, orders/items, payments, retention settings, deletion-request history) as one jsonb document. Gated on tenant.data.delete (Owner only) because it contains team e-mails and guest PII. Every referenced table is explicitly filtered by p_tenant_id in this function body.';
+
+revoke all on function export_tenant_data(uuid) from public, anon;
+grant execute on function export_tenant_data(uuid) to authenticated, service_role;

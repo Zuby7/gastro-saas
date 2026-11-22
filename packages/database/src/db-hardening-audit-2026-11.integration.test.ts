@@ -389,6 +389,34 @@ describe.skipIf(!dbAvailable)("database hardening after audit 2026-11 (issue #20
     });
   });
 
+  // ---- (12) export_tenant_data is Owner-only -----------------------------
+  describe("export_tenant_data", () => {
+    it("denies a Manager calling the RPC directly, allows the Owner", async () => {
+      const f = await seedFixture();
+
+      await expect(
+        queryAsUser(admin, managerId, `select export_tenant_data($1)`, [f.tenantA.tenantId]),
+      ).rejects.toThrow(/insufficient_privilege|permission/i);
+
+      const ok = await queryAsUser<{ export_tenant_data: { tenantId: string } }>(
+        admin,
+        f.tenantA.ownerId,
+        `select export_tenant_data($1)`,
+        [f.tenantA.tenantId],
+      );
+      expect(ok.rows[0]!.export_tenant_data.tenantId).toBe(f.tenantA.tenantId);
+    });
+
+    it("denies another tenant's Owner", async () => {
+      const f = await seedFixture();
+      await expect(
+        queryAsUser(admin, f.tenantB.ownerId, `select export_tenant_data($1)`, [
+          f.tenantA.tenantId,
+        ]),
+      ).rejects.toThrow(/insufficient_privilege|permission/i);
+    });
+  });
+
   // ---- (5) menu_versions ------------------------------------------------
   describe("menu_versions", () => {
     it("forces drafts on direct INSERT by an app role", async () => {
