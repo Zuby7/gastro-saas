@@ -17,13 +17,13 @@ export default function PlatformDatenschutzPage() {
   return (
     <main className="min-h-screen bg-surface-secondary">
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-10 sm:px-8">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="font-display text-2xl font-semibold text-foreground">
             Datenschutzerklärung
           </h1>
           <Link
             href="/"
-            className="shrink-0 text-sm font-medium text-link-foreground underline hover:text-brand-700"
+            className="text-sm font-medium text-link-foreground underline hover:text-foreground"
           >
             Zurück zur Startseite
           </Link>
