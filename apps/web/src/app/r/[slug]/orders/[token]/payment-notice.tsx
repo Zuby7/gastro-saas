@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { retryPaymentAction, type RetryPaymentState } from "./actions";
 
@@ -17,8 +18,8 @@ const initialState: RetryPaymentState = {};
  * `awaiting_payment`. Neither return URL is proof of payment -- the page's
  * real status still comes from the webhook-driven order status; this only
  * explains the situation and, after a cancel, offers a way forward ("Erneut
- * bezahlen" re-uses/creates a Stripe session for the SAME order, total
- * recomputed server-side). No guest cancel path exists in the domain, so no
+ * bezahlen" only re-uses the order's still-open Stripe session, it never
+ * creates a second one). No guest cancel path exists in the domain, so no
  * cancel button is offered; an unpaid order is cancelled automatically by
  * the awaiting-payment timeout.
  */
@@ -29,7 +30,7 @@ export function PaymentNotice({ tenantSlug, token, checkout }: PaymentNoticeProp
     { resetOnSuccess: false },
   );
 
-  if (checkout === "success") {
+  if (checkout === "success" || state.outcome === "confirming") {
     return (
       <section
         role="status"
@@ -41,6 +42,23 @@ export function PaymentNotice({ tenantSlug, token, checkout }: PaymentNoticeProp
           Vielen Dank! Wir warten noch auf die Bestätigung Ihrer Zahlung. Diese Seite aktualisiert
           sich automatisch.
         </p>
+      </section>
+    );
+  }
+
+  if (state.outcome === "expired") {
+    return (
+      <section role="alert" className="rounded-lg border border-danger-500 bg-danger-500/10 p-5">
+        <h2 className="text-sm font-semibold text-danger-foreground">Zahlungsfrist abgelaufen</h2>
+        <p className="mt-1 text-sm text-foreground">
+          Die Zahlungsfrist ist abgelaufen. Bitte bestellen Sie erneut.
+        </p>
+        <Link
+          href={`/r/${tenantSlug}`}
+          className="mt-3 inline-flex min-h-11 items-center font-medium text-link-foreground underline"
+        >
+          Zurück zur Speisekarte
+        </Link>
       </section>
     );
   }

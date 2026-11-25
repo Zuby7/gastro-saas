@@ -94,6 +94,8 @@ async function fetchOrderPaymentSnapshot(
 
 /** Stripe's hard limit for `product_data.description` is 500 characters. */
 const MAX_PRODUCT_DESCRIPTION_LENGTH = 400;
+/** Stripe caps `product_data.name` at 250 characters; leave room for the prefix. */
+const MAX_TENANT_NAME_LENGTH = 200;
 
 /**
  * Human-readable label for the single Stripe line item: product name
@@ -120,7 +122,9 @@ async function fetchOrderLineItemLabel(
     ]);
 
     const tenantName = tenantResult.data?.name?.trim();
-    const name = tenantName ? `Bestellung bei ${tenantName}` : "Bestellung";
+    const name = tenantName
+      ? `Bestellung bei ${tenantName.slice(0, MAX_TENANT_NAME_LENGTH)}`
+      : "Bestellung";
 
     const summary = (itemsResult.data ?? [])
       .map((item) => `${item.quantity}× ${item.dish_name_snapshot}`)
@@ -161,67 +165,6 @@ async function fetchOrderLineItemLabel(
  */
 export async function createCheckoutSessionForOrder(
   input: CreateCheckoutSessionInput,
-): Promise<CreateCheckoutSessionResult> {
-  return createSessionForAwaitingOrder(input, `checkout-session:${input.orderId}`);
-}
-
-/**
- * "Erneut bezahlen" after the guest came back from Stripe's cancel URL (or
- * simply wants to retry): returns the URL of a still-open Checkout Session
- * of the SAME `awaiting_payment` order if there is one (no duplicate
- * sessions), otherwise creates a fresh session. The amount is always the
- * order's own guarded `total_cents`, re-read from the database -- never a
- * client value. A new session uses its own idempotency key (attempt number
- * = payments recorded so far), so double-clicks collapse onto one session
- * while a genuinely new attempt after an expired session gets a new one.
- * Still never marks anything paid; only the verified webhook does.
- */
-export async function resumeCheckoutSessionForOrder(
-  input: CreateCheckoutSessionInput,
-): Promise<CreateCheckoutSessionResult> {
-  const order = await fetchOrderPaymentSnapshot(input.tenantId, input.orderId);
-
-  if (order.status !== "awaiting_payment") {
-    throw new Error("This order is not awaiting payment.");
-  }
-
-  const admin = createSupabaseAdminClient();
-  const { data: previousPayments } = await admin
-    .from("payments")
-    .select("stripe_checkout_session_id, created_at")
-    .eq("order_id", input.orderId)
-    .eq("tenant_id", input.tenantId)
-    .order("created_at", { ascending: false })
-    .returns<Array<{ stripe_checkout_session_id: string; created_at: string }>>();
-
-  const previous = previousPayments ?? [];
-  const latest = previous[0];
-
-  if (latest) {
-    const stripe = createStripeClient();
-    try {
-      const existing = await stripe.checkout.sessions.retrieve(latest.stripe_checkout_session_id);
-      if (existing.status === "open" && existing.url) {
-        return { checkoutUrl: existing.url };
-      }
-    } catch {
-      // Session unreadable (e.g. expired and purged): fall through and
-      // create a new one.
-    }
-  }
-
-  const attempt = previous.length;
-  return createSessionForAwaitingOrder(
-    input,
-    attempt === 0
-      ? `checkout-session:${input.orderId}`
-      : `checkout-session:${input.orderId}:${attempt}`,
-  );
-}
-
-async function createSessionForAwaitingOrder(
-  input: CreateCheckoutSessionInput,
-  idempotencyKey: string,
 ): Promise<CreateCheckoutSessionResult> {
   const order = await fetchOrderPaymentSnapshot(input.tenantId, input.orderId);
 
@@ -291,7 +234,7 @@ async function createSessionForAwaitingOrder(
   };
 
   const session = await stripe.checkout.sessions.create(sessionParams, {
-    idempotencyKey,
+    idempotencyKey: `checkout-session:${input.orderId}`,
   });
 
   if (!session.url) {
@@ -328,4 +271,53 @@ async function createSessionForAwaitingOrder(
   });
 
   return { checkoutUrl: session.url };
+}
+
+export type ResumeCheckoutResult =
+  { kind: "open"; checkoutUrl: string } | { kind: "complete" } | { kind: "expired" };
+
+/**
+ * "Erneut bezahlen": REUSE ONLY. Looks up the order's latest Stripe Checkout
+ * Session and never creates a second one (a duplicate session could be paid
+ * twice). `open` -> the Stripe URL to redirect to; `complete` -> payment is
+ * being confirmed by the webhook (no redirect); `expired` (or no session was
+ * ever recorded) -> the guest has to order again. If Stripe cannot be
+ * reached, the retrieve error propagates so the caller can answer with a
+ * retryable error -- nothing is created in that case either. Never marks
+ * anything paid; only the verified webhook does.
+ */
+export async function resumeCheckoutSessionForOrder(
+  input: CreateCheckoutSessionInput,
+): Promise<ResumeCheckoutResult> {
+  const order = await fetchOrderPaymentSnapshot(input.tenantId, input.orderId);
+
+  if (order.status !== "awaiting_payment") {
+    throw new Error("This order is not awaiting payment.");
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: payments } = await admin
+    .from("payments")
+    .select("stripe_checkout_session_id, created_at")
+    .eq("order_id", input.orderId)
+    .eq("tenant_id", input.tenantId)
+    .order("created_at", { ascending: false })
+    .returns<Array<{ stripe_checkout_session_id: string; created_at: string }>>();
+
+  const latest = payments?.[0];
+  if (!latest) {
+    return { kind: "expired" };
+  }
+
+  const session = await createStripeClient().checkout.sessions.retrieve(
+    latest.stripe_checkout_session_id,
+  );
+
+  if (session.status === "open" && session.url) {
+    return { kind: "open", checkoutUrl: session.url };
+  }
+  if (session.status === "complete") {
+    return { kind: "complete" };
+  }
+  return { kind: "expired" };
 }

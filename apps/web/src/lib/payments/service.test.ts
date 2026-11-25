@@ -177,6 +177,17 @@ describe("createCheckoutSessionForOrder line item label", () => {
     expect(params.line_items[0]!.price_data.product_data.name).not.toContain("order-1");
   });
 
+  it("caps a very long tenant name so the Stripe product name stays within 250 characters", async () => {
+    state.tenantName = "R".repeat(400);
+    const { createCheckoutSessionForOrder } = await import("./service");
+    await createCheckoutSessionForOrder(input);
+
+    const [params] = createCheckoutSessionMock.mock.calls[0] as [
+      { line_items: Array<{ price_data: { product_data: { name: string } } }> },
+    ];
+    expect(params.line_items[0]!.price_data.product_data.name.length).toBeLessThanOrEqual(250);
+  });
+
   it("falls back to a generic name and no description when tenant/items are unavailable", async () => {
     state.tenantName = null;
     state.orderItems = [];
@@ -190,7 +201,7 @@ describe("createCheckoutSessionForOrder line item label", () => {
   });
 });
 
-describe("resumeCheckoutSessionForOrder", () => {
+describe("resumeCheckoutSessionForOrder (reuse only)", () => {
   const input = {
     tenantId: "tenant-1",
     tenantSlug: "demo",
@@ -198,43 +209,64 @@ describe("resumeCheckoutSessionForOrder", () => {
     guestAccessToken: "raw-token",
   };
 
-  it("re-uses a still-open Checkout Session instead of creating a second one", async () => {
+  beforeEach(() => {
     state.existingPayments = [
-      { stripe_checkout_session_id: "cs_test_open", created_at: "2026-11-22T10:00:00Z" },
+      { stripe_checkout_session_id: "cs_test_latest", created_at: "2026-11-22T10:00:00Z" },
     ];
+  });
+
+  it("returns the Stripe URL of a still-open session", async () => {
     retrieveCheckoutSessionMock.mockResolvedValue({
       status: "open",
-      url: "https://checkout.stripe.com/c/pay/cs_test_open",
+      url: "https://checkout.stripe.com/c/pay/cs_test_latest",
     });
-
     const { resumeCheckoutSessionForOrder } = await import("./service");
+
     await expect(resumeCheckoutSessionForOrder(input)).resolves.toEqual({
-      checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_open",
+      kind: "open",
+      checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_latest",
     });
+    expect(retrieveCheckoutSessionMock).toHaveBeenCalledWith("cs_test_latest");
     expect(createCheckoutSessionMock).not.toHaveBeenCalled();
   });
 
-  it("creates a fresh session with a new idempotency key when the previous one expired", async () => {
-    state.existingPayments = [
-      { stripe_checkout_session_id: "cs_test_old", created_at: "2026-11-22T10:00:00Z" },
-    ];
-    retrieveCheckoutSessionMock.mockResolvedValue({ status: "expired", url: null });
-
+  it("reports a completed session without a URL and never creates a session", async () => {
+    retrieveCheckoutSessionMock.mockResolvedValue({ status: "complete", url: null });
     const { resumeCheckoutSessionForOrder } = await import("./service");
-    await resumeCheckoutSessionForOrder(input);
 
-    const [params, options] = createCheckoutSessionMock.mock.calls[0] as [
-      { line_items: Array<{ price_data: { unit_amount: number } }> },
-      { idempotencyKey: string },
-    ];
-    expect(options.idempotencyKey).toBe("checkout-session:order-1:1");
-    // Total is re-read from the order row, never supplied by the caller.
-    expect(params.line_items[0]!.price_data.unit_amount).toBe(2599);
+    await expect(resumeCheckoutSessionForOrder(input)).resolves.toEqual({ kind: "complete" });
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("reports an expired session and never creates a new one", async () => {
+    retrieveCheckoutSessionMock.mockResolvedValue({ status: "expired", url: null });
+    const { resumeCheckoutSessionForOrder } = await import("./service");
+
+    await expect(resumeCheckoutSessionForOrder(input)).resolves.toEqual({ kind: "expired" });
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("propagates a retrieve failure and creates nothing", async () => {
+    retrieveCheckoutSessionMock.mockRejectedValue(new Error("stripe 503"));
+    const { resumeCheckoutSessionForOrder } = await import("./service");
+
+    await expect(resumeCheckoutSessionForOrder(input)).rejects.toThrow("stripe 503");
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("treats an order without any recorded session as expired, creating nothing", async () => {
+    state.existingPayments = [];
+    const { resumeCheckoutSessionForOrder } = await import("./service");
+
+    await expect(resumeCheckoutSessionForOrder(input)).resolves.toEqual({ kind: "expired" });
+    expect(retrieveCheckoutSessionMock).not.toHaveBeenCalled();
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
   });
 
   it("refuses orders that are no longer awaiting payment", async () => {
     state.order = { ...state.order!, status: "received" };
     const { resumeCheckoutSessionForOrder } = await import("./service");
+
     await expect(resumeCheckoutSessionForOrder(input)).rejects.toThrow("not awaiting payment");
     expect(createCheckoutSessionMock).not.toHaveBeenCalled();
   });
