@@ -10,7 +10,7 @@ const initialState: CreateTenantFormState = {};
  * Onboarding-completion fallback form (ticket #7 fix cycle 1, item 4/5) --
  * see `actions.ts`'s `createTenantAction` for the cases this covers.
  */
-export interface CreateTenantFormProps {
+interface CreateTenantFormProps {
   /**
    * Prefill values recovered from `user_metadata` (set at signUp time, see
    * ticket #60) so a user who confirmed their email after registering

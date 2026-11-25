@@ -6,12 +6,12 @@ import type { DishActionState } from "./actions";
 
 const initialState: DishActionState = {};
 
-export type AvailabilityAction = (
+type AvailabilityAction = (
   prevState: DishActionState,
   formData: FormData,
 ) => Promise<DishActionState>;
 
-export interface AvailabilityToggleFormProps {
+interface AvailabilityToggleFormProps {
   action: AvailabilityAction;
   /** Hidden form fields identifying the target row (dishId, plus variantId/optionId if applicable). */
   hiddenFields: Record<string, string>;

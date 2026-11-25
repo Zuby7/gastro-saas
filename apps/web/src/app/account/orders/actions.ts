@@ -72,7 +72,7 @@ const TransitionOrderStatusSchema = z.object({
 const TRANSITION_FAILED_MESSAGE =
   "Der Bestellstatus konnte nicht geändert werden. Bitte versuchen Sie es erneut.";
 
-export interface TransitionOrderStatusActionResult {
+interface TransitionOrderStatusActionResult {
   error?: string;
   status?: OrderStatus;
 }

@@ -19,7 +19,7 @@ export interface LookupItem {
   assigned: boolean;
 }
 
-export interface AssignableLookupSectionProps {
+interface AssignableLookupSectionProps {
   dishId: string;
   entity: AssignmentEntity;
   heading: string;

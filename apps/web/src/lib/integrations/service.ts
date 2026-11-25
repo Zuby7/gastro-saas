@@ -21,7 +21,7 @@ export class IntegrationDomainError extends Error {
  * (ticket #38 acceptance criterion 2) genuinely has nothing published yet.
  * A distinct, safe-to-display error rather than a raw RPC failure.
  */
-export class NoPublishedMenuError extends IntegrationDomainError {
+class NoPublishedMenuError extends IntegrationDomainError {
   constructor() {
     super("Für dieses Restaurant ist noch keine Speisekarte veröffentlicht.");
   }

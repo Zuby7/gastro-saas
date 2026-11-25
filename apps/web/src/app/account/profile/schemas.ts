@@ -30,8 +30,6 @@ export const ProfileSchema = z.object({
   legalTermsText: z.string().trim().max(20000, "Der AGB-Text ist zu lang.").default(""),
 });
 
-export type ProfileInput = z.infer<typeof ProfileSchema>;
-
 const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
 const OpeningHourRowSchema = z
@@ -63,7 +61,5 @@ const OpeningHourRowSchema = z
 export const OpeningHoursSchema = z.object({
   rows: z.array(OpeningHourRowSchema).length(7),
 });
-
-export type OpeningHourRow = z.infer<typeof OpeningHourRowSchema>;
 
 export { WEEKDAYS };

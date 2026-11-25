@@ -65,7 +65,7 @@ interface RawPaymentStatusRow {
   payment_status: OrderPaymentStatus;
 }
 
-export interface ListTenantOrdersForDashboardOptions {
+interface ListTenantOrdersForDashboardOptions {
   tenantId: string;
   /** Page size (offset-free "top N most recent" pagination) -- see module header. */
   limit?: number;

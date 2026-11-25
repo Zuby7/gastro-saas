@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type DishVersionContext =
+type DishVersionContext =
   { kind: "draft" } | { kind: "frozen"; draftDishId: string | null; draftExists: boolean };
 
 /**

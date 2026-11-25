@@ -14,7 +14,7 @@ import { sha256Hex } from "@/lib/security/opaque-token";
  */
 let warnedMissingSecret = false;
 
-export function hashIp(ip: string): string | null {
+function hashIp(ip: string): string | null {
   const secret = process.env.IP_HASH_SECRET;
   if (secret) {
     return createHmac("sha256", secret).update(ip, "utf8").digest("hex");
@@ -51,7 +51,7 @@ function resolveRateLimitBucketHash(ip: string, sessionTokenHash: string): strin
  * (`cookies()`/`headers()` are not available inside `after()` callbacks
  * there) and pass them in; without it the recorders read them themselves.
  */
-export interface VisitorContext {
+interface VisitorContext {
   token: string | null;
   ip: string;
 }

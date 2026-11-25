@@ -12,7 +12,7 @@ import {
 } from "@/lib/integrations/service";
 import type { IntegrationSyncJobView } from "@/lib/integrations/types";
 
-export interface IntegrationActionResult {
+interface IntegrationActionResult {
   error?: string;
   jobs?: IntegrationSyncJobView[];
 }

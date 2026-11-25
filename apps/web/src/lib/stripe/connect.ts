@@ -5,7 +5,7 @@ import {
   type ConnectAccountStatus,
 } from "@gastro-saas/domain";
 
-export interface ConnectAccountSnapshot {
+interface ConnectAccountSnapshot {
   chargesEnabled: boolean;
   payoutsEnabled: boolean;
   status: ConnectAccountStatus;

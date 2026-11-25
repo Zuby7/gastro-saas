@@ -5,7 +5,7 @@ import type { OrderStatus } from "@gastro-saas/domain";
  * (ticket #22) -- distinct from any future staff-facing kitchen dashboard
  * copy (Epic 8), which may want more operational wording.
  */
-export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   awaiting_payment: "Zahlung ausstehend",
   received: "Bestellung eingegangen",
   accepted: "Bestellung angenommen",
@@ -16,7 +16,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 };
 
 /** A short, customer-facing sentence describing what the current status means. */
-export const ORDER_STATUS_DESCRIPTIONS: Record<OrderStatus, string> = {
+const ORDER_STATUS_DESCRIPTIONS: Record<OrderStatus, string> = {
   awaiting_payment: "Wir warten noch auf die Zahlungsbestätigung für Ihre Bestellung.",
   received: "Das Restaurant hat Ihre Bestellung erhalten.",
   accepted: "Das Restaurant hat Ihre Bestellung angenommen.",
@@ -42,7 +42,7 @@ export function orderStatusDescription(status: OrderStatus): string {
  * never shows it, see `dashboard-service.ts`'s `ORDER_DASHBOARD_STATUSES`)
  * but still needs an entry here since the type is `Record<OrderStatus, ...>`.
  */
-export const STAFF_ORDER_STATUS_COLUMN_LABELS: Record<OrderStatus, string> = {
+const STAFF_ORDER_STATUS_COLUMN_LABELS: Record<OrderStatus, string> = {
   awaiting_payment: "Zahlung ausstehend",
   received: "Neu",
   accepted: "Angenommen",
@@ -79,7 +79,7 @@ export function orderStatusActionLabel(toStatus: OrderStatus): string {
 }
 
 /** German labels for the narrow `orders.read`-gated payment-status projection (see `dashboard-service.ts`). */
-export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
   unpaid: "Nicht bezahlt",
   processing: "Zahlung offen",
   paid: "Bezahlt",
