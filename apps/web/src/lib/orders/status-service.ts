@@ -15,7 +15,7 @@ export class InvalidOrderStatusTransitionError extends Error {
   }
 }
 
-export interface TransitionOrderStatusInput {
+interface TransitionOrderStatusInput {
   tenantId: string;
   orderId: string;
   toStatus: OrderStatus;

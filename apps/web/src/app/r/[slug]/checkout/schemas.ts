@@ -53,5 +53,3 @@ export const CheckoutSchema = z.discriminatedUnion("fulfillmentType", [
       .max(40, "Die Tischnummer ist zu lang."),
   }),
 ]);
-
-export type CheckoutInput = z.infer<typeof CheckoutSchema>;

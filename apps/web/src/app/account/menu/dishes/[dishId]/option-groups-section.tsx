@@ -36,7 +36,7 @@ export interface OptionGroupRecord {
   options: OptionRecord[];
 }
 
-export interface OptionGroupsSectionProps {
+interface OptionGroupsSectionProps {
   dishId: string;
   allOptionGroups: OptionGroupRecord[];
   assignedGroupIds: string[];

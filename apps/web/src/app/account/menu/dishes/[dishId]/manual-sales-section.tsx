@@ -14,7 +14,7 @@ export interface ManualSaleEntryRecord {
   created_at: string;
 }
 
-export interface ManualSalesSectionProps {
+interface ManualSalesSectionProps {
   dishId: string;
   entries: ManualSaleEntryRecord[];
 }

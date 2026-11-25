@@ -224,7 +224,7 @@ interface RefundRow {
   status: string;
 }
 
-export interface PaymentRefundSummary {
+interface PaymentRefundSummary {
   paymentId: string;
   amountCents: number;
   currency: string;
@@ -314,7 +314,7 @@ export async function getPaymentRefundSummary(
   };
 }
 
-export interface IssueRefundInput {
+interface IssueRefundInput {
   tenantId: string;
   orderId: string;
   actorUserId: string;
@@ -329,7 +329,7 @@ export interface IssueRefundInput {
   requestToken: string;
 }
 
-export interface IssueRefundResult {
+interface IssueRefundResult {
   refundId: string;
   stripeRefundId: string;
   amountCents: number;

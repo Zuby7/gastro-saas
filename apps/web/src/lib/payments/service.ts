@@ -273,7 +273,7 @@ export async function createCheckoutSessionForOrder(
   return { checkoutUrl: session.url };
 }
 
-export type ResumeCheckoutResult =
+type ResumeCheckoutResult =
   { kind: "open"; checkoutUrl: string } | { kind: "complete" } | { kind: "expired" };
 
 /**

@@ -10,14 +10,14 @@ import { z } from "zod";
  * can report an empty/generic MIME type for CSV on some platforms, and a
  * MIME type alone can be spoofed).
  */
-export const ALLOWED_IMPORT_MIME_TYPES = [
+const ALLOWED_IMPORT_MIME_TYPES = [
   "text/csv",
   "application/vnd.ms-excel", // some browsers report this for .csv
   "application/csv",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
 ] as const;
 
-export const ALLOWED_IMPORT_EXTENSIONS = [".csv", ".xlsx"] as const;
+const ALLOWED_IMPORT_EXTENSIONS = [".csv", ".xlsx"] as const;
 
 export const MAX_IMPORT_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 

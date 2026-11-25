@@ -102,7 +102,7 @@ export interface RateLimitStore {
  */
 const DEFAULT_IP_THRESHOLD_MULTIPLIER = 4;
 
-export interface RateLimitCheck {
+interface RateLimitCheck {
   scope: RateLimitScope;
   ip: string;
   email: string;
@@ -126,7 +126,7 @@ export interface RateLimitCheck {
   windowSeconds: number;
 }
 
-export interface RateLimitResult {
+interface RateLimitResult {
   limited: boolean;
   /** Pass to `store.markSucceeded()` if the guarded operation succeeds. */
   attemptId: string | null;

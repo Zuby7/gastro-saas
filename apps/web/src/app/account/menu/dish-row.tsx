@@ -8,7 +8,7 @@ import { archiveDishAction, type MenuActionState } from "./actions";
 
 const initialState: MenuActionState = {};
 
-export interface DishRowProps {
+interface DishRowProps {
   id: string;
   name: string;
   priceCents: number | null;

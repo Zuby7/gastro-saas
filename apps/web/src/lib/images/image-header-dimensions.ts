@@ -17,7 +17,7 @@
  * `new_from_byteslice` (and therefore any decode allocation) ever runs.
  */
 
-export interface ImageDimensions {
+interface ImageDimensions {
   width: number;
   height: number;
 }

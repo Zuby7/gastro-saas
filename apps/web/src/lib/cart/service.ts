@@ -24,7 +24,7 @@ export async function resolveTenantIdBySlug(tenantSlug: string): Promise<string 
   return data?.id ?? null;
 }
 
-export interface GuestCartContext {
+interface GuestCartContext {
   tenantId: string;
   cartId: string;
 }
@@ -83,7 +83,7 @@ export async function getCartView(cartId: string, tenantId: string): Promise<Car
   return data as CartView;
 }
 
-export interface AddCartItemInput {
+interface AddCartItemInput {
   cartId: string;
   tenantId: string;
   dishId: string;

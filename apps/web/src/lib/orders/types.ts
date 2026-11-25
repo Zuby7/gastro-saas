@@ -42,7 +42,7 @@ export interface CreateOrderResult {
  * the guest access token hash itself, `order_status_events.note`/
  * `actor_user_id`) -- see that migration's header for the full rationale.
  */
-export interface OrderStatusItemSelectionView {
+interface OrderStatusItemSelectionView {
   name: string;
   priceDeltaCents: number;
 }

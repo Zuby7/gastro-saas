@@ -8,13 +8,13 @@ import { z } from "zod";
  */
 
 /** Default upper bound: EUR 100,000.00. */
-export const MAX_EURO_INPUT_CENTS = 10_000_000;
+const MAX_EURO_INPUT_CENTS = 10_000_000;
 
-export type EuroParseFailure = "empty" | "invalid" | "negative" | "too_many_decimals" | "too_large";
+type EuroParseFailure = "empty" | "invalid" | "negative" | "too_many_decimals" | "too_large";
 
-export type EuroParseResult = { ok: true; cents: number } | { ok: false; reason: EuroParseFailure };
+type EuroParseResult = { ok: true; cents: number } | { ok: false; reason: EuroParseFailure };
 
-export interface EuroParseOptions {
+interface EuroParseOptions {
   /** Accept a leading minus (e.g. a discount on an option). Default false. */
   allowNegative?: boolean;
   /** Upper bound on the absolute value in cents. Default MAX_EURO_INPUT_CENTS. */
@@ -91,7 +91,7 @@ const MESSAGES: Record<EuroParseFailure, string> = {
   too_large: "Der Betrag ist zu hoch.",
 };
 
-export function euroParseMessage(reason: EuroParseFailure): string {
+function euroParseMessage(reason: EuroParseFailure): string {
   return MESSAGES[reason];
 }
 

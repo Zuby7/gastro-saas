@@ -8,7 +8,7 @@ import { RatingNotFoundError, moderateRating } from "@/lib/ratings/moderation-se
 import { ModerateRatingSchema } from "@/lib/ratings/schemas";
 import type { RatingModerationStatus } from "@/lib/ratings/types";
 
-export interface ModerateRatingActionResult {
+interface ModerateRatingActionResult {
   error?: string;
   status?: RatingModerationStatus;
 }

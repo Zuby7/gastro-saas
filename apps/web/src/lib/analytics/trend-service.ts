@@ -16,7 +16,7 @@ import {
  */
 export type TrendPeriodType = "day" | "week" | "month" | "custom";
 
-export interface TrendComparisonOptions {
+interface TrendComparisonOptions {
   periodType: TrendPeriodType;
   /** Required (and only used) when periodType === 'custom'. 'YYYY-MM-DD', inclusive start. */
   customStart?: string;
