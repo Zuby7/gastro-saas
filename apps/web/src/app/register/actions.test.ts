@@ -30,6 +30,12 @@ vi.mock("@/lib/auth/supabase-rate-limit-store", () => ({
   }),
 }));
 
+const isTenantSlugTakenMock = vi.fn(async (..._args: unknown[]) => false);
+
+vi.mock("@/lib/tenant/slug-availability", () => ({
+  isTenantSlugTaken: (...args: unknown[]) => isTenantSlugTakenMock(...args),
+}));
+
 const padToFloorMock = vi.fn(async (..._args: unknown[]) => {});
 
 vi.mock("@/lib/timing/floor", () => ({
@@ -53,6 +59,7 @@ function validFormData(overrides: Partial<Record<string, string>> = {}): FormDat
 beforeEach(() => {
   vi.clearAllMocks();
   reserveAttemptMock.mockResolvedValue({ attemptId: "attempt-1", ipCount: 1, ipEmailCount: 1 });
+  isTenantSlugTakenMock.mockResolvedValue(false);
 });
 
 describe("registerAction", () => {
@@ -215,7 +222,33 @@ describe("registerAction", () => {
     });
   });
 
-  it("reports a slug conflict distinctly and does not lose the created account", async () => {
+  it("rejects a taken web address with a slug field error BEFORE signUp, so the user can fix it and resubmit", async () => {
+    isTenantSlugTakenMock.mockResolvedValueOnce(true);
+
+    const { registerAction } = await import("./actions");
+    const result = await registerAction({}, validFormData({ tenantSlug: "vergeben" }));
+
+    expect(isTenantSlugTakenMock).toHaveBeenCalledWith({ __marker: "admin-client" }, "vergeben");
+    expect(result.fieldErrors?.tenantSlug).toContain("bereits vergeben");
+    expect(signUpMock).not.toHaveBeenCalled();
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(padToFloorMock.mock.calls.map((call) => call[1])).toEqual([500]);
+  });
+
+  it("does not reveal e-mail state when the slug is free: an existing address still gets the neutral answer", async () => {
+    signUpMock.mockResolvedValueOnce({
+      data: { session: null, user: { id: "fake-id", identities: [] } },
+      error: null,
+    });
+
+    const { registerAction } = await import("./actions");
+    const result = await registerAction({}, validFormData());
+
+    expect(result.info).toContain("Falls diese E-Mail-Adresse");
+    expect(result.fieldErrors).toBeUndefined();
+  });
+
+  it("redirects a racing slug conflict (after signUp) to /account instead of an error loop", async () => {
     signUpMock.mockResolvedValueOnce({
       data: { session: { access_token: "token" }, user: { identities: [{ id: "1" }] } },
       error: null,
@@ -226,10 +259,23 @@ describe("registerAction", () => {
     });
 
     const { registerAction } = await import("./actions");
-    const result = await registerAction({}, validFormData());
+    await expect(registerAction({}, validFormData())).rejects.toThrow(
+      "NEXT_REDIRECT:/account?notice=tenant-slug-taken",
+    );
+    expect(markSucceededMock).toHaveBeenCalledWith("attempt-1");
+  });
 
-    expect(result.fieldErrors?.tenantSlug).toBeDefined();
-    expect(result.error).toContain("bereits vergeben");
+  it("redirects any other tenant-creation failure after signUp to /account with a notice", async () => {
+    signUpMock.mockResolvedValueOnce({
+      data: { session: { access_token: "token" }, user: { identities: [{ id: "1" }] } },
+      error: null,
+    });
+    rpcMock.mockResolvedValueOnce({ data: null, error: { code: "XX000", message: "boom" } });
+
+    const { registerAction } = await import("./actions");
+    await expect(registerAction({}, validFormData())).rejects.toThrow(
+      "NEXT_REDIRECT:/account?notice=tenant-create-failed",
+    );
   });
 
   // Ticket #146: explicit AGB/Datenschutz consent is required server-side,

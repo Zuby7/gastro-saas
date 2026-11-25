@@ -1,6 +1,13 @@
 "use client";
 
+import {
+  FieldError,
+  FormFeedback,
+  fieldErrorProps,
+  useDismissOnEdit,
+} from "@/lib/forms/field-feedback";
 import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
+import { formatCentsAsEuro } from "@/lib/money/euro";
 import { useActionState } from "react";
 import {
   setAllergenReviewedAction,
@@ -40,6 +47,7 @@ export function DishBasicsForm({
     initialState,
     { resetOnSuccess: false },
   );
+  const { dismissed, onEdit } = useDismissOnEdit(state);
   const [reviewState, reviewFormAction, isReviewPending] = useActionState(
     setAllergenReviewedAction,
     initialState,
@@ -65,18 +73,9 @@ export function DishBasicsForm({
 
       {canEditMenu ? (
         <>
-          {state.error ? (
-            <p role="alert" className="text-sm text-danger-foreground">
-              {state.error}
-            </p>
-          ) : null}
-          {state.success ? (
-            <p role="status" className="text-sm text-success-600">
-              {state.success}
-            </p>
-          ) : null}
+          <FormFeedback state={state} dismissed={dismissed} />
 
-          <form {...formAction} className="flex flex-col gap-3" noValidate>
+          <form {...formAction} onInput={onEdit} className="flex flex-col gap-3" noValidate>
             <input type="hidden" name="dishId" value={dishId} />
             <div className="flex flex-col gap-1">
               <label htmlFor="dish-name" className="text-sm font-medium text-foreground">
@@ -87,8 +86,10 @@ export function DishBasicsForm({
                 name="name"
                 defaultValue={name}
                 required
+                {...fieldErrorProps(state, "name", "dish-name-error")}
                 className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
               />
+              <FieldError id="dish-name-error" state={state} name="name" />
             </div>
             <div className="flex flex-col gap-1">
               <label htmlFor="dish-description" className="text-sm font-medium text-foreground">
@@ -99,22 +100,26 @@ export function DishBasicsForm({
                 name="description"
                 defaultValue={description}
                 rows={3}
+                {...fieldErrorProps(state, "description", "dish-description-error")}
                 className="rounded-md border border-neutral-300 px-3 py-2 text-foreground"
               />
+              <FieldError id="dish-description-error" state={state} name="description" />
             </div>
             <div className="flex flex-col gap-1">
               <label htmlFor="dish-price" className="text-sm font-medium text-foreground">
-                Grundpreis (Cent)
+                Grundpreis (€)
               </label>
               <input
                 id="dish-price"
-                name="priceCents"
+                name="priceEuro"
                 type="text"
-                inputMode="numeric"
-                defaultValue={priceCents ?? ""}
-                placeholder="z. B. 1200"
+                inputMode="decimal"
+                defaultValue={priceCents !== null ? formatCentsAsEuro(priceCents) : ""}
+                placeholder="z. B. 12,50"
+                {...fieldErrorProps(state, "priceEuro", "dish-price-error")}
                 className="w-32 rounded-md border border-neutral-300 px-3 py-2 text-foreground"
               />
+              <FieldError id="dish-price-error" state={state} name="priceEuro" />
             </div>
             <button
               type="submit"

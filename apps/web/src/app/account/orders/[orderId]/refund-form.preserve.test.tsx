@@ -10,12 +10,12 @@ describe("RefundForm keeps input after an error", () => {
   it("keeps amount and reason when the server returns a validation error", async () => {
     issueRefundAction.mockResolvedValue({
       error: "Rückerstattung abgelehnt.",
-      fieldErrors: { amountCents: "Zu hoch." },
+      fieldErrors: { amountEuro: "Zu hoch." },
     });
     render(<RefundForm orderId="order-1" remainingRefundableCents={1000} />);
 
     const amount = screen.getByLabelText(/Betrag/);
-    fireEvent.change(amount, { target: { value: "5000" } });
+    fireEvent.change(amount, { target: { value: "50,00" } });
     fireEvent.change(screen.getByLabelText("Grund (erforderlich)"), {
       target: { value: "Falsche Lieferung" },
     });
@@ -25,7 +25,7 @@ describe("RefundForm keeps input after an error", () => {
 
     await waitFor(() => expect(issueRefundAction).toHaveBeenCalledTimes(1));
     expect((await screen.findAllByRole("alert")).length).toBeGreaterThan(0);
-    expect(screen.getByLabelText(/Betrag/)).toHaveValue("5000");
+    expect(screen.getByLabelText(/Betrag/)).toHaveValue("50,00");
     expect(screen.getByLabelText("Grund (erforderlich)")).toHaveValue("Falsche Lieferung");
   });
 });

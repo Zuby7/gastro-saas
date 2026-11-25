@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  FieldError,
+  FormFeedback,
+  fieldErrorProps,
+  useDismissOnEdit,
+} from "@/lib/forms/field-feedback";
 import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { useActionState } from "react";
 import {
@@ -35,6 +41,7 @@ export function VariantsSection({
     createVariantAction,
     initialState,
   );
+  const { dismissed, onEdit } = useDismissOnEdit(createState);
   const [deleteState, deleteFormAction] = useActionState(deleteVariantAction, initialState);
 
   return (
@@ -87,7 +94,12 @@ export function VariantsSection({
       ) : null}
 
       {canEditMenu ? (
-        <form {...createFormAction} className="flex flex-wrap items-end gap-2" noValidate>
+        <form
+          {...createFormAction}
+          onInput={onEdit}
+          className="flex flex-wrap items-end gap-2"
+          noValidate
+        >
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
             <label htmlFor="variant-name" className="text-sm font-medium text-foreground">
@@ -97,21 +109,26 @@ export function VariantsSection({
               id="variant-name"
               name="name"
               required
+              {...fieldErrorProps(createState, "name", "variant-name-error")}
               className="rounded-md border border-neutral-300 px-2 py-1 text-foreground"
             />
+            <FieldError id="variant-name-error" state={createState} name="name" />
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="variant-price" className="text-sm font-medium text-foreground">
-              Preis (Cent)
+              Preis (€)
             </label>
             <input
               id="variant-price"
-              name="priceCents"
+              name="priceEuro"
               type="text"
-              inputMode="numeric"
+              inputMode="decimal"
+              placeholder="z. B. 12,50"
               required
+              {...fieldErrorProps(createState, "priceEuro", "variant-price-error")}
               className="w-28 rounded-md border border-neutral-300 px-2 py-1 text-foreground"
             />
+            <FieldError id="variant-price-error" state={createState} name="priceEuro" />
           </div>
           <button
             type="submit"
@@ -120,12 +137,8 @@ export function VariantsSection({
           >
             {isCreatePending ? "Wird angelegt…" : "Variante anlegen"}
           </button>
+          <FormFeedback state={createState} dismissed={dismissed} />
         </form>
-      ) : null}
-      {createState.error ? (
-        <p role="alert" className="text-sm text-danger-foreground">
-          {createState.error}
-        </p>
       ) : null}
     </section>
   );

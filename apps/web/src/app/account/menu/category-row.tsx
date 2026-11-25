@@ -2,6 +2,7 @@
 
 import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { useActionState } from "react";
+import { ArchiveButton } from "./archive-button";
 import {
   archiveCategoryAction,
   moveCategoryAction,
@@ -67,12 +68,7 @@ export function CategoryRow({ id, name }: { id: string; name: string }) {
 
       <form action={archiveFormAction}>
         <input type="hidden" name="categoryId" value={id} />
-        <button
-          type="submit"
-          className="rounded-md border border-danger-500 px-2 py-1 text-sm text-danger-foreground"
-        >
-          Archivieren
-        </button>
+        <ArchiveButton itemLabel={name} />
       </form>
 
       {renameState.error ? (
