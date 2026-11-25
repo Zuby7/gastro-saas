@@ -23,7 +23,8 @@ Rule of thumb: above roughly 400 lines, split by concern when you next touch the
 
 ## Rate limits and abuse
 
-- Guest flow bugs from the 2026-11 bug hunt (cart, payment cancel, service): #227.
+- Guest flow bugs from the 2026-11 bug hunt (cart, payment cancel, service): #227 (merged). Retry is reuse-only by design; after a declined card the order is cancelled by the webhook, so the guest reorders.
+- PayPal is not offered: Stripe does not support it with Connect. A PayPal-over-Mollie path exists in the unmerged PR #201.
 - Cart creation has no per-IP limit: #210 (needs a migration for a new `auth_rate_limit_attempts` scope).
 - Mollie payments can stay open after the timeout sweep cancels an order: #200. Mollie as a whole: #195 (PR #201 open).
 
