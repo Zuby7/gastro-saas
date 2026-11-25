@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { formatPrice } from "@/lib/public-menu/format";
 import type { PublicMenuDish } from "@/lib/public-menu/types";
 import { addToCartAction, type CartActionState } from "./cart/actions";
@@ -16,19 +16,23 @@ interface DishDetailProps {
 
 const initialCartActionState: CartActionState = {};
 
+/** How long the success confirmation stays visible before it dismisses itself. */
+const CONFIRMATION_DISMISS_MS = 3000;
+
 /**
  * `floating`: when true, the visible error/success message is positioned
- * `absolute inset-0` over the `relative` price/button row the caller
- * provides, replacing that row's content instead of growing it. `Simple
- * AddButton` needs this -- its form sits in a tight `justify-between`
- * price/button row inside a card whose height is set by its CSS Grid track,
- * and an in-flow message growing that form's height pushed the row (and the
- * whole card) taller than its grid track, overlapping the neighboring card
- * (reported live bug, 2026-09-08). Overlaying within the row's own box also
- * keeps the message inside the card's `overflow-hidden` bounds, so it can't
- * spill past the card edge either. `DishOptionChooser`'s panel is a
+ * `absolute bottom-full right-0` above the `relative` price/button row the
+ * caller provides, so it never grows that row (an in-flow message pushed the
+ * row and the card taller than its CSS Grid track, overlapping the
+ * neighboring card -- live bug 2026-09-08) and, unlike the earlier
+ * `inset-0` overlay, never covers the price or the "+" button, so the guest
+ * can add the dish again right away. `DishOptionChooser`'s panel is a
  * full-width disclosure with room to grow, so it keeps the in-flow
- * (non-floating) placement, which is more discoverable there.
+ * (non-floating) placement.
+ *
+ * The success confirmation dismisses itself after ~3 s and can be closed
+ * manually; errors stay until closed or the next submit. No animation is
+ * used, so `prefers-reduced-motion` is respected by construction.
  */
 function useCartFeedback(
   dish: PublicMenuDish,
@@ -36,6 +40,18 @@ function useCartFeedback(
   state: CartActionState,
   floating: boolean,
 ) {
+  const [dismissedState, setDismissedState] = useState<CartActionState | null>(null);
+
+  useEffect(() => {
+    if (!state.cart || state.error) {
+      return;
+    }
+    const timer = setTimeout(() => setDismissedState(state), CONFIRMATION_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [state]);
+
+  const dismissed = dismissedState === state;
+
   const announcement = state.error
     ? state.error
     : state.cart
@@ -43,8 +59,19 @@ function useCartFeedback(
       : "";
 
   const messageClassName = floating
-    ? "absolute inset-0 z-10 flex items-center justify-end overflow-hidden"
-    : "mt-2";
+    ? "absolute bottom-full right-0 z-10 mb-1 flex max-w-full items-center gap-1 overflow-hidden"
+    : "mt-2 flex items-center gap-1";
+
+  const closeButton = (
+    <button
+      type="button"
+      onClick={() => setDismissedState(state)}
+      aria-label="Meldung schließen"
+      className="-my-2 -mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-foreground-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-700"
+    >
+      <X className="h-4 w-4" aria-hidden="true" />
+    </button>
+  );
 
   return (
     <>
@@ -52,27 +79,31 @@ function useCartFeedback(
         {announcement}
       </p>
 
-      {state.error ? (
-        <p
+      {state.error && !dismissed ? (
+        <div
           role="alert"
           className={`${messageClassName} rounded-md border border-danger-500 bg-danger-500/10 px-3 py-2 text-sm text-danger-foreground shadow-sm`}
         >
-          {state.error}
-        </p>
+          <span>{state.error}</span>
+          {closeButton}
+        </div>
       ) : null}
 
-      {state.cart ? (
-        <p
+      {state.cart && !dismissed ? (
+        <div
           className={`${messageClassName} rounded-md border border-neutral-300 bg-surface px-3 py-2 text-sm text-foreground shadow-sm`}
         >
-          Im Warenkorb: {state.cart.itemCount} Artikel ·{" "}
-          <Link
-            href={`/r/${tenantSlug}/cart`}
-            className="font-medium text-accent-foreground underline"
-          >
-            Warenkorb ansehen
-          </Link>
-        </p>
+          <span>
+            Im Warenkorb: {state.cart.itemCount} Artikel ·{" "}
+            <Link
+              href={`/r/${tenantSlug}/cart`}
+              className="inline-block py-2 font-medium text-accent-foreground underline"
+            >
+              Warenkorb ansehen
+            </Link>
+          </span>
+          {closeButton}
+        </div>
       ) : null}
     </>
   );
@@ -96,8 +127,8 @@ export function SimpleAddButton({ dish, tenantSlug }: DishDetailProps) {
 
   return (
     // No `relative` here -- the ancestor price/button row (dish-card.tsx)
-    // provides the positioning context so the floating confirmation covers
-    // that whole row, not just this form's own (shrink-to-fit) box.
+    // provides the positioning context so the floating confirmation sits
+    // above that whole row, not just this form's own (shrink-to-fit) box.
     <form action={formAction} className="flex flex-col items-end">
       <input type="hidden" name="dishId" value={dish.id} />
       <input type="hidden" name="dishVariantId" value={variantId} />
@@ -131,9 +162,23 @@ export function DishOptionChooser({ dish, tenantSlug }: DishDetailProps) {
   // `tenantSlug` is bound server-side (not read from a client-editable form
   // field) -- see the doc comment on `addToCartAction` in `./cart/actions.ts`.
   const boundAddToCartAction = addToCartAction.bind(null, tenantSlug);
+  const defaultVariantId = dish.variants[0]?.id ?? "";
+  // After a successful add the visible form AND the React state (preview
+  // price, hidden `optionIds`) must agree. The hook's automatic
+  // `form.reset()` only clears the DOM of these controlled inputs, leaving the
+  // state (and so the next add) with the old extras -- so reset is disabled
+  // and the state is cleared explicitly, which re-renders the inputs unticked.
   const [state, formAction, isPending] = usePreservedFormAction(
-    boundAddToCartAction,
+    async (previous: CartActionState, formData: FormData) => {
+      const next = await boundAddToCartAction(previous, formData);
+      if (!next.error && next.cart) {
+        setSelectedVariantId(defaultVariantId);
+        setSelectedOptions({});
+      }
+      return next;
+    },
     initialCartActionState,
+    { resetOnSuccess: false },
   );
   const feedback = useCartFeedback(dish, tenantSlug, state, false);
 
@@ -188,10 +233,13 @@ export function DishOptionChooser({ dish, tenantSlug }: DishDetailProps) {
         <fieldset className="flex flex-col gap-2">
           <legend className="font-medium text-foreground">Variante</legend>
           {dish.variants.map((variant) => (
-            <label key={variant.id} className="flex items-center justify-between gap-3 text-sm">
-              <span>
+            <label
+              key={variant.id}
+              className="flex min-h-11 items-center justify-between gap-3 text-sm"
+            >
+              <span className="flex items-center">
                 <input
-                  className="mr-2"
+                  className="mr-3 h-5 w-5 shrink-0"
                   type="radio"
                   name={`variant-${dish.id}`}
                   value={variant.id}
@@ -218,10 +266,13 @@ export function DishOptionChooser({ dish, tenantSlug }: DishDetailProps) {
               </span>
             </legend>
             {group.options.map((option) => (
-              <label key={option.id} className="flex items-center justify-between gap-3 text-sm">
-                <span>
+              <label
+                key={option.id}
+                className="flex min-h-11 items-center justify-between gap-3 text-sm"
+              >
+                <span className="flex items-center">
                   <input
-                    className="mr-2"
+                    className="mr-3 h-5 w-5 shrink-0"
                     type="checkbox"
                     checked={(selectedOptions[group.id] ?? []).includes(option.id)}
                     disabled={
@@ -251,7 +302,7 @@ export function DishOptionChooser({ dish, tenantSlug }: DishDetailProps) {
       <button
         type="submit"
         disabled={!requiredGroupsSatisfied || dish.soldOut || isPending}
-        className="rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60"
+        className="min-h-11 rounded-md bg-brand-600 px-4 py-2 font-medium text-neutral-0 transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60"
       >
         {isPending ? "Wird hinzugefügt..." : "In den Warenkorb"}
       </button>

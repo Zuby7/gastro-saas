@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createCheckoutSessionMock = vi.fn();
+const retrieveCheckoutSessionMock = vi.fn();
 const recordOrderAuditEventMock = vi.fn();
 
 vi.mock("@/lib/stripe/client", () => ({
   createStripeClient: () => ({
-    checkout: { sessions: { create: (...args: unknown[]) => createCheckoutSessionMock(...args) } },
+    checkout: {
+      sessions: {
+        create: (...args: unknown[]) => createCheckoutSessionMock(...args),
+        retrieve: (...args: unknown[]) => retrieveCheckoutSessionMock(...args),
+      },
+    },
   }),
 }));
 
@@ -23,6 +29,9 @@ interface FakeState {
   } | null;
   paymentAccount: { stripe_account_id: string; charges_enabled: boolean } | null;
   paymentsInsertError: { code: string; message: string } | null;
+  tenantName: string | null;
+  orderItems: Array<{ dish_name_snapshot: string; quantity: number }>;
+  existingPayments: Array<{ stripe_checkout_session_id: string; created_at: string }>;
 }
 
 let state: FakeState;
@@ -54,8 +63,38 @@ vi.mock("@/lib/supabase/admin", () => ({
           }),
         };
       }
+      if (table === "tenants") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: state.tenantName === null ? null : { name: state.tenantName },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "order_items") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({ returns: async () => ({ data: state.orderItems, error: null }) }),
+            }),
+          }),
+        };
+      }
       if (table === "payments") {
         return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                order: () => ({
+                  returns: async () => ({ data: state.existingPayments, error: null }),
+                }),
+              }),
+            }),
+          }),
           insert: async (payload: unknown) => {
             paymentsInsertCalls.push(payload);
             return { error: state.paymentsInsertError };
@@ -80,6 +119,12 @@ beforeEach(() => {
     },
     paymentAccount: { stripe_account_id: "acct_123", charges_enabled: true },
     paymentsInsertError: null,
+    tenantName: "Trattoria Roma",
+    orderItems: [
+      { dish_name_snapshot: "Pizza Margherita", quantity: 2 },
+      { dish_name_snapshot: "Cola", quantity: 1 },
+    ],
+    existingPayments: [],
   };
   createCheckoutSessionMock.mockResolvedValue({
     id: "cs_test_abc",
@@ -98,6 +143,132 @@ describe("isTenantChargeReady", () => {
 
     state.paymentAccount = null;
     await expect(isTenantChargeReady("tenant-1")).resolves.toBe(false);
+  });
+});
+
+describe("createCheckoutSessionForOrder line item label", () => {
+  const input = {
+    tenantId: "tenant-1",
+    tenantSlug: "demo",
+    orderId: "order-1",
+    guestAccessToken: "raw-token",
+  };
+
+  it("uses 'Bestellung bei <Restaurant>' with an item summary as ONE line item with the unchanged server total", async () => {
+    const { createCheckoutSessionForOrder } = await import("./service");
+    await createCheckoutSessionForOrder(input);
+
+    const [params] = createCheckoutSessionMock.mock.calls[0] as [
+      {
+        line_items: Array<{
+          quantity: number;
+          price_data: { unit_amount: number; product_data: { name: string; description?: string } };
+        }>;
+      },
+    ];
+    expect(params.line_items).toHaveLength(1);
+    expect(params.line_items[0]!.price_data.unit_amount).toBe(2599);
+    expect(params.line_items[0]!.price_data.product_data.name).toBe(
+      "Bestellung bei Trattoria Roma",
+    );
+    expect(params.line_items[0]!.price_data.product_data.description).toBe(
+      "2× Pizza Margherita, 1× Cola",
+    );
+    expect(params.line_items[0]!.price_data.product_data.name).not.toContain("order-1");
+  });
+
+  it("caps a very long tenant name so the Stripe product name stays within 250 characters", async () => {
+    state.tenantName = "R".repeat(400);
+    const { createCheckoutSessionForOrder } = await import("./service");
+    await createCheckoutSessionForOrder(input);
+
+    const [params] = createCheckoutSessionMock.mock.calls[0] as [
+      { line_items: Array<{ price_data: { product_data: { name: string } } }> },
+    ];
+    expect(params.line_items[0]!.price_data.product_data.name.length).toBeLessThanOrEqual(250);
+  });
+
+  it("falls back to a generic name and no description when tenant/items are unavailable", async () => {
+    state.tenantName = null;
+    state.orderItems = [];
+    const { createCheckoutSessionForOrder } = await import("./service");
+    await createCheckoutSessionForOrder(input);
+
+    const [params] = createCheckoutSessionMock.mock.calls[0] as [
+      { line_items: Array<{ price_data: { product_data: Record<string, unknown> } }> },
+    ];
+    expect(params.line_items[0]!.price_data.product_data).toEqual({ name: "Bestellung" });
+  });
+});
+
+describe("resumeCheckoutSessionForOrder (reuse only)", () => {
+  const input = {
+    tenantId: "tenant-1",
+    tenantSlug: "demo",
+    orderId: "order-1",
+    guestAccessToken: "raw-token",
+  };
+
+  beforeEach(() => {
+    state.existingPayments = [
+      { stripe_checkout_session_id: "cs_test_latest", created_at: "2026-11-22T10:00:00Z" },
+    ];
+  });
+
+  it("returns the Stripe URL of a still-open session", async () => {
+    retrieveCheckoutSessionMock.mockResolvedValue({
+      status: "open",
+      url: "https://checkout.stripe.com/c/pay/cs_test_latest",
+    });
+    const { resumeCheckoutSessionForOrder } = await import("./service");
+
+    await expect(resumeCheckoutSessionForOrder(input)).resolves.toEqual({
+      kind: "open",
+      checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_latest",
+    });
+    expect(retrieveCheckoutSessionMock).toHaveBeenCalledWith("cs_test_latest");
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a completed session without a URL and never creates a session", async () => {
+    retrieveCheckoutSessionMock.mockResolvedValue({ status: "complete", url: null });
+    const { resumeCheckoutSessionForOrder } = await import("./service");
+
+    await expect(resumeCheckoutSessionForOrder(input)).resolves.toEqual({ kind: "complete" });
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("reports an expired session and never creates a new one", async () => {
+    retrieveCheckoutSessionMock.mockResolvedValue({ status: "expired", url: null });
+    const { resumeCheckoutSessionForOrder } = await import("./service");
+
+    await expect(resumeCheckoutSessionForOrder(input)).resolves.toEqual({ kind: "expired" });
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("propagates a retrieve failure and creates nothing", async () => {
+    retrieveCheckoutSessionMock.mockRejectedValue(new Error("stripe 503"));
+    const { resumeCheckoutSessionForOrder } = await import("./service");
+
+    await expect(resumeCheckoutSessionForOrder(input)).rejects.toThrow("stripe 503");
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("treats an order without any recorded session as expired, creating nothing", async () => {
+    state.existingPayments = [];
+    const { resumeCheckoutSessionForOrder } = await import("./service");
+
+    await expect(resumeCheckoutSessionForOrder(input)).resolves.toEqual({ kind: "expired" });
+    expect(retrieveCheckoutSessionMock).not.toHaveBeenCalled();
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses orders that are no longer awaiting payment", async () => {
+    state.order = { ...state.order!, status: "received" };
+    const { resumeCheckoutSessionForOrder } = await import("./service");
+
+    await expect(resumeCheckoutSessionForOrder(input)).rejects.toThrow("not awaiting payment");
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
   });
 });
 

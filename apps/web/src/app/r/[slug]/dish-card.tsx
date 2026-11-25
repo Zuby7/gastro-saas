@@ -57,6 +57,30 @@ function startingPriceLabel(dish: PublicMenuDish): string {
   return `ab ${formatPrice(cents, dish.currency)}`;
 }
 
+/**
+ * Visible price text. Multi-variant dishes show "ab 9,00 €"; a dish without
+ * any usable price shows nothing misleading ("Ausverkauft" when sold out)
+ * instead of the generic "Preis nach Auswahl".
+ */
+function visiblePriceText(dish: PublicMenuDish): string {
+  const cents = startingPriceCents(dish);
+  if (cents === null) {
+    return dish.soldOut ? "Ausverkauft" : formatPrice(null, dish.currency);
+  }
+  return dish.variants.length > 1 ? startingPriceLabel(dish) : formatPrice(cents, dish.currency);
+}
+
+/**
+ * The SQL (`get_public_menu`) emits the bare phrase "Vom Restaurant
+ * angegeben." for reviewed dishes, which is cryptic on its own; it is shown
+ * with a clear prefix. The "not yet confirmed" notice passes through as is.
+ */
+function allergenNoticeText(notice: string): string {
+  return notice.trim() === "Vom Restaurant angegeben."
+    ? "Allergene: vom Restaurant angegeben"
+    : notice;
+}
+
 export function DishCard({ dish, tenantSlug, eagerImage = false }: DishCardProps) {
   return (
     <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-surface shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_20px_rgba(0,0,0,.06)]">
@@ -124,7 +148,9 @@ export function DishCard({ dish, tenantSlug, eagerImage = false }: DishCardProps
           </ul>
         ) : null}
 
-        <p className="text-xs text-foreground-secondary">{dish.allergenNotice}</p>
+        <p className="text-xs text-foreground-secondary">
+          {allergenNoticeText(dish.allergenNotice)}
+        </p>
 
         {dish.soldOut ? (
           // Sold-out dishes still show their price -- only the add-to-cart
@@ -133,21 +159,19 @@ export function DishCard({ dish, tenantSlug, eagerImage = false }: DishCardProps
           // lost entirely for sold-out dishes).
           <div className="mt-auto flex items-center pt-2">
             <span className="font-display font-bold text-accent-foreground">
-              {isSimpleDish(dish)
-                ? formatPrice(dish.priceCents, dish.currency)
-                : startingPriceLabel(dish)}
+              {visiblePriceText(dish)}
             </span>
           </div>
         ) : isSimpleDish(dish) ? (
-          // `relative`: SimpleAddButton's post-submit confirmation overlays
-          // this row (`absolute inset-0`) instead of growing it -- an
+          // `relative`: SimpleAddButton's post-submit confirmation floats
+          // above this row (`absolute bottom-full`) instead of growing it -- an
           // in-flow message here previously made this row taller than its
           // CSS Grid track, overlapping the neighboring card (live bug,
           // 2026-09-08). Staying within this row's own box also keeps it
           // inside the card's `overflow-hidden` bounds.
           <div className="relative mt-auto flex items-center justify-between pt-2">
             <span className="font-display font-bold text-accent-foreground">
-              {formatPrice(dish.priceCents, dish.currency)}
+              {visiblePriceText(dish)}
             </span>
             <SimpleAddButton dish={dish} tenantSlug={tenantSlug} />
           </div>
@@ -155,10 +179,10 @@ export function DishCard({ dish, tenantSlug, eagerImage = false }: DishCardProps
           <details className="group mt-auto pt-2">
             <summary
               aria-label={`${dish.name}, ${startingPriceLabel(dish)}: Auswahl öffnen`}
-              className={`flex cursor-pointer list-none items-center justify-between rounded-lg [&::-webkit-details-marker]:hidden ${ADD_BUTTON_INTERACTIVE_CLASSNAME}`}
+              className={`flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg [&::-webkit-details-marker]:hidden ${ADD_BUTTON_INTERACTIVE_CLASSNAME}`}
             >
               <span className="font-display font-bold text-accent-foreground">
-                {formatPrice(startingPriceCents(dish), dish.currency)}
+                {visiblePriceText(dish)}
               </span>
               <span className={ADD_BUTTON_VISUAL_CLASSNAME} aria-hidden="true">
                 <Plus className="h-4 w-4" />

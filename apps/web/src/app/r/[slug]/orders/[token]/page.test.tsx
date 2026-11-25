@@ -17,16 +17,21 @@ vi.mock("@/lib/orders/token", () => ({
   hashOrderAccessToken: (token: string) => `hashed-${token}`,
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
+
 // The client-side polling component is exercised separately in
 // `./order-status-live.test.tsx`; keep this suite focused on the server
 // component's rendering/authorization logic.
-vi.mock("./actions", () => ({
-  pollOrderStatus: vi.fn().mockResolvedValue(null),
-}));
-
 // The rating form's submission behavior is exercised separately in
 // `./rating-form.test.tsx`; keep this suite focused on which of the
 // form/already-rated/nothing states the page picks for a given order.
+vi.mock("./actions", () => ({
+  pollOrderStatus: vi.fn().mockResolvedValue(null),
+  retryPaymentAction: vi.fn(),
+}));
+
 vi.mock("./rating-actions", () => ({
   submitRatingAction: vi.fn(),
 }));
@@ -209,5 +214,49 @@ describe("OrderStatusPage", () => {
     expect(
       screen.queryByRole("heading", { name: "Wie war Ihre Bestellung?" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows 'Zahlung abgebrochen' with a retry action for an awaiting_payment order returning from Stripe's cancel URL", async () => {
+    getOrderStatusByTokenMock.mockResolvedValue(buildOrder({ status: "awaiting_payment" }));
+    const { default: OrderStatusPage } = await import("./page");
+
+    render(
+      await OrderStatusPage({
+        params: Promise.resolve({ slug: "demo", token: "valid-token" }),
+        searchParams: Promise.resolve({ checkout: "cancelled" }),
+      }),
+    );
+
+    expect(screen.getByText("Zahlung abgebrochen")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Erneut bezahlen" })).toBeInTheDocument();
+  });
+
+  it("shows 'Zahlung wird bestätigt' after the success return while still awaiting_payment", async () => {
+    getOrderStatusByTokenMock.mockResolvedValue(buildOrder({ status: "awaiting_payment" }));
+    const { default: OrderStatusPage } = await import("./page");
+
+    render(
+      await OrderStatusPage({
+        params: Promise.resolve({ slug: "demo", token: "valid-token" }),
+        searchParams: Promise.resolve({ checkout: "success" }),
+      }),
+    );
+
+    expect(screen.getByText("Zahlung wird bestätigt")).toBeInTheDocument();
+  });
+
+  it("never shows the payment notice once the order is no longer awaiting_payment (the query param is no proof of anything)", async () => {
+    getOrderStatusByTokenMock.mockResolvedValue(buildOrder({ status: "received" }));
+    const { default: OrderStatusPage } = await import("./page");
+
+    render(
+      await OrderStatusPage({
+        params: Promise.resolve({ slug: "demo", token: "valid-token" }),
+        searchParams: Promise.resolve({ checkout: "cancelled" }),
+      }),
+    );
+
+    expect(screen.queryByText("Zahlung abgebrochen")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Erneut bezahlen" })).not.toBeInTheDocument();
   });
 });

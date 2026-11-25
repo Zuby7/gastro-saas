@@ -7,10 +7,12 @@ import { orderStatusLabel } from "@/lib/orders/status-labels";
 import { hashOrderAccessToken } from "@/lib/orders/token";
 import { isOrderPaidStatus } from "@/lib/orders/receipt";
 import { OrderStatusLive } from "./order-status-live";
+import { PaymentNotice } from "./payment-notice";
 import { RatingForm } from "./rating-form";
 
 interface OrderStatusPageProps {
   params: Promise<{ slug: string; token: string }>;
+  searchParams?: Promise<{ checkout?: string | string[] }>;
 }
 
 /**
@@ -38,8 +40,13 @@ interface OrderStatusPageProps {
  * authorization boundary) -- it only prevents a confusing/spoofable
  * presentation of restaurant A's order under restaurant B's page chrome.
  */
-export default async function OrderStatusPage({ params }: OrderStatusPageProps) {
+export default async function OrderStatusPage({ params, searchParams }: OrderStatusPageProps) {
   const { slug, token } = await params;
+  // Stripe's return URLs carry `?checkout=success|cancelled`. Never proof of
+  // payment: the notice only renders while the order is still awaiting_payment.
+  const checkoutParam = (await searchParams)?.checkout;
+  const checkoutReturn =
+    checkoutParam === "cancelled" || checkoutParam === "success" ? checkoutParam : null;
   const [menu, order] = await Promise.all([
     getPublicMenu(slug),
     getOrderStatusByToken(hashOrderAccessToken(token)),
@@ -89,6 +96,10 @@ export default async function OrderStatusPage({ params }: OrderStatusPageProps) 
           initialStatus={order.status}
           orderId={order.orderId}
         />
+
+        {order.status === "awaiting_payment" && checkoutReturn ? (
+          <PaymentNotice tenantSlug={slug} token={token} checkout={checkoutReturn} />
+        ) : null}
 
         <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground">Details</h2>

@@ -47,7 +47,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
 
   return (
     <li
-      className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${
+      className={`flex min-w-0 flex-col gap-3 rounded-lg border p-4 ${
         line.isAvailable ? "border-neutral-200 bg-surface" : "border-danger-500 bg-danger-500/5"
       }`}
     >
@@ -55,7 +55,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
         {announcement}
       </p>
 
-      <div>
+      <div className="min-w-0 break-words">
         <p className="font-medium text-foreground">
           {line.dishName}
           {line.variantName ? ` (${line.variantName})` : ""}
@@ -82,31 +82,41 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
         ) : null}
       </div>
 
-      <div className="flex items-center gap-4">
-        <form {...updateAction} className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Stepper: each button submits immediately with the new quantity as
+            its own `name`/`value` (the preserved-form hook includes the
+            submitter). The server action still validates 1..20. */}
+        <form {...updateAction} className="flex items-center gap-1">
           <input type="hidden" name="cartItemId" value={line.cartItemId} />
-          <label className="sr-only" htmlFor={`quantity-${line.cartItemId}`}>
-            Menge für {line.dishName}
-          </label>
-          <input
-            id={`quantity-${line.cartItemId}`}
-            name="quantity"
-            type="number"
-            min={1}
-            max={20}
-            defaultValue={line.quantity}
-            className="w-16 rounded-md border border-neutral-300 px-2 py-1 text-sm text-foreground"
-          />
           <button
             type="submit"
-            disabled={isUpdating}
-            className="rounded-md border border-neutral-300 px-3 py-1 text-sm font-medium text-foreground hover:border-ember-400 hover:text-ember-700 disabled:opacity-60"
+            name="quantity"
+            value={line.quantity - 1}
+            disabled={isUpdating || line.quantity <= 1}
+            aria-label={`Menge für ${line.dishName} verringern`}
+            className="flex h-11 w-11 items-center justify-center rounded-md border border-neutral-300 text-lg font-medium text-foreground hover:border-ember-400 hover:text-ember-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-700 disabled:opacity-60"
           >
-            Aktualisieren
+            <span aria-hidden="true">&minus;</span>
+          </button>
+          <span
+            className="min-w-10 text-center font-medium text-foreground"
+            aria-label={`Menge für ${line.dishName}: ${line.quantity}`}
+          >
+            {line.quantity}
+          </span>
+          <button
+            type="submit"
+            name="quantity"
+            value={line.quantity + 1}
+            disabled={isUpdating || line.quantity >= 20}
+            aria-label={`Menge für ${line.dishName} erhöhen`}
+            className="flex h-11 w-11 items-center justify-center rounded-md border border-neutral-300 text-lg font-medium text-foreground hover:border-ember-400 hover:text-ember-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-700 disabled:opacity-60"
+          >
+            <span aria-hidden="true">+</span>
           </button>
         </form>
 
-        <p className="w-24 text-right font-medium text-foreground">
+        <p className="ml-auto min-w-20 text-right font-medium text-foreground">
           {formatPrice(line.lineTotalCents, currency)}
         </p>
 
@@ -115,7 +125,7 @@ export function CartLine({ line, tenantSlug, currency }: CartLineProps) {
           <button
             type="submit"
             disabled={isRemoving}
-            className="rounded-md border border-neutral-300 px-3 py-1 text-sm font-medium text-danger-foreground hover:border-danger-500 disabled:opacity-60"
+            className="min-h-11 rounded-md border border-neutral-300 px-3 py-1 text-sm font-medium text-danger-foreground hover:border-danger-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ember-700 disabled:opacity-60"
           >
             Entfernen
           </button>

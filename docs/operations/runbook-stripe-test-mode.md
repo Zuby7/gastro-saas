@@ -78,6 +78,8 @@ There is no automated Stripe e2e test (Playwright covers only register/login). V
 6. Refund check: as a role with `payments.refund`, refund the order from `/account/orders/<id>`; `refunds.status` becomes `succeeded`.
 7. Negative checks worth doing after changes to payment code: decline card (order stays `awaiting_payment`, then cancelled by the timeout sweep after 30 minutes), replay a webhook with the Dashboard "resend" (returns `duplicate: true`), send a request with a bad signature (400). Delivery log shows 5xx for an event: Stripe retries automatically; check the Worker logs for the database error before replaying manually.
 
+"Erneut bezahlen" on the order-status page (shown after returning from Stripe with `?checkout=cancelled`) only reuses the order's still-open Checkout Session within the original payment deadline; it never creates a second session. If the session is expired, the guest sees "Die Zahlungsfrist ist abgelaufen. Bitte bestellen Sie erneut." and has to place a new order; a completed session shows "Zahlung wird bestätigt" without a redirect. Known limitation, tracked for follow-up: `payment_intent.payment_failed` cancels the order, so after one declined card the guest must reorder instead of retrying on the same order.
+
 If step 3 never completes, see [troubleshooting.md](troubleshooting.md) (wrong webhook secret, endpoint not reachable, localhost redirect).
 
 ## Related

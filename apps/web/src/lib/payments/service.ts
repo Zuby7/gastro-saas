@@ -92,6 +92,54 @@ async function fetchOrderPaymentSnapshot(
   };
 }
 
+/** Stripe's hard limit for `product_data.description` is 500 characters. */
+const MAX_PRODUCT_DESCRIPTION_LENGTH = 400;
+/** Stripe caps `product_data.name` at 250 characters; leave room for the prefix. */
+const MAX_TENANT_NAME_LENGTH = 200;
+
+/**
+ * Human-readable label for the single Stripe line item: product name
+ * "Bestellung bei <Restaurantname>" and a one-line item summary as the
+ * description. Purely presentational -- the charged amount always comes from
+ * the order's own guarded `total_cents`. Best effort: if the tenant name or
+ * the items cannot be read, falls back to a generic name rather than
+ * blocking the payment.
+ */
+async function fetchOrderLineItemLabel(
+  tenantId: string,
+  orderId: string,
+): Promise<{ name: string; description?: string }> {
+  try {
+    const admin = createSupabaseAdminClient();
+    const [tenantResult, itemsResult] = await Promise.all([
+      admin.from("tenants").select("name").eq("id", tenantId).maybeSingle<{ name: string }>(),
+      admin
+        .from("order_items")
+        .select("dish_name_snapshot, quantity")
+        .eq("order_id", orderId)
+        .eq("tenant_id", tenantId)
+        .returns<Array<{ dish_name_snapshot: string; quantity: number }>>(),
+    ]);
+
+    const tenantName = tenantResult.data?.name?.trim();
+    const name = tenantName
+      ? `Bestellung bei ${tenantName.slice(0, MAX_TENANT_NAME_LENGTH)}`
+      : "Bestellung";
+
+    const summary = (itemsResult.data ?? [])
+      .map((item) => `${item.quantity}× ${item.dish_name_snapshot}`)
+      .join(", ");
+    const description =
+      summary.length > MAX_PRODUCT_DESCRIPTION_LENGTH
+        ? `${summary.slice(0, MAX_PRODUCT_DESCRIPTION_LENGTH - 1)}…`
+        : summary;
+
+    return description ? { name, description } : { name };
+  } catch {
+    return { name: "Bestellung" };
+  }
+}
+
 /**
  * Creates (or idempotently re-returns) a Stripe-hosted Checkout Session for
  * an order that was just created in `awaiting_payment` status, and persists
@@ -126,6 +174,8 @@ export async function createCheckoutSessionForOrder(
 
   const { stripeAccountId } = await fetchChargeReadyAccount(input.tenantId);
 
+  const label = await fetchOrderLineItemLabel(input.tenantId, input.orderId);
+
   const stripe = createStripeClient();
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const orderStatusUrl = `${origin}/r/${input.tenantSlug}/orders/${input.guestAccessToken}`;
@@ -139,7 +189,8 @@ export async function createCheckoutSessionForOrder(
           currency: order.currency.toLowerCase(),
           unit_amount: order.totalCents,
           product_data: {
-            name: `Bestellung ${order.orderId}`,
+            name: label.name,
+            ...(label.description ? { description: label.description } : {}),
           },
         },
       },
@@ -220,4 +271,53 @@ export async function createCheckoutSessionForOrder(
   });
 
   return { checkoutUrl: session.url };
+}
+
+export type ResumeCheckoutResult =
+  { kind: "open"; checkoutUrl: string } | { kind: "complete" } | { kind: "expired" };
+
+/**
+ * "Erneut bezahlen": REUSE ONLY. Looks up the order's latest Stripe Checkout
+ * Session and never creates a second one (a duplicate session could be paid
+ * twice). `open` -> the Stripe URL to redirect to; `complete` -> payment is
+ * being confirmed by the webhook (no redirect); `expired` (or no session was
+ * ever recorded) -> the guest has to order again. If Stripe cannot be
+ * reached, the retrieve error propagates so the caller can answer with a
+ * retryable error -- nothing is created in that case either. Never marks
+ * anything paid; only the verified webhook does.
+ */
+export async function resumeCheckoutSessionForOrder(
+  input: CreateCheckoutSessionInput,
+): Promise<ResumeCheckoutResult> {
+  const order = await fetchOrderPaymentSnapshot(input.tenantId, input.orderId);
+
+  if (order.status !== "awaiting_payment") {
+    throw new Error("This order is not awaiting payment.");
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: payments } = await admin
+    .from("payments")
+    .select("stripe_checkout_session_id, created_at")
+    .eq("order_id", input.orderId)
+    .eq("tenant_id", input.tenantId)
+    .order("created_at", { ascending: false })
+    .returns<Array<{ stripe_checkout_session_id: string; created_at: string }>>();
+
+  const latest = payments?.[0];
+  if (!latest) {
+    return { kind: "expired" };
+  }
+
+  const session = await createStripeClient().checkout.sessions.retrieve(
+    latest.stripe_checkout_session_id,
+  );
+
+  if (session.status === "open" && session.url) {
+    return { kind: "open", checkoutUrl: session.url };
+  }
+  if (session.status === "complete") {
+    return { kind: "complete" };
+  }
+  return { kind: "expired" };
 }

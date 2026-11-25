@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { OrderStatus } from "@gastro-saas/domain";
 import { isTerminalOrderStatus } from "@gastro-saas/domain";
 import { orderStatusDescription, orderStatusLabel } from "@/lib/orders/status-labels";
 import { pollOrderStatus } from "./actions";
 
 const POLL_INTERVAL_MS = 20_000;
+/** While the guest is waiting for the payment webhook, poll much faster. */
+const AWAITING_PAYMENT_POLL_INTERVAL_MS = 4_000;
 
 interface OrderStatusLiveProps {
   tenantSlug: string;
@@ -28,8 +31,10 @@ interface OrderStatusLiveProps {
  * actually change after initial render. This component polls
  * `pollOrderStatus` (a server action re-using the exact same
  * token-hash-based lookup/authorization as the initial page load, see
- * `./actions.ts`) on a plain interval -- no websockets/realtime, a kitchen
- * order status changing every 20-30s is plenty timely -- and only updates
+ * `./actions.ts`) on a plain timer -- no websockets/realtime -- every 4 s
+ * while the order is `awaiting_payment` (the guest is waiting for the payment
+ * webhook), otherwise every 20 s, and calls `router.refresh()` when the
+ * status changes -- and only updates
  * (and therefore only re-announces) the `aria-live` region's text when the
  * status actually changes, so a screen reader announces the new status once
  * rather than repeating the same text on every poll.
@@ -51,10 +56,7 @@ export function OrderStatusLive({
   const orderToken = orderId.replace(/-/g, "").slice(0, 8).toUpperCase();
   const [status, setStatus] = useState<OrderStatus>(initialStatus);
   const statusRef = useRef(status);
-
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
+  const router = useRouter();
 
   useEffect(() => {
     if (isTerminalOrderStatus(initialStatus)) {
@@ -62,26 +64,42 @@ export function OrderStatusLive({
     }
 
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const interval = setInterval(() => {
-      void pollOrderStatus(tenantSlug, token).then((result) => {
-        if (cancelled || !result) {
-          return;
-        }
-        if (result.status !== statusRef.current) {
-          setStatus(result.status);
-        }
-        if (isTerminalOrderStatus(result.status)) {
-          clearInterval(interval);
-        }
-      });
-    }, POLL_INTERVAL_MS);
+    const schedule = () => {
+      timer = setTimeout(
+        () => void tick(),
+        statusRef.current === "awaiting_payment"
+          ? AWAITING_PAYMENT_POLL_INTERVAL_MS
+          : POLL_INTERVAL_MS,
+      );
+    };
+
+    const tick = async () => {
+      const result = await pollOrderStatus(tenantSlug, token).catch(() => null);
+      if (cancelled) {
+        return;
+      }
+      if (result && result.status !== statusRef.current) {
+        statusRef.current = result.status;
+        setStatus(result.status);
+        // Re-render the server component so the receipt link, rating form,
+        // order history and payment notice follow the new status.
+        router.refresh();
+      }
+      if (result && isTerminalOrderStatus(result.status)) {
+        return;
+      }
+      schedule();
+    };
+
+    schedule();
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      clearTimeout(timer);
     };
-  }, [tenantSlug, token, initialStatus]);
+  }, [tenantSlug, token, initialStatus, router]);
 
   return (
     // The order-status page's strongest candidate for the full ticket
