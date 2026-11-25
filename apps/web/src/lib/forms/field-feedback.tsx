@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export interface FeedbackState {
+interface FeedbackState {
   error?: string;
   success?: string;
   fieldErrors?: Record<string, string>;

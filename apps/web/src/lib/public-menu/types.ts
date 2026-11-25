@@ -1,4 +1,4 @@
-export interface PublicMenuOption {
+interface PublicMenuOption {
   id: string;
   name: string;
   priceDeltaCents: number;

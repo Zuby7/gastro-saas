@@ -19,7 +19,7 @@ import { AvailabilityToggleForm } from "./availability-toggle-form";
 
 const initialState: DishActionState = {};
 
-export interface DishBasicsFormProps {
+interface DishBasicsFormProps {
   dishId: string;
   name: string;
   description: string;

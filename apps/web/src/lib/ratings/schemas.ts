@@ -21,8 +21,6 @@ export const RatingSchema = z.object({
     .transform((value) => value ?? ""),
 });
 
-export type RatingInput = z.infer<typeof RatingSchema>;
-
 /**
  * Server-side validation boundary for the moderation queue's status-change
  * action (ticket #121, Epic-10 Opus review finding 2 -- `moderateRatingAction`
@@ -39,5 +37,3 @@ export const ModerateRatingSchema = z.object({
     message: "Ungültiger Moderationsstatus.",
   }),
 });
-
-export type ModerateRatingInput = z.infer<typeof ModerateRatingSchema>;

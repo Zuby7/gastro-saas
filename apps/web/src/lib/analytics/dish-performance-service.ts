@@ -17,7 +17,7 @@ import {
  * `classifyDishPerformance()`, applied here to the raw stats -- see that
  * module's header for why this split exists.
  */
-export interface RawDishStatsRow {
+interface RawDishStatsRow {
   dishId: string;
   dishName: string;
   categoryId: string;

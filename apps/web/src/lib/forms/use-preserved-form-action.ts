@@ -2,12 +2,12 @@
 
 import { startTransition, useActionState, useEffect, useRef, type FormEvent } from "react";
 
-export type PreservedFormProps = {
+type PreservedFormProps = {
   action: (formData: FormData) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-export type PreservedFormOptions<S> = {
+type PreservedFormOptions<S> = {
   /** Defines "success" from the state shape. Default: the state has no truthy `error` and no non-empty `fieldErrors`. */
   isSuccess?: (state: S) => boolean;
   /** Reset the form fields after a successful result (default: true). */

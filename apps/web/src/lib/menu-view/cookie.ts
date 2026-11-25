@@ -16,5 +16,3 @@ export async function readMenuViewToken(tenantSlug: string): Promise<string | nu
   const cookieStore = await cookies();
   return cookieStore.get(menuViewCookieName(tenantSlug))?.value ?? null;
 }
-
-export { menuViewCookieName };

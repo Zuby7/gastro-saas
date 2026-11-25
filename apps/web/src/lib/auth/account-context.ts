@@ -3,7 +3,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentMembership, type CurrentMembership } from "@/lib/tenant/current-membership";
 
-export interface AccountContext {
+interface AccountContext {
   supabase: SupabaseClient;
   /** Validated against the Auth server (`getUser()`), `null` when signed out. */
   user: User | null;

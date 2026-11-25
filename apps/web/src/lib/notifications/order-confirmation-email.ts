@@ -54,7 +54,7 @@ interface RestaurantProfileRow {
   brand_color: string;
 }
 
-export interface OrderConfirmationEmailInput {
+interface OrderConfirmationEmailInput {
   tenantId: string;
   orderId: string;
   /**

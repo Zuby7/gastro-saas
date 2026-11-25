@@ -2,7 +2,7 @@ import { Readable } from "node:stream";
 import ExcelJS from "exceljs";
 import type { ImportRowInput } from "@gastro-saas/domain";
 
-export interface ParsedSalesFile {
+interface ParsedSalesFile {
   headers: string[];
   rows: ImportRowInput[];
 }

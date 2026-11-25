@@ -36,7 +36,7 @@ import { PhotonImage, resize, SamplingFilter } from "@cf-wasm/photon";
 import { readImageDimensionsFromHeader } from "./image-header-dimensions";
 
 export const MAX_DIMENSION_PX = 1200;
-export const JPEG_QUALITY = 82;
+const JPEG_QUALITY = 82;
 
 /**
  * Upper bound on decoded pixel count. Guards against a decompression-bomb
@@ -63,7 +63,7 @@ export const MAX_DECODED_PIXELS = 40_000_000;
 export const REENCODED_CONTENT_TYPE = "image/jpeg";
 export const REENCODED_EXTENSION = "jpg";
 
-export type ReEncodeResult = { ok: true; buffer: Buffer } | { ok: false; error: "invalid_image" };
+type ReEncodeResult = { ok: true; buffer: Buffer } | { ok: false; error: "invalid_image" };
 
 /**
  * Decodes `input` as an image, downscales it to fit within
