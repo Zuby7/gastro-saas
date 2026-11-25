@@ -158,7 +158,9 @@ describe("retryPaymentAction", () => {
       status: "open",
       url: "https://checkout.stripe.com/c/pay/cs_test_1",
     });
-    await expect(run()).rejects.toThrow("NEXT_REDIRECT:https://checkout.stripe.com/c/pay/cs_test_1");
+    await expect(run()).rejects.toThrow(
+      "NEXT_REDIRECT:https://checkout.stripe.com/c/pay/cs_test_1",
+    );
     expect(redirectMock).toHaveBeenCalledTimes(1);
     expect(createSessionMock).not.toHaveBeenCalled();
   });
