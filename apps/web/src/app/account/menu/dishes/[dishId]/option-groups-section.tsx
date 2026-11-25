@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  FieldError,
+  FormFeedback,
+  fieldErrorProps,
+  useDismissOnEdit,
+} from "@/lib/forms/field-feedback";
 import { usePreservedFormAction } from "@/lib/forms/use-preserved-form-action";
 import { useActionState } from "react";
 import {
@@ -61,6 +67,9 @@ export function OptionGroupsSection({
     createOptionAction,
     initialState,
   );
+
+  const groupFeedback = useDismissOnEdit(createGroupState);
+  const optionFeedback = useDismissOnEdit(createOptionState);
 
   const assignedGroups = allOptionGroups.filter((group) => assignedGroupIds.includes(group.id));
   const unassignedGroups = allOptionGroups.filter((group) => !assignedGroupIds.includes(group.id));
@@ -166,7 +175,12 @@ export function OptionGroupsSection({
       ) : null}
 
       {canEditMenu ? (
-        <form {...createGroupFormAction} className="flex flex-wrap items-end gap-2" noValidate>
+        <form
+          {...createGroupFormAction}
+          onInput={groupFeedback.onEdit}
+          className="flex flex-wrap items-end gap-2"
+          noValidate
+        >
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
             <label htmlFor="new-group-name" className="text-sm font-medium text-foreground">
@@ -176,8 +190,10 @@ export function OptionGroupsSection({
               id="new-group-name"
               name="name"
               required
+              {...fieldErrorProps(createGroupState, "name", "new-group-name-error")}
               className="rounded-md border border-neutral-300 px-2 py-1 text-foreground"
             />
+            <FieldError id="new-group-name-error" state={createGroupState} name="name" />
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="new-group-min" className="text-sm font-medium text-foreground">
@@ -189,8 +205,10 @@ export function OptionGroupsSection({
               type="number"
               min={0}
               defaultValue={0}
+              {...fieldErrorProps(createGroupState, "minSelections", "new-group-min-error")}
               className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-foreground"
             />
+            <FieldError id="new-group-min-error" state={createGroupState} name="minSelections" />
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="new-group-max" className="text-sm font-medium text-foreground">
@@ -202,8 +220,10 @@ export function OptionGroupsSection({
               type="number"
               min={1}
               defaultValue={1}
+              {...fieldErrorProps(createGroupState, "maxSelections", "new-group-max-error")}
               className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-foreground"
             />
+            <FieldError id="new-group-max-error" state={createGroupState} name="maxSelections" />
           </div>
           <button
             type="submit"
@@ -212,16 +232,17 @@ export function OptionGroupsSection({
           >
             {isCreateGroupPending ? "Wird angelegt…" : "Gruppe anlegen"}
           </button>
-          {createGroupState.error ? (
-            <p role="alert" className="w-full text-sm text-danger-foreground">
-              {createGroupState.error}
-            </p>
-          ) : null}
+          <FormFeedback state={createGroupState} dismissed={groupFeedback.dismissed} />
         </form>
       ) : null}
 
       {canEditMenu && allOptionGroups.length > 0 ? (
-        <form {...createOptionFormAction} className="flex flex-wrap items-end gap-2" noValidate>
+        <form
+          {...createOptionFormAction}
+          onInput={optionFeedback.onEdit}
+          className="flex flex-wrap items-end gap-2"
+          noValidate
+        >
           <input type="hidden" name="dishId" value={dishId} />
           <div className="flex flex-col gap-1">
             <label htmlFor="new-option-group" className="text-sm font-medium text-foreground">
@@ -247,19 +268,28 @@ export function OptionGroupsSection({
               id="new-option-name"
               name="name"
               required
+              {...fieldErrorProps(createOptionState, "name", "new-option-name-error")}
               className="rounded-md border border-neutral-300 px-2 py-1 text-foreground"
             />
+            <FieldError id="new-option-name-error" state={createOptionState} name="name" />
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="new-option-price" className="text-sm font-medium text-foreground">
-              Preisaufschlag (Cent)
+              Preisaufschlag (€)
             </label>
             <input
               id="new-option-price"
-              name="priceDeltaCents"
-              type="number"
-              defaultValue={0}
+              name="priceDeltaEuro"
+              type="text"
+              inputMode="decimal"
+              defaultValue="0,00"
+              {...fieldErrorProps(createOptionState, "priceDeltaEuro", "new-option-price-error")}
               className="w-28 rounded-md border border-neutral-300 px-2 py-1 text-foreground"
+            />
+            <FieldError
+              id="new-option-price-error"
+              state={createOptionState}
+              name="priceDeltaEuro"
             />
           </div>
           <button
@@ -269,11 +299,7 @@ export function OptionGroupsSection({
           >
             {isCreateOptionPending ? "Wird angelegt…" : "Option anlegen"}
           </button>
-          {createOptionState.error ? (
-            <p role="alert" className="w-full text-sm text-danger-foreground">
-              {createOptionState.error}
-            </p>
-          ) : null}
+          <FormFeedback state={createOptionState} dismissed={optionFeedback.dismissed} />
         </form>
       ) : null}
     </section>

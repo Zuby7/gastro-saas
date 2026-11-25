@@ -1,12 +1,14 @@
 import { z } from "zod";
 
+import { euroCentsField } from "@/lib/money/euro";
+
 export const RefundSchema = z.object({
   orderId: z.string().uuid("Ungültige Bestellung."),
-  amountCents: z
-    .string()
-    .trim()
-    .regex(/^\d+$/, "Bitte geben Sie einen Betrag in Cent an (z. B. 500).")
-    .refine((value) => Number(value) > 0, "Der Betrag muss größer als 0 sein."),
+  /** Raw euro string from the form ("12,50"); parsed to integer cents. */
+  amountEuro: euroCentsField({ required: true }).refine(
+    (cents) => cents > 0,
+    "Der Betrag muss größer als 0 sein.",
+  ),
   reason: z
     .string()
     .trim()

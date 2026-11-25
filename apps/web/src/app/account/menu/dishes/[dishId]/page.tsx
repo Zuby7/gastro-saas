@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hasTenantPermission } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/tenant/current-membership";
+import { formatCentsAsEuro } from "@/lib/money/euro";
+import { resolveDishVersionContext } from "@/lib/menu/resolve-draft-dish";
 import { DishBasicsForm } from "./dish-basics-form";
 import { VariantsSection, type VariantRecord } from "./variants-section";
 import { OptionGroupsSection, type OptionGroupRecord } from "./option-groups-section";
@@ -16,6 +18,7 @@ interface DishPageProps {
 
 interface DishRow {
   id: string;
+  menu_version_id: string;
   category_id: string;
   name: string;
   description: string;
@@ -80,7 +83,7 @@ export default async function DishPage({ params }: DishPageProps) {
   const { data: dish } = await supabase
     .from("dishes")
     .select(
-      "id, category_id, name, description, price_cents, allergen_reviewed, media_asset_id, is_available, available_again_at",
+      "id, menu_version_id, category_id, name, description, price_cents, allergen_reviewed, media_asset_id, is_available, available_again_at",
     )
     .eq("id", dishId)
     .eq("tenant_id", membership.tenantId)
@@ -89,6 +92,23 @@ export default async function DishPage({ params }: DishPageProps) {
   if (!dish) {
     notFound();
   }
+
+  // publish_menu_version() freezes the published rows and clones a new draft
+  // with new ids, so an old dish link can point at a frozen dish whose edits
+  // would all fail. Jump to its draft twin, or fall back to read-only.
+  const versionContext = await resolveDishVersionContext(supabase, {
+    tenantId: membership.tenantId,
+    menuVersionId: dish.menu_version_id,
+    categoryId: dish.category_id,
+    dishName: dish.name,
+  });
+  if (versionContext.kind === "frozen" && versionContext.draftDishId) {
+    redirect(`/account/menu/dishes/${versionContext.draftDishId}`);
+  }
+  const isFrozen = versionContext.kind === "frozen";
+
+  const canEdit = canEditMenu && !isFrozen;
+  const canToggleAvailability = canManageAvailability && !isFrozen;
 
   const [
     { data: variants },
@@ -266,6 +286,44 @@ export default async function DishPage({ params }: DishPageProps) {
           </Link>
         </div>
 
+        {isFrozen ? (
+          <div
+            role="status"
+            className="flex flex-col gap-2 rounded-lg border-2 border-warning-500 bg-warning-500/10 p-4"
+          >
+            <p className="font-medium text-foreground">
+              Dieses Gericht gehört zu einer veröffentlichten Version und ist schreibgeschützt.
+            </p>
+            <p className="text-sm text-foreground-secondary">
+              Änderungen sind nur im aktuellen Entwurf möglich. Dort wurde kein passendes Gericht
+              gefunden; öffnen Sie die Speisekarte, um das Gericht im Entwurf zu suchen.
+            </p>
+            <Link
+              href="/account/menu"
+              className="w-fit text-sm font-medium text-link-foreground underline hover:text-brand-700"
+            >
+              Zur Speisekarte (Entwurf)
+            </Link>
+          </div>
+        ) : null}
+
+        {isFrozen ? (
+          <dl className="flex flex-col gap-1 rounded-lg border border-neutral-200 bg-surface p-4 text-foreground shadow-sm">
+            <div className="flex gap-2">
+              <dt className="font-medium">Beschreibung:</dt>
+              <dd>{dish.description || "keine"}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="font-medium">Grundpreis:</dt>
+              <dd>
+                {dish.price_cents !== null
+                  ? `${formatCentsAsEuro(dish.price_cents)} €`
+                  : "kein Grundpreis"}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+
         <DishBasicsForm
           dishId={dish.id}
           name={dish.name}
@@ -274,11 +332,11 @@ export default async function DishPage({ params }: DishPageProps) {
           allergenReviewed={dish.allergen_reviewed}
           isAvailable={dish.is_available}
           availableAgainAt={dish.available_again_at}
-          canEditMenu={canEditMenu}
-          canManageAvailability={canManageAvailability}
+          canEditMenu={canEdit}
+          canManageAvailability={canToggleAvailability}
         />
 
-        {canEditMenu ? (
+        {canEdit ? (
           <ImageUploadForm
             dishId={dish.id}
             currentImageUrl={currentImageUrl}
@@ -293,19 +351,19 @@ export default async function DishPage({ params }: DishPageProps) {
         <VariantsSection
           dishId={dish.id}
           variants={variants ?? []}
-          canEditMenu={canEditMenu}
-          canManageAvailability={canManageAvailability}
+          canEditMenu={canEdit}
+          canManageAvailability={canToggleAvailability}
         />
 
         <OptionGroupsSection
           dishId={dish.id}
           allOptionGroups={allOptionGroups}
           assignedGroupIds={assignedGroupIds}
-          canEditMenu={canEditMenu}
-          canManageAvailability={canManageAvailability}
+          canEditMenu={canEdit}
+          canManageAvailability={canToggleAvailability}
         />
 
-        {canEditMenu ? (
+        {canEdit ? (
           <>
             <AssignableLookupSection
               dishId={dish.id}

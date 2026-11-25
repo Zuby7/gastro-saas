@@ -26,6 +26,7 @@ import {
   VariantSchema,
   type AssignmentEntity,
 } from "./schemas";
+import { zodFieldErrors } from "@/lib/forms/zod-field-errors";
 
 export interface DishActionState {
   error?: string;
@@ -168,16 +169,14 @@ export async function updateDishBasicsAction(
   const parsed = DishBasicsSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description") ?? "",
-    priceCents: formData.get("priceCents") ?? "",
+    priceEuro: formData.get("priceEuro") ?? "",
   });
 
   if (!dishId || !parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.success ? [] : parsed.error.issues) {
-      const field = issue.path[0];
-      if (typeof field === "string") fieldErrors[field] = issue.message;
-    }
-    return { error: "Bitte korrigieren Sie die markierten Felder.", fieldErrors };
+    return {
+      error: "Bitte korrigieren Sie die markierten Felder.",
+      fieldErrors: parsed.success ? undefined : zodFieldErrors(parsed.error),
+    };
   }
 
   const { supabase, tenantId } = await requireMenuWriteContext();
@@ -189,7 +188,7 @@ export async function updateDishBasicsAction(
     .update({
       name: parsed.data.name,
       description: parsed.data.description,
-      price_cents: parsed.data.priceCents ? Number(parsed.data.priceCents) : null,
+      price_cents: parsed.data.priceEuro,
     })
     .eq("id", dishId)
     .eq("tenant_id", tenantId)
@@ -359,11 +358,14 @@ export async function createVariantAction(
   const dishId = String(formData.get("dishId") ?? "");
   const parsed = VariantSchema.safeParse({
     name: formData.get("name"),
-    priceCents: formData.get("priceCents"),
+    priceEuro: formData.get("priceEuro"),
   });
 
   if (!dishId || !parsed.success) {
-    return { error: "Bitte korrigieren Sie die markierten Felder." };
+    return {
+      error: "Bitte korrigieren Sie die markierten Felder.",
+      fieldErrors: parsed.success ? undefined : zodFieldErrors(parsed.error),
+    };
   }
 
   const { supabase, tenantId } = await requireMenuWriteContext();
@@ -374,7 +376,7 @@ export async function createVariantAction(
     tenant_id: tenantId,
     dish_id: dishId,
     name: parsed.data.name,
-    price_cents: Number(parsed.data.priceCents),
+    price_cents: parsed.data.priceEuro,
   });
 
   if (error) {
@@ -423,7 +425,10 @@ export async function createOptionGroupAction(
   });
 
   if (!dishId || !parsed.success) {
-    return { error: parsed.success ? "Ungültige Eingabe." : parsed.error.issues[0]?.message };
+    return {
+      error: "Bitte korrigieren Sie die markierten Felder.",
+      fieldErrors: parsed.success ? undefined : zodFieldErrors(parsed.error),
+    };
   }
 
   const { supabase, tenantId } = await requireMenuWriteContext();
@@ -456,11 +461,14 @@ export async function createOptionAction(
   const parsed = OptionSchema.safeParse({
     optionGroupId: formData.get("optionGroupId"),
     name: formData.get("name"),
-    priceDeltaCents: formData.get("priceDeltaCents") ?? "0",
+    priceDeltaEuro: formData.get("priceDeltaEuro") ?? "",
   });
 
   if (!dishId || !parsed.success) {
-    return { error: "Bitte korrigieren Sie die markierten Felder." };
+    return {
+      error: "Bitte korrigieren Sie die markierten Felder.",
+      fieldErrors: parsed.success ? undefined : zodFieldErrors(parsed.error),
+    };
   }
 
   const { supabase, tenantId } = await requireMenuWriteContext();
@@ -471,7 +479,7 @@ export async function createOptionAction(
     tenant_id: tenantId,
     option_group_id: parsed.data.optionGroupId,
     name: parsed.data.name,
-    price_delta_cents: parsed.data.priceDeltaCents,
+    price_delta_cents: parsed.data.priceDeltaEuro ?? 0,
   });
 
   if (error) {
@@ -546,7 +554,10 @@ export async function createLookupValueAction(
   const nameParsed = LookupNameSchema.safeParse({ name: formData.get("name") });
 
   if (!dishId || !entityParsed.success || !nameParsed.success) {
-    return { error: "Bitte korrigieren Sie die markierten Felder." };
+    return {
+      error: "Bitte korrigieren Sie die markierten Felder.",
+      fieldErrors: nameParsed.success ? undefined : zodFieldErrors(nameParsed.error),
+    };
   }
 
   const { supabase, tenantId } = await requireMenuWriteContext();

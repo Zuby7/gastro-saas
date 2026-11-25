@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { euroCentsField } from "@/lib/money/euro";
+
 export const CategoryNameSchema = z.object({
   name: z
     .string()
@@ -16,13 +18,6 @@ export const DishSchema = z.object({
     .min(1, "Bitte geben Sie einen Namen ein.")
     .max(200, "Der Name ist zu lang."),
   description: z.string().trim().max(2000, "Die Beschreibung ist zu lang.").default(""),
-  priceCents: z
-    .string()
-    .trim()
-    .optional()
-    .or(z.literal(""))
-    .refine(
-      (value) => !value || /^\d+$/.test(value),
-      "Bitte geben Sie einen Preis in Cent an (z. B. 1200).",
-    ),
+  /** Raw euro string from the form ("12,50"); parsed to integer cents. */
+  priceEuro: euroCentsField({ required: false }),
 });

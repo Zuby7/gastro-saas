@@ -52,7 +52,7 @@ function membershipTable() {
 function refundFormData(overrides: Partial<Record<string, string>> = {}): FormData {
   const fd = new FormData();
   fd.set("orderId", overrides.orderId ?? "11111111-1111-4111-8111-111111111111");
-  fd.set("amountCents", overrides.amountCents ?? "500");
+  fd.set("amountEuro", overrides.amountEuro ?? "5,00");
   fd.set("reason", overrides.reason ?? "Kunde unzufrieden");
   fd.set("requestToken", overrides.requestToken ?? "33333333-3333-4333-8333-333333333333");
   return fd;
@@ -89,14 +89,50 @@ describe("issueRefundAction", () => {
     const { issueRefundAction } = await import("./actions");
     const result = await issueRefundAction(
       {},
-      refundFormData({ amountCents: "not-a-number", reason: "" }),
+      refundFormData({ amountEuro: "not-a-number", reason: "" }),
     );
 
     expect(result.error).toBeDefined();
-    expect(result.fieldErrors?.amountCents).toBeDefined();
+    expect(result.fieldErrors?.amountEuro).toBeDefined();
     expect(result.fieldErrors?.reason).toBeDefined();
     expect(rpcMock).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["5", 500],
+    ["12,50", 1250],
+    ["12.50", 1250],
+    ["1.250,00", 125000],
+  ])("converts the euro input %j to %i cents on the server", async (input, cents) => {
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "require_tenant_permission") return { data: null, error: null };
+      throw new Error(`unexpected rpc: ${fn}`);
+    });
+    issueRefundForOrderMock.mockResolvedValue({
+      refundId: "refund-1",
+      stripeRefundId: "re_test_abc",
+      amountCents: cents,
+    });
+
+    const { issueRefundAction } = await import("./actions");
+    await issueRefundAction({}, refundFormData({ amountEuro: input }));
+
+    expect(issueRefundForOrderMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ amountCents: cents }),
+    );
+  });
+
+  it.each(["0", "0,00", "-5", "12,505", "", "abc"])(
+    "rejects the invalid euro amount %j with a field error",
+    async (input) => {
+      const { issueRefundAction } = await import("./actions");
+      const result = await issueRefundAction({}, refundFormData({ amountEuro: input }));
+
+      expect(result.fieldErrors?.amountEuro).toBeDefined();
+      expect(issueRefundForOrderMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("issues a refund scoped to the caller's own tenant when authorized", async () => {
     rpcMock.mockImplementation(async (fn: string) => {
@@ -162,7 +198,7 @@ describe("issueRefundAction", () => {
     issueRefundForOrderMock.mockRejectedValue(new RefundExceedsRemainingAmountError());
 
     const { issueRefundAction } = await import("./actions");
-    const result = await issueRefundAction({}, refundFormData({ amountCents: "999999" }));
+    const result = await issueRefundAction({}, refundFormData({ amountEuro: "9999,99" }));
 
     expect(result.error).toMatch(/übersteigt/);
   });
@@ -176,7 +212,7 @@ describe("issueRefundAction", () => {
     issueRefundForOrderMock.mockRejectedValue(new RefundAwaitingReconciliationError());
 
     const { issueRefundAction } = await import("./actions");
-    const result = await issueRefundAction({}, refundFormData({ amountCents: "100" }));
+    const result = await issueRefundAction({}, refundFormData({ amountEuro: "1" }));
 
     expect(result.error).toMatch(/manuell.*(geprüft|prüfen)/i);
   });

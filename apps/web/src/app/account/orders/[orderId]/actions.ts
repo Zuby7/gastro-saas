@@ -36,7 +36,7 @@ export async function issueRefundAction(
 ): Promise<RefundActionState> {
   const parsed = RefundSchema.safeParse({
     orderId: formData.get("orderId"),
-    amountCents: formData.get("amountCents"),
+    amountEuro: formData.get("amountEuro"),
     reason: formData.get("reason"),
     requestToken: formData.get("requestToken"),
   });
@@ -82,7 +82,7 @@ export async function issueRefundAction(
       tenantId: membership.tenantId,
       orderId: parsed.data.orderId,
       actorUserId: user.id,
-      amountCents: Number(parsed.data.amountCents),
+      amountCents: parsed.data.amountEuro,
       reason: parsed.data.reason,
       requestToken: parsed.data.requestToken,
     });
