@@ -59,21 +59,25 @@ export async function resolveDishVersionContext(
     return { kind: "frozen", draftDishId: null, draftExists: true };
   }
 
-  const { data: draftCategory } = await supabase
+  // Fetch two rows per lookup: names are not unique, and picking one of two
+  // same-named twins would send the user to a possibly wrong dish. More than
+  // one match is treated as unresolved (read-only view).
+  const { data: draftCategories } = await supabase
     .from("categories")
     .select("id")
     .eq("menu_version_id", draft.id)
     .eq("tenant_id", input.tenantId)
     .eq("name", category.name)
     .is("archived_at", null)
-    .limit(1)
-    .maybeSingle<{ id: string }>();
+    .limit(2)
+    .returns<{ id: string }[]>();
 
-  if (!draftCategory) {
+  const [draftCategory, otherCategory] = draftCategories ?? [];
+  if (!draftCategory || otherCategory) {
     return { kind: "frozen", draftDishId: null, draftExists: true };
   }
 
-  const { data: draftDish } = await supabase
+  const { data: draftDishes } = await supabase
     .from("dishes")
     .select("id")
     .eq("menu_version_id", draft.id)
@@ -81,8 +85,13 @@ export async function resolveDishVersionContext(
     .eq("category_id", draftCategory.id)
     .eq("name", input.dishName)
     .is("archived_at", null)
-    .limit(1)
-    .maybeSingle<{ id: string }>();
+    .limit(2)
+    .returns<{ id: string }[]>();
 
-  return { kind: "frozen", draftDishId: draftDish?.id ?? null, draftExists: true };
+  const [draftDish, otherDish] = draftDishes ?? [];
+  return {
+    kind: "frozen",
+    draftDishId: draftDish && !otherDish ? draftDish.id : null,
+    draftExists: true,
+  };
 }

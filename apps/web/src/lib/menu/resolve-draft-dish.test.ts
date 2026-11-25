@@ -17,6 +17,12 @@ function clientWith(results: Record<string, unknown[]>) {
         };
       }
       chain.maybeSingle = async () => ({ data: results[table]?.shift() ?? null });
+      // List queries (`.limit(2).returns()`) resolve to an array of rows.
+      chain.returns = () => chain;
+      chain.then = (resolve: (value: unknown) => void) => {
+        const next = results[table]?.shift();
+        resolve({ data: Array.isArray(next) ? next : next ? [next] : [] });
+      };
       return chain;
     },
   };
@@ -89,6 +95,32 @@ describe("resolveDishVersionContext", () => {
       kind: "frozen",
       draftDishId: null,
       draftExists: false,
+    });
+  });
+
+  it("treats two same-named dishes in the draft as unresolved instead of picking one", async () => {
+    const { client } = clientWith({
+      menu_versions: [{ id: "v-published", status: "published" }, { id: "v-draft" }],
+      categories: [{ name: "Pizza" }, { id: "cat-new" }],
+      dishes: [[{ id: "dish-a" }, { id: "dish-b" }]],
+    });
+    expect(await resolveDishVersionContext(client, INPUT)).toEqual({
+      kind: "frozen",
+      draftDishId: null,
+      draftExists: true,
+    });
+  });
+
+  it("treats two same-named categories in the draft as unresolved", async () => {
+    const { client } = clientWith({
+      menu_versions: [{ id: "v-published", status: "published" }, { id: "v-draft" }],
+      categories: [{ name: "Pizza" }, [{ id: "cat-a" }, { id: "cat-b" }]],
+      dishes: [{ id: "dish-new" }],
+    });
+    expect(await resolveDishVersionContext(client, INPUT)).toEqual({
+      kind: "frozen",
+      draftDishId: null,
+      draftExists: true,
     });
   });
 });

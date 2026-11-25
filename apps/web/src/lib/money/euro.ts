@@ -87,7 +87,7 @@ const MESSAGES: Record<EuroParseFailure, string> = {
   empty: "Bitte geben Sie einen Betrag in Euro an (z. B. 12,50).",
   invalid: "Bitte geben Sie einen gültigen Betrag in Euro an (z. B. 12,50).",
   negative: "Der Betrag darf nicht negativ sein.",
-  too_many_decimals: "Bitte geben Sie höchstens zwei Nachkommastellen an (z. B. 12,50).",
+  too_many_decimals: "Bitte höchstens zwei Nachkommastellen angeben, z. B. 12,50.",
   too_large: "Der Betrag ist zu hoch.",
 };
 
