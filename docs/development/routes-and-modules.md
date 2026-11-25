@@ -37,6 +37,8 @@ Verified against `apps/web/src/app/**/page.tsx` and `route.ts` on 2026-11-22 (35
 | `/account/privacy`                         | Data export and deletion requests (the export download needs `tenant.data.delete`)        | `tenant.settings.write` / `tenant.data.delete`                          |
 | `/account/integrations`                    | Integration accounts and mock-provider sync                                               | `integrations.manage`                                                   |
 
+Related UI pieces: `app/account/menu/archive-button.tsx` (two-step "Archivieren" then "Wirklich archivieren?"), `app/account/orders/order-board.tsx` (each card links to "Details und Erstattung" = `/account/orders/[orderId]`), `app/r/[slug]/orders/[token]/retry-payment-action` (in `actions.ts`, "Erneut bezahlen", reuse-only) with `payment-notice.tsx`, `/account?notice=tenant-slug-taken|tenant-create-failed` for a failed tenant creation after sign-up, and the field-level error for an already taken web address on `/register`.
+
 Roles map to permission sets in the database (Owner, Manager, Kitchen, Service, Marketing; custom roles possible). Grep `insert into permissions` in `supabase/migrations/` for the authoritative list.
 
 ## API routes
@@ -52,30 +54,31 @@ Middleware (`apps/web/src/middleware.ts`) runs on all paths except `_next/static
 
 ## Module map: `apps/web/src/lib`
 
-| Module           | Responsibility                                                                                                                                                                                             |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supabase/`      | `server.ts` cookie-bound client (RLS as the user); `admin.ts` service-role client for guest/webhook paths (server only)                                                                                    |
-| `tenant/`        | `getCurrentMembership()`: tenant context from the session                                                                                                                                                  |
-| `auth/`          | zod schemas, `requireTenantPermission` / `hasTenantPermission`, `account-context.ts` (`getAccountContext()`, per-request cached session context), rate limiting (+ Supabase store), client IP, role labels |
-| `security/`      | `opaque-token.ts`: shared opaque bearer token primitives (`createOpaqueToken()`, `sha256Hex()`)                                                                                                            |
-| `forms/`         | `usePreservedFormAction`: keeps typed input after a failed server action                                                                                                                                   |
-| `timing/`        | Response-time floor against login timing side channels                                                                                                                                                     |
-| `audit/`         | Audit-event writers (login, menu admin via the `record_audit_event()` RPC with a pre-migration fallback, order events)                                                                                     |
-| `invitations/`   | Invitation tokens and invitation email                                                                                                                                                                     |
-| `menu/`          | Get-or-create the tenant's current draft menu version                                                                                                                                                      |
-| `public-menu/`   | `getPublicMenu()`, legal page fetch, price formatting                                                                                                                                                      |
-| `images/`        | Dish image header checks and re-encoding (`@cf-wasm/photon`)                                                                                                                                               |
-| `import/`        | Excel/CSV sales file parsing                                                                                                                                                                               |
-| `cart/`          | Cart token and cookie, RPC wrappers (`service.ts`), types                                                                                                                                                  |
-| `orders/`        | Order service (create from cart), token/cookie, status lookup and polling, staff dashboard service/diff, receipt, labels                                                                                   |
-| `payments/`      | Checkout Session creation, webhook processing, refund service, awaiting-payment constants                                                                                                                  |
-| `stripe/`        | `createStripeClient()` (test-mode gate, Fetch HTTP client), webhook secret getters, Connect helpers (Express account, Account Link, status snapshot)                                                       |
-| `notifications/` | Order confirmation email (Resend, logged in `email_sends`)                                                                                                                                                 |
-| `analytics/`     | Dashboard, dish-performance, trend and extras services (call the analytics RPCs)                                                                                                                           |
-| `menu-view/`     | Visit cookie name/token, view and add-to-cart recording with hashed visitor id and HMAC'd IP                                                                                                               |
-| `consent/`       | Consent cookie, cookie inventory (typed, tested), cookie table and platform cookie link                                                                                                                    |
-| `ratings/`       | Guest rating submission and moderation services, schemas, labels                                                                                                                                           |
-| `integrations/`  | Integration service around the mock provider, labels, types                                                                                                                                                |
+| Module           | Responsibility                                                                                                                                                                                                              |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supabase/`      | `server.ts` cookie-bound client (RLS as the user); `admin.ts` service-role client for guest/webhook paths (server only)                                                                                                     |
+| `tenant/`        | `getCurrentMembership()`: tenant context from the session; `slug-availability.ts` (`isTenantSlugTaken`, service-role boolean lookup used by registration); `account-notices.ts` (fixed notice texts for `/account?notice=`) |
+| `auth/`          | zod schemas, `requireTenantPermission` / `hasTenantPermission`, `account-context.ts` (`getAccountContext()`, per-request cached session context), rate limiting (+ Supabase store), client IP, role labels                  |
+| `security/`      | `opaque-token.ts`: shared opaque bearer token primitives (`createOpaqueToken()`, `sha256Hex()`)                                                                                                                             |
+| `forms/`         | `usePreservedFormAction`: keeps typed input after a failed server action; `field-feedback.tsx` (field-level errors, dismiss success on edit)                                                                                |
+| `money/`         | `euro.ts`: `parseEuroToCents`, `formatCentsAsEuro` (admin inputs in euro, integer cents internally)                                                                                                                         |
+| `timing/`        | Response-time floor against login timing side channels                                                                                                                                                                      |
+| `audit/`         | Audit-event writers (login, menu admin via the `record_audit_event()` RPC with a pre-migration fallback, order events)                                                                                                      |
+| `invitations/`   | Invitation tokens and invitation email                                                                                                                                                                                      |
+| `menu/`          | Get-or-create the tenant's current draft menu version; `resolve-draft-dish.ts` (maps a dish id from a published/archived version to the matching draft dish, or read-only)                                                  |
+| `public-menu/`   | `getPublicMenu()`, legal page fetch, price formatting                                                                                                                                                                       |
+| `images/`        | Dish image header checks and re-encoding (`@cf-wasm/photon`)                                                                                                                                                                |
+| `import/`        | Excel/CSV sales file parsing                                                                                                                                                                                                |
+| `cart/`          | Cart token and cookie, RPC wrappers (`service.ts`), types                                                                                                                                                                   |
+| `orders/`        | Order service (create from cart), token/cookie, status lookup and polling, staff dashboard service/diff, receipt, labels                                                                                                    |
+| `payments/`      | Checkout Session creation, webhook processing, refund service, awaiting-payment constants                                                                                                                                   |
+| `stripe/`        | `createStripeClient()` (test-mode gate, Fetch HTTP client), webhook secret getters, Connect helpers (Express account, Account Link, status snapshot)                                                                        |
+| `notifications/` | Order confirmation email (Resend, logged in `email_sends`)                                                                                                                                                                  |
+| `analytics/`     | Dashboard, dish-performance, trend and extras services (call the analytics RPCs)                                                                                                                                            |
+| `menu-view/`     | Visit cookie name/token, view and add-to-cart recording with hashed visitor id and HMAC'd IP                                                                                                                                |
+| `consent/`       | Consent cookie, cookie inventory (typed, tested), cookie table and platform cookie link                                                                                                                                     |
+| `ratings/`       | Guest rating submission and moderation services, schemas, labels                                                                                                                                                            |
+| `integrations/`  | Integration service around the mock provider, labels, types                                                                                                                                                                 |
 
 ## Packages
 

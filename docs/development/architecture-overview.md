@@ -14,6 +14,10 @@ Shape: one Next.js app (modular monolith) talking to Supabase (Postgres + Auth +
 6. **Order status** `/r/<slug>/orders/<token>`: Stripe redirects here with `?checkout=success|cancelled`, which is **never** proof of payment. The page reads status through `get_order_status_by_token` (token hash compared per row, slug must match) and polls with a server action until a terminal state. Status shows "Bestellung eingegangen" once the webhook has been processed.
 7. **Receipt** `/r/<slug>/orders/<token>/beleg`: same token-read path, shown only for paid statuses; unknown or cross-tenant tokens render the generic not-found page.
 
+**Payment retry ("Erneut bezahlen")**: when the guest cancels at Stripe, the order-status page shows "Zahlung abgebrochen" with a retry button (`retryPaymentAction`, rate-limited, authorised by possession of the guest token like the status poll). The action only **reuses** the order's still-open Checkout Session through `resumeCheckoutSessionForOrder` (open: redirect to the same Stripe URL; complete: "Zahlung wird bestätigt", no redirect; expired or missing: "Zahlungsfrist abgelaufen", the guest orders again). It deliberately never creates a second session: two payable sessions for one order could be paid twice and risk a double charge. The reuse window is the original ~30 minute session deadline. The order-status page refreshes itself (`OrderStatusLive` polls every 4 s while awaiting payment, otherwise every 20 s, and calls `router.refresh()`), so receipt and rating appear without a manual reload. Stripe's hosted page shows "Bestellung bei <Restaurant>" with an item summary as one line item whose amount is the unchanged server total. Guests can place several orders over time; each order has its own token and status page.
+
+Money input: admin forms take **euros** ("12,50"); `lib/money/euro.ts` parses the raw string on the server into integer cents (no floating point). Everything stored or sent to Stripe stays in cents.
+
 Orders that stay `awaiting_payment` are cancelled by `sweep_stale_awaiting_payment_orders()` (pg_cron every 5 minutes, default 30 minutes).
 
 ## Payments state machine

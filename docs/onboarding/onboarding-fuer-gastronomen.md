@@ -58,41 +58,47 @@ _Abbildung 3: Die Speisekarte aus Sicht des Gastes._
 
 ### Schritt 3: Warenkorb
 
-**Der Gast** sieht seine Auswahl. Er kann die Menge ändern ("Aktualisieren") oder ein Gericht entfernen. Die Gesamtsumme steht darunter. Mit "Zur Kasse" geht es weiter.
+**Der Gast** sieht seine Auswahl. Er kann die Menge mit den Knöpfen **Minus** und **Plus** ändern oder ein Gericht entfernen. Die Gesamtsumme steht darunter. Mit "Zur Kasse" geht es weiter.
 
 **Sie als Restaurant** sehen noch nichts. Der Warenkorb gehört nur dem Gast.
 
 > **Gut zu wissen:** Die Summe wird vom System selbst berechnet. Der Gast kann den Preis nicht verändern.
 
-![Warenkorb auf dem Handy mit einem Gericht, Menge 1, den Knöpfen "Aktualisieren" und "Entfernen", der Gesamtsumme 6,50 Euro und dem Knopf "Zur Kasse"](img/22-gast-warenkorb.png)
+![Warenkorb auf dem Handy mit einem Gericht, den Mengen-Knöpfen Minus und Plus, dem Knopf "Entfernen", der Gesamtsumme und dem Knopf "Zur Kasse"](img/22-gast-warenkorb.png)
 
-_Abbildung 4: Der Warenkorb._
+_Abbildung 4: Der Warenkorb mit Mengen-Knöpfen._
 
 ### Schritt 4: Kasse
 
-**Der Gast** gibt seinen Namen ein. Telefonnummer und Hinweis sind freiwillig. Er wählt "Online bestellen & abholen" oder "Am Tisch bestellen". Er setzt ein Häkchen bei AGB und Datenschutzerklärung und tippt auf "Weiter zur Zahlung".
+**Der Gast** gibt seinen Namen ein. Telefonnummer und Hinweis sind freiwillig. Er wählt "Online bestellen & abholen" oder "Am Tisch bestellen". Er setzt ein Häkchen bei AGB und Datenschutzerklärung und tippt auf "Weiter zur Zahlung". Auf der Seite sieht er noch einmal seine Artikel und die Summe. Ein Gast kann im Lauf des Tages mehrere Bestellungen aufgeben. Jede Bestellung ist unabhängig von den anderen.
 
 **Sie als Restaurant** sehen die Bestellung erst nach der Zahlung (siehe Schritt 5).
 
-![Kasse auf dem Handy mit den Feldern Name, Telefonnummer, Hinweis, Auswahl Abholung oder Tisch, Häkchen für AGB und Datenschutz und dem Knopf "Weiter zur Zahlung"](img/23-gast-kasse.png)
+![Kasse auf dem Handy mit der Liste der bestellten Artikel, den Feldern Name, Telefonnummer, Hinweis, Auswahl Abholung oder Tisch, Häkchen für AGB und Datenschutz und dem Knopf "Weiter zur Zahlung"](img/23-gast-kasse.png)
 
-_Abbildung 5: Die Kasse. Auf dem Bild steht "Sichere Zahlung über Stripe" mit Kreditkarte und Klarna (der Screenshot zeigt noch einen älteren Stand mit PayPal; PayPal wird derzeit nicht angeboten). Welche weiteren Zahlarten wirklich angeboten werden, hängt von den Einstellungen bei Stripe ab._
+_Abbildung 5: Die Kasse. Sie listet die Artikel auf. Welche Zahlarten angeboten werden, hängt von den Einstellungen bei Stripe ab. PayPal wird derzeit **nicht** angeboten (siehe [Häufige Fragen](#10-häufige-fragen))._
 
 ### Schritt 5: Bezahlen
 
-**Der Gast** wird zur Bezahlseite von Stripe weitergeleitet und zahlt dort. **Im Testmodus** nutzt er eine Test-Karte. Es wird kein Geld abgebucht. Die Kartendaten sehen weder Sie noch die Anwendung. Sie gehen nur an Stripe.
+**Der Gast** wird zur Bezahlseite von Stripe weitergeleitet und zahlt dort. **Im Testmodus** nutzt er eine Test-Karte. Es wird kein Geld abgebucht. Die Kartendaten sehen weder Sie noch die Anwendung. Sie gehen nur an Stripe. Auf der Stripe-Seite steht oben "Bestellung bei" und der Name Ihres Restaurants.
+
+**Bricht der Gast ab**, kommt er auf seine Bestellstatus-Seite zurück. Dort steht **Zahlung abgebrochen** und ein Knopf **Erneut bezahlen**. Der Knopf öffnet die noch offene Bezahlseite derselben Bestellung wieder. Das geht nur innerhalb der ursprünglichen Zahlungsfrist von etwa 30 Minuten. Danach steht dort "Zahlungsfrist abgelaufen" und der Gast muss neu bestellen. Es gibt nie zwei offene Bezahlseiten für eine Bestellung, so kann nicht doppelt abgebucht werden. Eine nicht bezahlte Bestellung wird nach kurzer Zeit automatisch storniert.
+
+![Bestellstatus auf dem Handy mit dem Hinweis "Zahlung abgebrochen" und dem Knopf "Erneut bezahlen"](img/26-gast-zahlung-abgebrochen.png)
+
+_Abbildung 5a: Der Hinweis nach einem Abbruch bei Stripe._
 
 **Sie als Restaurant** sehen die Bestellung als bezahlt, sobald Stripe die Zahlung bestätigt hat. Dass der Gast auf die Seite zurückkehrt, reicht dafür nicht. So wird nichts als "bezahlt" gezeigt, was nicht bezahlt ist.
 
 ### Schritt 6: Bestellstatus
 
-**Der Gast** sieht eine Seite mit dem Status ("Bestellung eingegangen"), einer Bestellnummer, den bestellten Artikeln und einem Verlauf. Die Seite aktualisiert sich von selbst, wenn Sie den Status ändern.
+**Der Gast** sieht eine Seite mit dem Status ("Bestellung eingegangen"), einer Bestellnummer, den bestellten Artikeln und einem Verlauf. Die Seite aktualisiert sich von selbst, wenn Sie den Status ändern oder die Zahlung bestätigt wird. Ein Neuladen ist nicht nötig. Beleg und Bewertung erscheinen ebenfalls von selbst.
 
 **Sie als Restaurant** sehen die Bestellung auf der Seite [Bestellungen](#bestellungen) in der Spalte "Neu" und führen sie Schritt für Schritt weiter.
 
 ![Bestellstatus auf dem Handy mit "Bestellung eingegangen", Bestellnummer, Details, bestellten Artikeln, Verlauf und Links zum digitalen Beleg und zur Speisekarte](img/24-gast-bestellstatus.png)
 
-_Abbildung 6: Der Bestellstatus. Im Verlauf steht im Bild noch "Zahlung ausstehend", weil das Bild direkt nach dem Bestellen entstand._
+_Abbildung 6: Der Bestellstatus nach der Zahlung._
 
 ### Schritt 7: Beleg
 
@@ -118,6 +124,8 @@ Planen Sie eine halbe Stunde ein. Halten Sie Ihre Speisekarte und ein paar Fotos
 2. Tragen Sie Restaurantnamen, die Web-Adresse Ihres Restaurants, Ihre E-Mail-Adresse und ein Passwort ein. Die Web-Adresse wird Teil des Links zu Ihrer Speisekarte, zum Beispiel `mein-restaurant`.
 3. Setzen Sie das Häkchen bei AGB und Datenschutzerklärung. Klicken Sie auf **Registrieren**.
 4. Sie werden automatisch **Inhaber** Ihres Restaurants.
+
+Ist die gewünschte Web-Adresse schon vergeben, steht direkt am Feld eine Meldung. Wählen Sie dann eine andere. Wird Ihr Konto angelegt, das Restaurant aber nicht (zum Beispiel weil die Adresse in der Zwischenzeit vergeben wurde), landen Sie in der Verwaltung mit einem Hinweis. Dort legen Sie das Restaurant mit den korrigierten Angaben an.
 
 ![Registrierformular mit den Feldern Restaurantname, Web-Adresse, E-Mail-Adresse, Passwort, Häkchen für AGB und Datenschutz und dem Knopf "Registrieren"](img/31-registrieren.png)
 
@@ -198,7 +206,7 @@ _Abbildung 10: Die Speisekarte in der Verwaltung. Im Bild ist der Entwurf noch l
 **So geht's:**
 
 1. Unter "Neue Kategorie" einen Namen eingeben und auf **Anlegen** klicken.
-2. Gerichte anlegen. Der Preis wird **in Cent** eingegeben (6,50 Euro sind also 650).
+2. Gerichte anlegen. Der Preis wird **in Euro** eingegeben, zum Beispiel `12,50`. Komma oder Punkt als Trennzeichen sind beide möglich.
 3. Beim Gericht (eigene Seite) Foto, Allergene, Varianten und Extras pflegen. Dort können Sie ein Gericht auch als **Ausverkauft** markieren und wieder auf **Verfügbar** stellen.
 4. **Qualitätsprüfung ausführen** klicken und Hinweise beheben.
 5. **Veröffentlichen** klicken.
@@ -206,17 +214,19 @@ _Abbildung 10: Die Speisekarte in der Verwaltung. Im Bild ist der Entwurf noch l
 **Worauf achten:**
 
 - Nach Änderungen an Gerichten oder Preisen müssen Sie erneut **veröffentlichen**, sonst bleibt die alte Karte für Gäste sichtbar.
+- Ein Gericht, das zu einer schon veröffentlichten Karte gehört, lässt sich nicht mehr direkt ändern. Öffnen Sie ein solches Gericht (zum Beispiel über einen alten Link), werden Sie zum passenden Gericht im Entwurf weitergeleitet. Gibt es keines, sehen Sie das Gericht nur zum Lesen.
+- **Archivieren** fragt zur Sicherheit nach: Erst nach dem zweiten Klick auf **Wirklich archivieren?** wird archiviert.
 - Laden Sie nur Fotos hoch, die Sie selbst gemacht haben oder für die Sie die Rechte besitzen.
 - Pflegen Sie Allergene sorgfältig. Für richtige Angaben sind Sie verantwortlich.
 - Über **Verkaufsdaten importieren** können Sie eine Excel- oder CSV-Datei mit Verkäufen einlesen. Das dient den Auswertungen unter Analytics.
 
 ### Bestellungen
 
-![Bestell-Dashboard mit Spalten Neu, Angenommen, In Zubereitung, Fertig, Abgeschlossen und Storniert, jeweils mit Bestellkarten](img/03-bestellungen.png)
+![Bestell-Dashboard mit Spalten Neu, Angenommen, In Zubereitung, Fertig und Abgeschlossen, jeweils mit Bestellkarten und dem Link "Details und Erstattung"](img/03-bestellungen.png)
 
-_Abbildung 11: Das Bestell-Dashboard. Die Bestellungen von "Test Gast" sind Test-Bestellungen._
+_Abbildung 11: Das Bestell-Dashboard. Die Karten sind Test-Bestellungen. Der Link "Details und Erstattung" steht auf jeder Karte. Die Spalte "Storniert" ist im Bild ausgeblendet._
 
-**Wofür?** Die Live-Übersicht für Küche und Service. Jede Bestellung ist eine Karte. Die Spalten zeigen den Stand: **Neu, Angenommen, In Zubereitung, Fertig, Abgeschlossen, Storniert**. Auf jeder Karte stehen Name, Uhrzeit, Art (Abholung oder Tisch), Betrag und der Zahlungsstand.
+**Wofür?** Die Live-Übersicht für Küche und Service. Jede Bestellung ist eine Karte. Die Spalten zeigen den Stand: **Neu, Angenommen, In Zubereitung, Fertig, Abgeschlossen, Storniert**. Auf jeder Karte stehen Name, Uhrzeit, Art (Abholung oder Tisch), Betrag und der Zahlungsstand. Ein Link **Details und Erstattung** auf jeder Karte öffnet die Detailseite der Bestellung (siehe [Rückerstattungen](#rückerstattungen)).
 
 **So geht's:**
 
@@ -425,7 +435,25 @@ Bevor echte Zahlungen möglich sind, braucht es mindestens:
 
 ### Rückerstattungen
 
-Ganze oder teilweise Rückerstattungen sind in der Anwendung vorgesehen. Sie lösen sie auf der Detailseite einer Bestellung aus. Mehr dazu in den [Häufigen Fragen](#10-häufige-fragen).
+Ganze oder teilweise Rückerstattungen lösen Sie auf der Detailseite einer Bestellung aus:
+
+1. Im Bestell-Dashboard auf der Karte **Details und Erstattung** klicken.
+2. Beim Formular **Rückerstattung auslösen** den Betrag **in Euro** eintragen, zum Beispiel `4,50`. Das Feld zeigt den höchstens möglichen Betrag.
+3. Einen Grund eintragen und absenden.
+
+![Detailseite einer Bestellung mit Bestelldetails, Zahlung und dem Formular "Rückerstattung auslösen" mit Betragsfeld in Euro und Feld für den Grund](img/11-erstattung.png)
+
+_Abbildung 11a: Die Detailseite mit dem Formular für die Rückerstattung. Der Betrag wird in Euro eingetragen._
+
+Zurückgezahlt werden kann nur, was bezahlt wurde. Im Testmodus wird kein echtes Geld bewegt. Rückerstattungen sind nur bestimmten Rollen erlaubt (Inhaber, Geschäftsführung).
+
+### Zahlung abgebrochen oder abgelaufen
+
+Bricht ein Gast bei Stripe ab, kann er auf seiner Bestellstatus-Seite mit **Erneut bezahlen** weiterzahlen, solange die ursprüngliche Zahlungsfrist (etwa 30 Minuten) läuft. Danach muss er neu bestellen. Solche Bestellungen sind für Sie nicht bezahlt und werden nach kurzer Zeit automatisch storniert. Bereiten Sie sie nicht zu.
+
+### Zahlarten und PayPal
+
+Angeboten wird, was Stripe für Ihr Konto freigibt (zum Beispiel Karte). **PayPal wird nicht angeboten.** Stripe unterstützt PayPal bei Zahlungen direkt an Ihr Restaurant nicht. Eine Lösung über einen anderen Zahlungsdienst ist in Arbeit, aber **noch nicht verfügbar**.
 
 ---
 
@@ -480,19 +508,22 @@ Barrierefreiheit heißt: Die Seiten sollen auch für Menschen nutzbar sein, die 
 Eine Bestellung gilt erst als bezahlt, wenn Stripe die Zahlung bestätigt hat. Warten Sie einen Moment. Bitten Sie den Gast, seinen Bestellstatus zu öffnen. Steht dort noch "Zahlung ausstehend", ist die Zahlung nicht bestätigt. Wenden Sie sich im Zweifel an die Hilfe.
 
 **2. Ein Gast zahlt nicht. Die Bestellung steht auf "Zahlung offen" oder "Nicht bezahlt".**
-Solche Bestellungen bereiten Sie **nicht** zu. Im Dashboard sehen Sie sie in der Spalte "Storniert" mit dem Kennzeichen "Nicht bezahlt" oder "Zahlung offen" (siehe Abbildung 11).
+Solche Bestellungen bereiten Sie **nicht** zu. Im Dashboard sehen Sie sie in der Spalte "Storniert" mit dem Kennzeichen "Nicht bezahlt" oder "Zahlung offen". (Die Spalte ist in Abbildung 11 ausgeblendet.)
+
+**2a. Ein Gast hat bei Stripe abgebrochen. Was tun?**
+Nichts. Der Gast sieht auf seiner Bestellstatus-Seite "Zahlung abgebrochen" und kann mit **Erneut bezahlen** weiterzahlen, solange die Frist von etwa 30 Minuten läuft. Danach muss er neu bestellen. Die nicht bezahlte Bestellung wird automatisch storniert.
 
 **3. Ein Gericht ist ausverkauft. Was tun?**
 Öffnen Sie in der **Speisekarte** das Gericht und stellen Sie es auf **Ausverkauft**. Optional können Sie angeben, ab wann es automatisch wieder verfügbar ist. Wenn das Gericht wieder da ist, stellen Sie es auf **Verfügbar**.
 
 **4. Wie ändere ich einen Preis?**
-In der Speisekarte beim Gericht den Preis ändern (in Cent). Danach die Qualitätsprüfung ausführen und **neu veröffentlichen**. Erst dann sehen Gäste die Änderung.
+In der Speisekarte beim Gericht den Preis in Euro ändern (zum Beispiel `12,50`). Danach die Qualitätsprüfung ausführen und **neu veröffentlichen**. Erst dann sehen Gäste die Änderung.
 
 **5. Kann ich eine Bestellung stornieren?**
 Das System kennt den Zustand "Storniert" und eine Berechtigung zum Stornieren. Einen Knopf dafür auf den Karten im Bestell-Dashboard gibt es aber **noch nicht**. Wenden Sie sich bei Bedarf an die Hilfe.
 
 **6. Wie erstatte ich einem Gast Geld zurück?**
-Auf der Detailseite einer Bestellung gibt es das Formular **Rückerstattung auslösen**. Dort tragen Sie einen Betrag (in Cent) und einen Grund ein. Eine Teil-Erstattung ist möglich. Zurückgezahlt werden kann nur, was bezahlt wurde. Das Bestell-Dashboard hat **noch keinen direkten Link** auf diese Detailseite. Im Testmodus wird kein echtes Geld bewegt. Rückerstattungen sind nur bestimmten Rollen erlaubt (Inhaber, Geschäftsführung).
+Im Bestell-Dashboard klicken Sie auf der Karte auf **Details und Erstattung**. Dort gibt es das Formular **Rückerstattung auslösen**. Tragen Sie einen Betrag in Euro (zum Beispiel 4,50) und einen Grund ein. Eine Teil-Erstattung ist möglich. Zurückgezahlt werden kann nur, was bezahlt wurde. Im Testmodus wird kein echtes Geld bewegt. Rückerstattungen sind nur bestimmten Rollen erlaubt (Inhaber, Geschäftsführung).
 
 **7. Eine Mitarbeiterin hat ihr Passwort vergessen. Was tun?**
 Eine Funktion "Passwort vergessen" ist **noch nicht verfügbar**. Wenden Sie sich an die Hilfe.
@@ -506,8 +537,14 @@ Bitten Sie die Person, im Spam-Ordner nachzusehen. Prüfen Sie, ob die E-Mail-Ad
 **10. Ein Gast möchte keine Cookies akzeptieren. Kann er trotzdem bestellen?**
 Er kann **Alle ablehnen** wählen. Notwendige Cookies, etwa für den Warenkorb, werden weiterhin gesetzt, damit die Bestellung funktioniert.
 
+**10a. Kann ein Gast mehrmals bestellen?**
+Ja. Jede Bestellung ist unabhängig. Der Gast sieht den Status jeder Bestellung auf ihrer eigenen Seite.
+
 **11. Welche Gebühren fallen an?**
 Dazu enthält diese Anleitung keine Angaben. Zahlungsgebühren fallen bei Stripe an, sobald echtes Geld fließt. Fragen Sie vor dem Echtbetrieb nach den genauen Konditionen.
+
+**11a. Gibt es PayPal?**
+Nein. Stripe unterstützt PayPal bei Zahlungen direkt an Ihr Restaurant nicht. Eine Lösung über einen anderen Zahlungsdienst ist in Arbeit, aber **noch nicht verfügbar**.
 
 **12. Kann ich Lieferando oder Wolt anbinden?**
 Nein. Eine solche Anbindung gibt es **nicht**. Die Seite Integrationen ist nur ein Test (siehe [Integrationen](#integrationen)).
@@ -549,6 +586,12 @@ Die Anwendung ist für eine Bestätigungs-E-Mail vorbereitet. Verlassen Sie sich
 
 - **Testmodus**
   Betriebsart, in der nur zum Ausprobieren gezahlt wird. Es fließt kein echtes Geld. Gezahlt wird mit Test-Karten.
+
+- **Zahlung abgebrochen / Erneut bezahlen**
+  Hinweis auf der Bestellstatus-Seite des Gastes nach einem Abbruch bei Stripe. Der Knopf öffnet die noch offene Bezahlseite wieder, solange die Zahlungsfrist (etwa 30 Minuten) läuft.
+
+- **Details und Erstattung**
+  Link auf jeder Bestellkarte. Er öffnet die Detailseite mit dem Formular für Rückerstattungen (Betrag in Euro).
 
 - **Cookie**
   Eine kleine Datei im Browser. Sie merkt sich zum Beispiel den Warenkorb oder die Cookie-Auswahl.
